@@ -8,6 +8,7 @@ import com.example.eam.Roles.Repository.AppPermissionRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.core.annotation.Order;
 import org.springframework.stereotype.Component;
 
 import java.util.ArrayList;
@@ -15,6 +16,7 @@ import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Order(1)
 public class PermissionSeeder implements ApplicationRunner {
 
     private final AppPermissionRepository permissionRepository;
