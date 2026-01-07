@@ -19,7 +19,7 @@ public class EmailService {
     private final JavaMailSender mailSender;
     private final Environment environment;
 
-    @Value("${app.mail.enforce-credentials:false}")
+    @Value("${app.mail.enforce-credentials:true}")
     private boolean enforceMailCredentials;
 
     private String fromEmail;
