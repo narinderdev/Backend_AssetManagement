@@ -205,13 +205,26 @@ public class MaterialRequisitionService {
     }
 
     private MaterialRequisitionResponse toResponse(MaterialRequisition mr) {
-        List<MaterialRequisitionLineResponse> lines = Optional.ofNullable(mr.getLines())
-                .orElseGet(Collections::emptyList)
-                .stream()
+        List<MaterialRequisitionLine> mrLines = Optional.ofNullable(mr.getLines())
+                .orElseGet(Collections::emptyList);
+
+        Set<Long> itemIds = mrLines.stream()
+                .map(MaterialRequisitionLine::getItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        final Map<Long, BigDecimal> costPerUnitByItemId = itemIds.isEmpty()
+                ? Collections.emptyMap()
+                : inventoryItemRepository.findAllById(itemIds).stream()
+                .filter(item -> !item.isDeleted())
+                .collect(Collectors.toMap(InventoryItem::getId, InventoryItem::getCostPerUnit));
+
+        List<MaterialRequisitionLineResponse> lines = mrLines.stream()
                 .map(line -> MaterialRequisitionLineResponse.builder()
                         .id(line.getId())
                         .itemId(line.getItemId())
                         .requestedQty(line.getRequestedQty())
+                        .costPerUnit(costPerUnitByItemId.get(line.getItemId()))
                         .uom(line.getUom())
                         .remarks(line.getRemarks())
                         .build())

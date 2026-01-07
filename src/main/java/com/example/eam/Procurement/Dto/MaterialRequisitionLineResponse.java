@@ -16,6 +16,7 @@ public class MaterialRequisitionLineResponse {
     private Long id;
     private Long itemId;
     private BigDecimal requestedQty;
+    private BigDecimal costPerUnit;
     private String uom;
     private String remarks;
 }
