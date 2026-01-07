@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.mail.javamail.JavaMailSender;
@@ -17,6 +18,9 @@ public class EmailService {
 
     private final JavaMailSender mailSender;
     private final Environment environment;
+
+    @Value("${app.mail.enforce-credentials:false}")
+    private boolean enforceMailCredentials;
 
     private String fromEmail;
 
@@ -32,12 +36,13 @@ public class EmailService {
         log.info("Mail username present: {}", username != null && !username.isBlank());
         log.info("Mail password present: {}", password != null && !password.isBlank());
 
-        if (username == null || username.isBlank()) {
-            throw new IllegalStateException("spring.mail.username is NOT configured");
-        }
-
-        if (password == null || password.isBlank()) {
-            throw new IllegalStateException("spring.mail.password is NOT configured");
+        if ((username == null || username.isBlank()) || (password == null || password.isBlank())) {
+            if (enforceMailCredentials) {
+                throw new IllegalStateException("spring.mail.username/password are NOT configured");
+            } else {
+                log.warn("Mail credentials missing; email features (OTP/invite) will fail until configured.");
+                return;
+            }
         }
 
         // store for reuse
@@ -47,6 +52,9 @@ public class EmailService {
     }
 
     public void sendWithAttachment(String to, String subject, String html, byte[] pdf) {
+        if (fromEmail == null || fromEmail.isBlank()) {
+            throw new IllegalStateException("Mail is not configured; set spring.mail.username/password or set app.mail.enforce-credentials=true with valid credentials.");
+        }
         try {
             MimeMessage message = mailSender.createMimeMessage();
 
