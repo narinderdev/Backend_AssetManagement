@@ -164,6 +164,20 @@ public class WorkOrder {
     @Column(name = "supervisor_notes")
     private String supervisorNotes;
 
+    @Lob
+    @Column(name = "approval_notes")
+    private String approvalNotes;
+
+    @Lob
+    @Column(name = "precheck_notes")
+    private String precheckNotes;
+
+    @Column(name = "approved_by", length = 120)
+    private String approvedBy;
+
+    @Column(name = "approved_at")
+    private LocalDateTime approvedAt;
+
     @Builder.Default
     @Column(name = "deleted", nullable = false)
     private boolean deleted = false;

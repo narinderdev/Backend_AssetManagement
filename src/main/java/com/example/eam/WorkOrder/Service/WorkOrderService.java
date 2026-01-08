@@ -38,6 +38,7 @@ import java.math.RoundingMode;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -94,9 +95,9 @@ private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIO
         Technician technician = resolveTechnician(request.getAssignedTechnicianId());
         TechnicianTeam team = resolveTeam(request.getAssignedTeamId());
 
-WorkOrderStatus status = request.getStatus() != null ? request.getStatus() : WorkOrderStatus.NEW;
-        if (!CREATION_ALLOWED_STATUSES.contains(status)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid status for new Work Order");
+WorkOrderStatus status = WorkOrderStatus.NEW;
+        if (request.getStatus() != null && request.getStatus() != WorkOrderStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New work orders must start in NEW status");
         }
 
         WorkOrder wo = WorkOrder.builder()
@@ -227,6 +228,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public WorkOrderDetailsResponse patchWorkOrder(Long id, WorkOrderPatchRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order can only be updated while in NEW status");
+        }
 
         // asset update
         if (request.getAssetId() != null) {
@@ -291,6 +295,88 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Location is required when Asset is not selected");
         }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse approveWorkOrder(Long id, WorkOrderApproveRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only NEW work orders can be approved");
+        }
+
+        updateIfNotNull(request.getEstimatedLaborHours(), wo::setEstimatedLaborHours);
+        updateIfNotNull(request.getEstimatedMaterialCost(), wo::setEstimatedMaterialCost);
+
+        wo.setApprovalNotes(trim(request.getApprovalNotes()));
+        wo.setApprovedBy(trim(request.getApprovedBy()));
+        wo.setApprovedAt(LocalDateTime.now());
+
+        validateStatusTransition(wo.getStatus(), WorkOrderStatus.APPROVED);
+        wo.setStatus(WorkOrderStatus.APPROVED);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse scheduleWorkOrder(Long id, WorkOrderScheduleRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.APPROVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only APPROVED work orders can be scheduled");
+        }
+        if (request.getAssignedTechnicianId() == null && request.getAssignedTeamId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assign technician or team to schedule work order");
+        }
+        if (request.getPlannedEndDateTime().isBefore(request.getPlannedStartDateTime())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedEndDateTime must be after plannedStartDateTime");
+        }
+
+        if (request.getAssignedTechnicianId() != null) {
+            wo.setAssignedTechnician(resolveTechnician(request.getAssignedTechnicianId()));
+        }
+        if (request.getAssignedTeamId() != null) {
+            wo.setAssignedTeam(resolveTeam(request.getAssignedTeamId()));
+        }
+        wo.setPlanner(trim(request.getPlanner()));
+        wo.setPlannedStartDateTime(request.getPlannedStartDateTime());
+        wo.setPlannedEndDateTime(request.getPlannedEndDateTime());
+        wo.setPrecheckNotes(trim(request.getPreCheckNotes()));
+
+        // replace planned materials if provided
+        if (request.getPlannedMaterials() != null) {
+            workOrderMaterialPlanRepository.deleteByWorkOrder(wo);
+            List<WorkOrderMaterialPlan> plans = request.getPlannedMaterials().stream()
+                    .map(pm -> buildMaterialPlan(wo, pm))
+                    .toList();
+            workOrderMaterialPlanRepository.saveAll(plans);
+        }
+
+        validateStatusTransition(wo.getStatus(), WorkOrderStatus.SCHEDULED);
+        handleStatusSideEffects(wo, WorkOrderStatus.SCHEDULED);
+        wo.setStatus(WorkOrderStatus.SCHEDULED);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse startWorkOrder(Long id, WorkOrderStartRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.SCHEDULED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SCHEDULED work orders can be started");
+        }
+        LocalDateTime actualStart = request.getActualStartDateTime() != null
+                ? request.getActualStartDateTime()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+        wo.setActualStartDateTime(actualStart);
+        wo.setPrecheckNotes(trim(request.getCheckInNotes()));
+
+        validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
+        handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
+        wo.setStatus(WorkOrderStatus.IN_PROGRESS);
 
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
@@ -410,8 +496,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public void deleteWorkOrder(Long id) {
         WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only NEW work orders can be deleted");
+        }
         wo.setDeleted(true);
-        wo.setStatus(WorkOrderStatus.CLOSED);
         workOrderRepository.save(wo);
     }
 
@@ -599,6 +687,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return left.add(right);
     }
 
+    private String trim(String val) {
+        if (val == null) return null;
+        String t = val.trim();
+        return t.isEmpty() ? null : t;
+    }
+
     private WorkOrderLaborEntryResponse toLaborEntryResponse(WorkOrderLaborEntry entry) {
         Technician technician = entry.getTechnician();
         String techName = entry.getTechnicianNameSnapshot();
@@ -710,6 +804,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .beforePhotoUrl(wo.getBeforePhotoUrl())
                 .afterPhotoUrl(wo.getAfterPhotoUrl())
                 .supervisorNotes(wo.getSupervisorNotes())
+                .approvalNotes(wo.getApprovalNotes())
+                .precheckNotes(wo.getPrecheckNotes())
+                .approvedBy(wo.getApprovedBy())
+                .approvedAt(wo.getApprovedAt())
                 .status(wo.getStatus())
                 .source(wo.getSource())
                 .plannedMaterials(plannedMaterials)

@@ -51,6 +51,10 @@ import java.util.List;
         "beforePhotoUrl",
         "afterPhotoUrl",
         "supervisorNotes",
+        "approvalNotes",
+        "precheckNotes",
+        "approvedBy",
+        "approvedAt",
         "plannedMaterials",
         "status",
         "source",
@@ -103,6 +107,10 @@ public class WorkOrderDetailsResponse {
     private String beforePhotoUrl;
     private String afterPhotoUrl;
     private String supervisorNotes;
+    private String approvalNotes;
+    private String precheckNotes;
+    private String approvedBy;
+    private LocalDateTime approvedAt;
 
     private WorkOrderStatus status;
     private WorkOrderSource source;

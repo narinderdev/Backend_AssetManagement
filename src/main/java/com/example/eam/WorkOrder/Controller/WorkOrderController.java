@@ -33,6 +33,33 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order updated successfully", data));
     }
 
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> approve(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderApproveRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.approveWorkOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order approved", data));
+    }
+
+    @PostMapping("/{id}/schedule")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> schedule(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderScheduleRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.scheduleWorkOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order scheduled", data));
+    }
+
+    @PostMapping("/{id}/start")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> start(
+            @PathVariable Long id,
+            @RequestBody WorkOrderStartRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.startWorkOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order started", data));
+    }
+
     @PostMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> complete(@PathVariable Long id,
                                                                           @Valid @RequestBody WorkOrderCompletionRequest request) {
