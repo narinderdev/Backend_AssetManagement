@@ -1,0 +1,211 @@
+2026-01-08 13:40:32.825 [restartedMain] INFO  com.example.eam.EamApplication - Starting EamApplication using Java 25.0.1 with PID 18336 (C:\Users\apnit\EAM\eam\build\classes\java\main started by apnit in C:\Users\apnit\EAM\eam)
+2026-01-08 13:40:32.826 [restartedMain] INFO  com.example.eam.EamApplication - The following 1 profile is active: "sql"
+2026-01-08 13:40:33.811 [restartedMain] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-08 13:40:33.955 [restartedMain] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 142 ms. Found 32 JPA repository interfaces.
+2026-01-08 13:40:34.220 [restartedMain] INFO  o.s.boot.tomcat.TomcatWebServer - Tomcat initialized with port 8080 (http)
+2026-01-08 13:40:34.222 [restartedMain] INFO  o.a.catalina.core.StandardService - Starting service [Tomcat]
+2026-01-08 13:40:34.222 [restartedMain] INFO  o.a.catalina.core.StandardEngine - Starting Servlet engine: [Apache Tomcat/11.0.14]
+2026-01-08 13:40:34.258 [restartedMain] INFO  o.s.b.w.c.s.WebApplicationContextInitializer - Root WebApplicationContext: initialization completed in 1425 ms
+2026-01-08 13:40:34.423 [restartedMain] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-08 13:40:34.444 [Test worker] INFO  com.example.eam.EamApplicationTests - Starting EamApplicationTests using Java 25.0.1 with PID 21512 (started by apnit in C:\Users\apnit\EAM\eam)
+2026-01-08 13:40:34.446 [Test worker] INFO  com.example.eam.EamApplicationTests - The following 1 profile is active: "sql"
+2026-01-08 13:40:34.656 [restartedMain] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-08 13:40:34.658 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Starting...
+2026-01-08 13:40:35.375 [background-preinit] INFO  o.h.validator.internal.util.Version - HV000001: Hibernate Validator 9.0.1.Final
+2026-01-08 13:40:36.460 [restartedMain] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-2 - Added connection ConnectionID:11 ClientConnectionId: 016a5ed3-149b-4d9f-9b48-5d926e979f4e
+2026-01-08 13:40:36.460 [restartedMain] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-2 - Start completed.
+2026-01-08 13:40:36.612 [restartedMain] WARN  org.hibernate.orm.deprecation - HHH90000025: SQLServerDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-08 13:40:36.613 [restartedMain] INFO  o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [jdbc:sqlserver://localhost:1433;concatNullYieldsNull=ON;quotedIdentifier=ON;connectRetryInterval=10;connectRetryCount=1;maxResultBuffer=-1;sendTemporalDataTypesAsStringForBulkCopy=true;delayLoadingLobs=true;useFmtOnly=false;vectorTypeSupport=v1;cacheBulkCopyMetadata=false;bulkCopyForBatchInsertAllowEncryptedValueModifications=false;bulkCopyForBatchInsertTableLock=false;bulkCopyForBatchInsertKeepNulls=false;bulkCopyForBatchInsertKeepIdentity=false;bulkCopyForBatchInsertFireTriggers=false;bulkCopyForBatchInsertCheckConstraints=false;bulkCopyForBatchInsertBatchSize=0;useBulkCopyForBatchInsert=false;cancelQueryTimeout=-1;sslProtocol=TLS;calcBigDecimalPrecision=false;useDefaultJaasConfig=false;jaasConfigurationName=SQLJDBCDriver;statementPoolingCacheSize=0;serverPreparedStatementDiscardThreshold=10;enablePrepareOnFirstPreparedStatementCall=false;fips=false;socketTimeout=0;authentication=NotSpecified;authenticationScheme=nativeAuthentication;xopenStates=false;datetimeParameterType=datetime2;sendTimeAsDatetime=true;replication=false;trustStoreType=JKS;trustServerCertificate=true;TransparentNetworkIPResolution=true;iPAddressPreference=IPv4First;serverNameAsACE=false;sendStringParametersAsUnicode=true;selectMethod=direct;responseBuffering=adaptive;queryTimeout=-1;packetSize=8000;multiSubnetFailover=false;loginTimeout=30;lockTimeout=-1;lastUpdateCount=true;useDefaultGSSCredential=false;prepareMethod=prepexec;encrypt=false;disableStatementPooling=true;databaseName=EamDb;columnEncryptionSetting=Disabled;applicationName=Microsoft JDBC Driver for SQL Server;applicationIntent=readwrite;]
+	Database driver: Microsoft JDBC Driver 13.2 for SQL Server
+	Database dialect: SQLServerDialect
+	Database version: 17.0
+	Default catalog/schema: EamDb/dbo
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: 128
+	Pool: DatasourceConnectionProviderImpl
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-01-08 13:40:37.130 [Test worker] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2026-01-08 13:40:37.417 [Test worker] INFO  o.s.d.r.c.RepositoryConfigurationDelegate - Finished Spring Data repository scanning in 270 ms. Found 32 JPA repository interfaces.
+2026-01-08 13:40:38.028 [restartedMain] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-08 13:40:38.645 [Test worker] INFO  o.h.jpa.internal.util.LogHelper - HHH000204: Processing PersistenceUnitInfo [name: default]
+2026-01-08 13:40:38.746 [Test worker] INFO  org.hibernate.Version - HHH000412: Hibernate ORM core version 7.1.8.Final
+2026-01-08 13:40:39.614 [Test worker] INFO  o.s.o.j.p.SpringPersistenceUnitInfo - No LoadTimeWeaver setup: ignoring JPA class transformer
+2026-01-08 13:40:39.681 [Test worker] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Starting...
+2026-01-08 13:40:40.542 [Test worker] INFO  com.zaxxer.hikari.pool.HikariPool - HikariPool-1 - Added connection ConnectionID:1 ClientConnectionId: 3b155c38-aaa8-46f3-ad85-c80c0044bff5
+2026-01-08 13:40:40.545 [Test worker] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Start completed.
+2026-01-08 13:40:40.597 [Test worker] WARN  org.hibernate.orm.deprecation - HHH90000025: SQLServerDialect does not need to be specified explicitly using 'hibernate.dialect' (remove the property setting and it will be selected by default)
+2026-01-08 13:40:40.627 [Test worker] INFO  o.hibernate.orm.connections.pooling - HHH10001005: Database info:
+	Database JDBC URL [jdbc:sqlserver://localhost:1433;concatNullYieldsNull=ON;quotedIdentifier=ON;connectRetryInterval=10;connectRetryCount=1;maxResultBuffer=-1;sendTemporalDataTypesAsStringForBulkCopy=true;delayLoadingLobs=true;useFmtOnly=false;vectorTypeSupport=v1;cacheBulkCopyMetadata=false;bulkCopyForBatchInsertAllowEncryptedValueModifications=false;bulkCopyForBatchInsertTableLock=false;bulkCopyForBatchInsertKeepNulls=false;bulkCopyForBatchInsertKeepIdentity=false;bulkCopyForBatchInsertFireTriggers=false;bulkCopyForBatchInsertCheckConstraints=false;bulkCopyForBatchInsertBatchSize=0;useBulkCopyForBatchInsert=false;cancelQueryTimeout=-1;sslProtocol=TLS;calcBigDecimalPrecision=false;useDefaultJaasConfig=false;jaasConfigurationName=SQLJDBCDriver;statementPoolingCacheSize=0;serverPreparedStatementDiscardThreshold=10;enablePrepareOnFirstPreparedStatementCall=false;fips=false;socketTimeout=0;authentication=NotSpecified;authenticationScheme=nativeAuthentication;xopenStates=false;datetimeParameterType=datetime2;sendTimeAsDatetime=true;replication=false;trustStoreType=JKS;trustServerCertificate=true;TransparentNetworkIPResolution=true;iPAddressPreference=IPv4First;serverNameAsACE=false;sendStringParametersAsUnicode=true;selectMethod=direct;responseBuffering=adaptive;queryTimeout=-1;packetSize=8000;multiSubnetFailover=false;loginTimeout=30;lockTimeout=-1;lastUpdateCount=true;useDefaultGSSCredential=false;prepareMethod=prepexec;encrypt=false;disableStatementPooling=true;databaseName=EamDb;columnEncryptionSetting=Disabled;applicationName=Microsoft JDBC Driver for SQL Server;applicationIntent=readwrite;]
+	Database driver: Microsoft JDBC Driver 13.2 for SQL Server
+	Database dialect: SQLServerDialect
+	Database version: 17.0
+	Default catalog/schema: EamDb/dbo
+	Autocommit mode: undefined/unknown
+	Isolation level: READ_COMMITTED [default READ_COMMITTED]
+	JDBC fetch size: 128
+	Pool: DatasourceConnectionProviderImpl
+	Minimum pool size: undefined/unknown
+	Maximum pool size: undefined/unknown
+2026-01-08 13:40:40.719 [restartedMain] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-08 13:40:40.978 [restartedMain] INFO  com.example.eam.Common.EmailService - Mail username present: true
+2026-01-08 13:40:40.978 [restartedMain] INFO  com.example.eam.Common.EmailService - Mail password present: true
+2026-01-08 13:40:40.978 [restartedMain] INFO  com.example.eam.Common.EmailService - Mail will be sent FROM: mervinar945@gmail.com
+2026-01-08 13:40:41.867 [restartedMain] WARN  o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-08 13:40:41.938 [restartedMain] INFO  o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer - Global AuthenticationManager configured with UserDetailsService bean with name customUserDetailsService
+2026-01-08 13:40:42.797 [restartedMain] INFO  o.s.boot.tomcat.TomcatWebServer - Tomcat started on port 8080 (http) with context path '/'
+2026-01-08 13:40:42.802 [restartedMain] INFO  com.example.eam.EamApplication - Started EamApplication in 10.257 seconds (process running for 352.45)
+2026-01-08 13:40:43.102 [restartedMain] INFO  o.s.b.d.a.ConditionEvaluationDeltaLoggingListener - Condition evaluation unchanged
+2026-01-08 13:40:43.102 [restartedMain] WARN  o.s.c.events.SpringDocAppInitializer - SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-01-08 13:40:43.289 [Test worker] INFO  o.h.e.t.j.p.i.JtaPlatformInitiator - HHH000489: No JTA platform available (set 'hibernate.transaction.jta.platform' to enable JTA platform integration)
+2026-01-08 13:40:43.953 [Test worker] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Initialized JPA EntityManagerFactory for persistence unit 'default'
+2026-01-08 13:40:44.144 [Test worker] INFO  o.s.d.j.r.q.QueryEnhancerFactories - Hibernate is in classpath; If applicable, HQL parser will be used.
+2026-01-08 13:40:44.990 [Test worker] INFO  com.example.eam.Common.EmailService - Mail username present: true
+2026-01-08 13:40:44.990 [Test worker] INFO  com.example.eam.Common.EmailService - Mail password present: true
+2026-01-08 13:40:44.990 [Test worker] INFO  com.example.eam.Common.EmailService - Mail will be sent FROM: mervinar945@gmail.com
+2026-01-08 13:40:46.258 [Test worker] WARN  o.s.b.j.a.JpaBaseConfiguration$JpaWebConfiguration - spring.jpa.open-in-view is enabled by default. Therefore, database queries may be performed during view rendering. Explicitly configure spring.jpa.open-in-view to disable this warning
+2026-01-08 13:40:46.429 [Test worker] INFO  o.s.s.c.a.a.c.InitializeUserDetailsBeanManagerConfigurer$InitializeUserDetailsManagerConfigurer - Global AuthenticationManager configured with UserDetailsService bean with name customUserDetailsService
+2026-01-08 13:40:47.522 [Test worker] INFO  com.example.eam.EamApplicationTests - Started EamApplicationTests in 13.709 seconds (process running for 16.169)
+2026-01-08 13:40:48.444 [Test worker] WARN  o.s.c.events.SpringDocAppInitializer - SpringDoc /v3/api-docs endpoint is enabled by default. To disable it in production, set the property 'springdoc.api-docs.enabled=false'
+2026-01-08 13:40:48.910 [SpringApplicationShutdownHook] INFO  o.s.o.j.LocalContainerEntityManagerFactoryBean - Closing JPA EntityManagerFactory for persistence unit 'default'
+2026-01-08 13:40:48.925 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown initiated...
+2026-01-08 13:40:48.927 [SpringApplicationShutdownHook] INFO  com.zaxxer.hikari.HikariDataSource - HikariPool-1 - Shutdown completed.
+2026-01-08 13:41:50.240 [http-nio-8080-exec-1] INFO  o.a.c.c.C.[Tomcat].[localhost].[/] - Initializing Spring DispatcherServlet 'dispatcherServlet'
+2026-01-08 13:41:50.240 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Initializing Servlet 'dispatcherServlet'
+2026-01-08 13:41:50.244 [http-nio-8080-exec-1] INFO  o.s.web.servlet.DispatcherServlet - Completed initialization in 4 ms
+2026-01-08 13:41:50.451 [http-nio-8080-exec-2] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP REQUEST] --------------------------------
+POST /auth
+Header: Host = c84da8649c29.ngrok-free.app
+Header: User-Agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Header: Content-Length = 51
+Header: Accept = application/json, text/plain, */*
+Header: Accept-Encoding = gzip, deflate, br, zstd
+Header: Accept-Language = en-GB,en-US;q=0.9,en;q=0.8,hi;q=0.7
+Header: Content-Type = application/json
+Header: Ngrok-Skip-Browser-Warning = true
+Header: Origin = http://localhost:4200
+Header: Priority = u=1, i
+Header: Referer = http://localhost:4200/
+Header: Sec-Ch-Ua = "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"
+Header: Sec-Ch-Ua-Mobile = ?0
+Header: Sec-Ch-Ua-Platform = "Windows"
+Header: Sec-Fetch-Dest = empty
+Header: Sec-Fetch-Mode = cors
+Header: Sec-Fetch-Site = cross-site
+Body: {"email":"mad@yopmail.com","password":"***"}
+---------------------------------------------------
+2026-01-08 13:41:50.451 [http-nio-8080-exec-2] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP RESPONSE] -------------------------------
+Status: 200
+Duration: 131 ms
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Access-Control-Allow-Origin = http://localhost:4200
+Header: Access-Control-Allow-Credentials = true
+Body: {"statusCode":201,"status":"success","message":"Login Successfully","data":{"token":"***","user":{"id":5,"firstName":"Madhvi","lastName":"Joe","email":"mad@yopmail.com","status":"ACTIVE","deleted":false,"userRoles":[{"id":5,"role":{"id":6,"name":"Admin","description":"Full access","active":true,"permissions":[{"id":12,"code":"delete_work_order","module":"WORK_ORDER","action":"DELETE","label":"Delete Work Order","description":"Allows user to delete in WORK_ORDER","active":true,"sortOrder":12},{"id":3,"code":"update_asset","module":"ASSET","action":"UPDATE","label":"Update Asset","description":"Allows user to update in ASSET","active":true,"sortOrder":3},{"id":46,"code":"manage_roles","module":"MANAGE_ROLES","action":"ACCESS","label":"Access Manage Roles","description":"Allows user to access in MANAGE_ROLES","active":true,"sortOrder":46},{"id":16,"code":"delete_preventive_maintenance","module":"PREVENTIVE_MAINTENANCE","action":"DELETE","label":"Delete Preventive Maintenance","description":"Allows user to delete in PREVENTIVE_MAINTENANCE","active":true,"sortOrder":16},{"id":26,"code":"view_goods_receipt_note","module":"GOODS_RECEIPT_NOTE","action":"VIEW","label":"View Goods Receipt Note","description":"Allows user to view in GOODS_RECEIPT_NOTE","active":true,"sortOrder":26},{"id":30,"code":"view_vendor","module":"VENDOR","action":"VIEW","label":"View Vendor","description":"Allows user to view in VENDOR","active":true,"sortOrder":30},{"id":10,"code":"view_work_order","module":"WORK_ORDER","action":"VIEW","label":"View Work Order","description":"Allows user to view in WORK_ORDER","active":true,"sortOrder":10},{"id":35,"code":"update_inventory","module":"INVENTORY","action":"UPDATE","label":"Update Inventory","description":"Allows user to update in INVENTORY","active":true,"sortOrder":35},{"id":2,"code":"view_asset","module":"ASSET","action":"VIEW","label":"View Asset","description":"Allows user to view in ASSET","active":true,"sortOrder":2},{"id":19,"code":"update_material_requisition","module":"MATERIAL_REQUISITION","action":"UPDATE","label":"Update Material Requisition","description":"Allows user to update in MATERIAL_REQUISITION","active":true,"sortOrder":19},{"id":43,"code":"update_technician_team","module":"TECHNICIAN_TEAM","action":"UPDATE","label":"Update Technician Team","description":"Allows user to update in TECHNICIAN_TEAM","active":true,"sortOrder":43},{"id":36,"code":"delete_inventory","module":"INVENTORY","action":"DELETE","label":"Delete Inventory","description":"Allows user to delete in INVENTORY","active":true,"sortOrder":36},{"id":28,"code":"delete_goods_receipt_note","module":"GOODS_RECEIPT_NOTE","action":"DELETE","label":"Delete Goods Receipt Note","description":"Allows user to delete in GOODS_RECEIPT_NOTE","active":true,"sortOrder":28},{"id":33,"code":"create_inventory","module":"INVENTORY","action":"CREATE","label":"Create Inventory","description":"Allows user to create in INVENTORY","active":true,"sortOrder":33},{"id":11,"code":"update_work_order","module":"WORK_ORDER","action":"UPDATE","label":"Update Work Order","description":"Allows user to update in WORK_ORDER","active":true,"sortOrder":11},{"id":42,"code":"view_technician_team","module":"TECHNICIAN_TEAM","action":"VIEW","label":"View Technician Team","description":"Allows user to view in TECHNICIAN_TEAM","active":true,"sortOrder":42},{"id":4,"code":"delete_asset","module":"ASSET","action":"DELETE","label":"Delete Asset","description":"Allows user to delete in ASSET","active":true,"sortOrder":4},{"id":40,"code":"delete_technician","module":"TECHNICIAN","action":"DELETE","label":"Delete Technician","description":"Allows user to delete in TECHNICIAN","active":true,"sortOrder":40},{"id":1,"code":"create_asset","module":"ASSET","action":"CREATE","label":"Create Asset","description":"Allows user to create in ASSET","active":true,"sortOrder":1},{"id":32,"code":"delete_vendor","module":"VENDOR","action":"DELETE","label":"Delete Vendor","description":"Allows user to delete in VENDOR","active":true,"sortOrder":32},{"id":13,"code":"create_preventive_maintenance","module":"PREVENTIVE_MAINTENANCE","action":"CREATE","label":"Create Preventive Maintenance","description":"Allows user to create in PREVENTIVE_MAINTENANCE","active":true,"sortOrder":13},{"id":39,"code":"update_technician","module":"TECHNICIAN","action":"UPDATE","label":"Update Technician","description":"Allows user to update in TECHNICIAN","active":true,"sortOrder":39},{"id":5,"code":"create_service_request","module":"SERVICE_REQUEST","action":"CREATE","label":"Create Service Request","description":"Allows user to create in SERVICE_REQUEST","active":true,"sortOrder":5},{"id":38,"code":"view_technician","module":"TECHNICIAN","action":"VIEW","label":"View Technician","description":"Allows user to view in TECHNICIAN","active":true,"sortOrder":38},{"id":14,"code":"view_preventive_maintenance","module":"PREVENTIVE_MAINTENANCE","action":"VIEW","label":"View Preventive Maintenance","description":"Allows user to view in PREVENTIVE_MAINTENANCE","active":true,"sortOrder":14},{"id":44,"code":"delete_technician_team","module":"TECHNICIAN_TEAM","action":"DELETE","label":"Delete Technician Team","description":"Allows user to delete in TECHNICIAN_TEAM","active":true,"sortOrder":44},{"id":7,"code":"update_service_request","module":"SERVICE_REQUEST","action":"UPDATE","label":"Update Service Request","description":"Allows user to update in SERVICE_REQUEST","active":true,"sortOrder":7},{"id":34,"code":"view_inventory","module":"INVENTORY","action":"VIEW","label":"View Inventory","description":"Allows user to view in INVENTORY","active":true,"sortOrder":34},{"id":47,"code":"invite_user","module":"INVITE_USER","action":"ACCESS","label":"Access Invite User","description":"Allows user to access in INVITE_USER","active":true,"sortOrder":47},{"id":15,"code":"update_preventive_maintenance","module":"PREVENTIVE_MAINTENANCE","action":"UPDATE","label":"Update Preventive Maintenance","description":"Allows user to update in PREVENTIVE_MAINTENANCE","active":true,"sortOrder":15},{"id":18,"code":"view_material_requisition","module":"MATERIAL_REQUISITION","action":"VIEW","label":"View Material Requisition","description":"Allows user to view in MATERIAL_REQUISITION","active":true,"sortOrder":18},{"id":20,"code":"delete_material_requisition","module":"MATERIAL_REQUISITION","action":"DELETE","label":"Delete Material Requisition","description":"Allows user to delete in MATERIAL_REQUISITION","active":true,"sortOrder":20},{"id":25,"code":"create_goods_receipt_note","module":"GOODS_RECEIPT_NOTE","action":"CREATE","label":"Create Goods Receipt Note","description":"Allows user to create in GOODS_RECEIPT_NOTE","active":true,"sortOrder":25},{"id":31,"code":"update_vendor","module":"VENDOR","action":"UPDATE","label":"Update Vendor","description":"Allows user to update in VENDOR","active":true,"sortOrder":31},{"id":45,"code":"manage_users","module":"MANAGE_USERS","action":"ACCESS","label":"Access Manage Users","description":"Allows user to access in MANAGE_USERS","active":true,"sortOrder":45},{"id":27,"code":"update_goods_receipt_note","module":"GOODS_RECEIPT_NOTE","action":"UPDATE","label":"Update Goods Receipt Note","description":"Allows user to update in GOODS_RECEIPT_NOTE","active":true,"sortOrder":27},{"id":29,"code":"create_vendor","module":"VENDOR","action":"CREATE","label":"Create Vendor","description":"Allows user to create in VENDOR","active":true,"sortOrder":29},{"id":41,"code":"create_technician_team","module":"TECHNICIAN_TEAM","action":"CREATE","label":"Create Technician Team","description":"Allows user to create in TECHNICIAN_TEAM","active":true,"sortOrder":41},{"id":37,"code":"create_technician","module":"TECHNICIAN","action":"CREATE","label":"Create Technician","description":"Allows user to create in TECHNICIAN","active":true,"sortOrder":37},{"id":17,"code":"create_material_requisition","module":"MATERIAL_REQUISITION","action":"CREATE","label":"Create Material Requisition","description":"Allows user to create in MATERIAL_REQUISITION","active":true,"sortOrder":17},{"id":8,"code":"delete_service_request","module":"SERVICE_REQUEST","action":"DELETE","label":"Delete Service Request","description":"Allows user to delete in SERVICE_REQUEST","active":true,"sortOrder":8},{"id":23,"code":"update_purchase_order","module":"PURCHASE_ORDER","action":"UPDATE","label":"Update Purchase Order","description":"Allows user to update in PURCHASE_ORDER","active":true,"sortOrder":23},{"id":24,"code":"delete_purchase_order","module":"PURCHASE_ORDER","action":"DELETE","label":"Delete Purchase Order","description":"Allows user to delete in PURCHASE_ORDER","active":true,"sortOrder":24},{"id":6,"code":"view_service_request","module":"SERVICE_REQUEST","action":"VIEW","label":"View Service Request","description":"Allows user to view in SERVICE_REQUEST","active":true,"sortOrder":6},{"id":22,"code":"view_purchase_order","module":"PURCHASE_ORDER","action":"VIEW","label":"View Purchase Order","description":"Allows user to view in PURCHASE_ORDER","active":true,"sortOrder":22},{"id":21,"code":"create_purchase_order","module":"PURCHASE_ORDER","action":"CREATE","label":"Create Purchase Order","description":"Allows user to create in PURCHASE_ORDER","active":true,"sortOrder":21},{"id":9,"code":"create_work_order","module":"WORK_ORDER","action":"CREATE","label":"Create Work Order","description":"Allows user to create in WORK_ORDER","active":true,"sortOrder":9}],"createdAt":"2026-01-07T18:53:20.6581832","updatedAt":"2026-01-07T18:53:20.6581832","hibernateLazyInitializer":{}}}],"createdAt":"2026-01-08T05:59:19.014949400Z","updatedAt":"2026-01-08T05:59:19.014949400Z"}}}
+---------------------------------------------------
+2026-01-08 13:41:53.018 [http-nio-8080-exec-4] WARN  o.s.d.w.c.SpringDataJackson3Configuration$PageModule$WarningLoggingModifier - Serializing PageImpl instances as-is is not supported, meaning that there is no guarantee about the stability of the resulting JSON structure!
+	For a stable JSON structure, please use Spring Data's PagedModel (globally via @EnableSpringDataWebSupport(pageSerializationMode = VIA_DTO))
+	or Spring HATEOAS and Spring Data's PagedResourcesAssembler as documented in https://docs.spring.io/spring-data/commons/reference/repositories/core-extensions.html#core.web.pageables.
+
+2026-01-08 13:41:53.021 [http-nio-8080-exec-4] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP REQUEST] --------------------------------
+GET /api/roles
+Header: Host = c84da8649c29.ngrok-free.app
+Header: User-Agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Header: Accept = application/json, text/plain, */*
+Header: Accept-Encoding = gzip, deflate, br, zstd
+Header: Accept-Language = en-GB,en-US;q=0.9,en;q=0.8,hi;q=0.7
+Header: Authorization = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWRAeW9wbWFpbC5jb20iLCJlbWFpbCI6Im1hZEB5b3BtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiQWRtaW4iXSwiaWF0IjoxNzY3ODU5OTEwLCJleHAiOjE3Njc4NjM1MTB9.5EaoBMT5IRgTkjA8v_syam6WrWAfMvkVUUykdhjsPOk
+Header: Ngrok-Skip-Browser-Warning = true
+Header: Origin = http://localhost:4200
+Header: Priority = u=1, i
+Header: Referer = http://localhost:4200/
+Header: Sec-Ch-Ua = "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"
+Header: Sec-Ch-Ua-Mobile = ?0
+Header: Sec-Ch-Ua-Platform = "Windows"
+Header: Sec-Fetch-Dest = empty
+Header: Sec-Fetch-Mode = cors
+Header: Sec-Fetch-Site = cross-site
+---------------------------------------------------
+2026-01-08 13:41:53.021 [http-nio-8080-exec-4] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP RESPONSE] -------------------------------
+Status: 200
+Duration: 19 ms
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Access-Control-Allow-Origin = http://localhost:4200
+Header: Access-Control-Allow-Credentials = true
+Body: {"statusCode":200,"status":"success","message":"Roles fetched successfully","data":{"content":[{"active":true,"createdAt":"2025-12-20T15:30:51.6082855","description":"jikyu","id":1,"name":"iyuiyui","permissionCodes":["create_asset","view_asset"],"updatedAt":"2025-12-20T15:30:51.6082855"},{"active":true,"createdAt":"2025-12-20T15:33:24.7777752","description":"tyytyt","id":2,"name":"Top player","permissionCodes":["invite_user","create_asset","delete_technician_team","update_vendor","view_asset","view_goods_receipt_note","update_inventory","update_asset","manage_roles"],"updatedAt":"2025-12-20T15:33:24.7777752"},{"active":true,"createdAt":"2025-12-20T19:17:45.1236495","description":"test","id":3,"name":"Manager","permissionCodes":["invite_user","create_asset","manage_users","view_goods_receipt_note","update_goods_receipt_note"],"updatedAt":"2025-12-20T19:17:45.1236495"},{"active":true,"createdAt":"2026-01-06T18:31:49.1761519","description":"ertert","id":4,"name":"fger","permissionCodes":["create_asset","view_asset"],"updatedAt":"2026-01-06T18:31:49.1761519"},{"active":true,"createdAt":"2026-01-06T19:07:24.976728","description":"Test","id":5,"name":"Test","permissionCodes":["create_asset","view_asset","update_goods_receipt_note","manage_roles"],"updatedAt":"2026-01-06T19:07:24.976728"},{"active":true,"createdAt":"2026-01-07T18:53:20.6581832","description":"Full access","id":6,"name":"Admin","permissionCodes":["view_technician_team","create_material_requisition","create_goods_receipt_note","delete_service_request","view_work_order","update_preventive_maintenance","create_technician_team","update_material_requisition","update_technician","update_technician_team","delete_inventory","update_work_order","create_work_order","create_asset","create_preventive_maintenance","view_service_request","update_vendor","create_vendor","create_inventory","manage_users","delete_preventive_maintenance","view_material_requisition","delete_material_requisition","update_inventory","update_asset","create_service_request","update_service_request","invite_user","delete_technician","create_technician","view_vendor","view_asset","update_purchase_order","update_goods_receipt_note","view_purchase_order","view_inventory","manage_roles","view_preventive_maintenance","view_technician","delete_technician_team","view_goods_receipt_note","delete_goods_receipt_note","delete_purchase_order","delete_asset","delete_vendor","create_purchase_order","delete_work_order"],"updatedAt":"2026-01-07T18:53:20.6581832"}],"empty":false,"first":true,"last":true,"number":0,"numberOfElements":6,"pageable":{"offset":0,"pageNumber":0,"pageSize":20,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":20,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":6,"totalPages":1}}
+---------------------------------------------------
+2026-01-08 13:41:56.171 [http-nio-8080-exec-5] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP REQUEST] --------------------------------
+GET /api/roles
+Header: Host = c84da8649c29.ngrok-free.app
+Header: User-Agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Header: Accept = application/json, text/plain, */*
+Header: Accept-Encoding = gzip, deflate, br, zstd
+Header: Accept-Language = en-GB,en-US;q=0.9,en;q=0.8,hi;q=0.7
+Header: Authorization = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWRAeW9wbWFpbC5jb20iLCJlbWFpbCI6Im1hZEB5b3BtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiQWRtaW4iXSwiaWF0IjoxNzY3ODU5OTEwLCJleHAiOjE3Njc4NjM1MTB9.5EaoBMT5IRgTkjA8v_syam6WrWAfMvkVUUykdhjsPOk
+Header: Ngrok-Skip-Browser-Warning = true
+Header: Origin = http://localhost:4200
+Header: Priority = u=1, i
+Header: Referer = http://localhost:4200/
+Header: Sec-Ch-Ua = "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"
+Header: Sec-Ch-Ua-Mobile = ?0
+Header: Sec-Ch-Ua-Platform = "Windows"
+Header: Sec-Fetch-Dest = empty
+Header: Sec-Fetch-Mode = cors
+Header: Sec-Fetch-Site = cross-site
+---------------------------------------------------
+2026-01-08 13:41:56.171 [http-nio-8080-exec-5] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP RESPONSE] -------------------------------
+Status: 200
+Duration: 10 ms
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Access-Control-Allow-Origin = http://localhost:4200
+Header: Access-Control-Allow-Credentials = true
+Body: {"statusCode":200,"status":"success","message":"Roles fetched successfully","data":{"content":[{"active":true,"createdAt":"2025-12-20T15:30:51.6082855","description":"jikyu","id":1,"name":"iyuiyui","permissionCodes":["create_asset","view_asset"],"updatedAt":"2025-12-20T15:30:51.6082855"},{"active":true,"createdAt":"2025-12-20T15:33:24.7777752","description":"tyytyt","id":2,"name":"Top player","permissionCodes":["invite_user","create_asset","delete_technician_team","update_vendor","view_asset","view_goods_receipt_note","update_inventory","update_asset","manage_roles"],"updatedAt":"2025-12-20T15:33:24.7777752"},{"active":true,"createdAt":"2025-12-20T19:17:45.1236495","description":"test","id":3,"name":"Manager","permissionCodes":["invite_user","create_asset","manage_users","view_goods_receipt_note","update_goods_receipt_note"],"updatedAt":"2025-12-20T19:17:45.1236495"},{"active":true,"createdAt":"2026-01-06T18:31:49.1761519","description":"ertert","id":4,"name":"fger","permissionCodes":["create_asset","view_asset"],"updatedAt":"2026-01-06T18:31:49.1761519"},{"active":true,"createdAt":"2026-01-06T19:07:24.976728","description":"Test","id":5,"name":"Test","permissionCodes":["create_asset","view_asset","update_goods_receipt_note","manage_roles"],"updatedAt":"2026-01-06T19:07:24.976728"},{"active":true,"createdAt":"2026-01-07T18:53:20.6581832","description":"Full access","id":6,"name":"Admin","permissionCodes":["view_technician_team","create_material_requisition","create_goods_receipt_note","delete_service_request","view_work_order","update_preventive_maintenance","create_technician_team","update_material_requisition","update_technician","update_technician_team","delete_inventory","update_work_order","create_work_order","create_asset","create_preventive_maintenance","view_service_request","update_vendor","create_vendor","create_inventory","manage_users","delete_preventive_maintenance","view_material_requisition","delete_material_requisition","update_inventory","update_asset","create_service_request","update_service_request","invite_user","delete_technician","create_technician","view_vendor","view_asset","update_purchase_order","update_goods_receipt_note","view_purchase_order","view_inventory","manage_roles","view_preventive_maintenance","view_technician","delete_technician_team","view_goods_receipt_note","delete_goods_receipt_note","delete_purchase_order","delete_asset","delete_vendor","create_purchase_order","delete_work_order"],"updatedAt":"2026-01-07T18:53:20.6581832"}],"empty":false,"first":true,"last":true,"number":0,"numberOfElements":6,"pageable":{"offset":0,"pageNumber":0,"pageSize":20,"paged":true,"sort":{"empty":true,"sorted":false,"unsorted":true},"unpaged":false},"size":20,"sort":{"empty":true,"sorted":false,"unsorted":true},"totalElements":6,"totalPages":1}}
+---------------------------------------------------
+2026-01-08 13:42:27.942 [http-nio-8080-exec-7] INFO  com.example.eam.Common.EmailService - Email sent successfully to gori@yopmail.com
+2026-01-08 13:42:27.947 [http-nio-8080-exec-7] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP REQUEST] --------------------------------
+POST /users/invite
+Header: Host = c84da8649c29.ngrok-free.app
+Header: User-Agent = Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/143.0.0.0 Safari/537.36
+Header: Content-Length = 78
+Header: Accept = application/json, text/plain, */*
+Header: Accept-Encoding = gzip, deflate, br, zstd
+Header: Accept-Language = en-GB,en-US;q=0.9,en;q=0.8,hi;q=0.7
+Header: Authorization = Bearer eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiJtYWRAeW9wbWFpbC5jb20iLCJlbWFpbCI6Im1hZEB5b3BtYWlsLmNvbSIsInVzZXJJZCI6NSwicm9sZXMiOlsiQWRtaW4iXSwiaWF0IjoxNzY3ODU5OTEwLCJleHAiOjE3Njc4NjM1MTB9.5EaoBMT5IRgTkjA8v_syam6WrWAfMvkVUUykdhjsPOk
+Header: Content-Type = application/json
+Header: Ngrok-Skip-Browser-Warning = true
+Header: Origin = http://localhost:4200
+Header: Priority = u=1, i
+Header: Referer = http://localhost:4200/
+Header: Sec-Ch-Ua = "Google Chrome";v="143", "Chromium";v="143", "Not A(Brand";v="24"
+Header: Sec-Ch-Ua-Mobile = ?0
+Header: Sec-Ch-Ua-Platform = "Windows"
+Header: Sec-Fetch-Dest = empty
+Header: Sec-Fetch-Mode = cors
+Header: Sec-Fetch-Site = cross-site
+Body: {"firstName":"Gauri","lastName":"do","email":"gori@yopmail.com","roleIds":[1]}
+---------------------------------------------------
+2026-01-08 13:42:27.947 [http-nio-8080-exec-7] INFO  c.e.e.C.RequestResponseLoggingFilter - 
+--- [HTTP RESPONSE] -------------------------------
+Status: 200
+Duration: 5641 ms
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Vary = Origin
+Header: Access-Control-Allow-Origin = http://localhost:4200
+Header: Access-Control-Allow-Credentials = true
+Body: {"statusCode":200,"status":"success","message":"Invitation sent successfully","data":{"id":6,"firstName":"Gauri","lastName":"do","email":"gori@yopmail.com","status":"INVITED","deleted":false,"userRoles":[],"createdAt":"2026-01-08T08:12:22.344091600Z","updatedAt":"2026-01-08T08:12:22.344091600Z"}}
+---------------------------------------------------
