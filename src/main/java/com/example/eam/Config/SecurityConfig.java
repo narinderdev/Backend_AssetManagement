@@ -57,7 +57,7 @@ public class SecurityConfig {
                 ).permitAll()
 
                 // Public APIs
-                .requestMatchers("/auth/**").permitAll()
+                .requestMatchers(HttpMethod.POST, "/auth", "/auth/").permitAll()
                 .requestMatchers(
                         "/users/accept",
                         "/users/set-password"
