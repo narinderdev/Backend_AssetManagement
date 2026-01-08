@@ -40,3 +40,8 @@ out/
 .env
 *.env
 src/.env
+
+# logs file
+Logs
+logs/
+*.log
