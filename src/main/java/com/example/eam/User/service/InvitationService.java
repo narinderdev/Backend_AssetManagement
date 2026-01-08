@@ -77,6 +77,15 @@ public class InvitationService {
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.NOT_FOUND, "Role not found: " + roleId
                     ));
+
+            if ("admin".equalsIgnoreCase(role.getName())) {
+                long adminCount = userRoleRepository.countByRole_NameIgnoreCaseAndUser_IdNotAndUser_DeletedFalse(
+                        "Admin", saved.getId()
+                );
+                if (adminCount > 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Admin role is already assigned to another user");
+                }
+            }
             userRoleRepository.save(UserRole.builder()
                     .user(saved)
                     .role(role)

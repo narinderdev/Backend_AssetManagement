@@ -58,11 +58,12 @@ public class SecurityConfig {
 
                 // Public APIs
                 .requestMatchers(HttpMethod.POST, "/auth", "/auth/").permitAll()
+                .requestMatchers("/auth/signup/**").permitAll()
                 .requestMatchers(
                         "/users/accept",
                         "/users/set-password"
                 ).permitAll()
-                .requestMatchers(HttpMethod.POST, "/users").permitAll()
+                .requestMatchers(HttpMethod.POST, "/users", "/users/").permitAll()
                 .requestMatchers(HttpMethod.POST, "/users/invite").hasRole("Admin")
 
                 // Everything else needs JWT

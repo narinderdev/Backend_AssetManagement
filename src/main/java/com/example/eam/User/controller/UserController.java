@@ -27,4 +27,12 @@ public class UserController {
             ApiResponse<Users> response = ApiResponse.successResponse(201, "User Created Successfully", user);
             return ResponseEntity.ok(response);
     }
+
+    @GetMapping
+    public ResponseEntity<ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>>> listUsers() {
+        var users = userService.listUsers();
+        ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>> response =
+                ApiResponse.successResponse(200, "Users fetched successfully", users);
+        return ResponseEntity.ok(response);
+    }
 }

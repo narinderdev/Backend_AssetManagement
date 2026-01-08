@@ -7,6 +7,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.UserCreateDto;
+import com.example.eam.User.dto.UserSummaryDto;
 import com.example.eam.User.entity.UserRole;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
@@ -16,6 +17,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import lombok.RequiredArgsConstructor;
 import java.util.Optional;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -38,6 +40,12 @@ public class UserService {
             Optional<Users> existingUser = usersRepository.findByEmailAndDeletedFalse(email);
             if (existingUser.isPresent()) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists with this email");
+            }
+
+            // Enforce single Admin assignment
+            long adminCount = userRoleRepository.countByRole_NameIgnoreCaseAndUser_DeletedFalse("Admin");
+            if (adminCount > 0) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Admin role is already assigned to another user");
             }
 
             // Assign Admin role to the new user
@@ -68,6 +76,36 @@ public class UserService {
             userRoleRepository.save(userRole);
 
             return savedUser;
+        }
+
+        @Transactional(readOnly = true)
+        public java.util.List<UserSummaryDto> listUsers() {
+            return usersRepository.findAllActiveWithRoles()
+                    .stream()
+                    .map(this::toSummary)
+                    .toList();
+        }
+
+        private UserSummaryDto toSummary(Users user) {
+            String first = user.getFirstName() != null ? user.getFirstName().trim() : "";
+            String last = user.getLastName() != null ? user.getLastName().trim() : "";
+            String fullName = (first + " " + last).trim();
+
+            java.util.List<String> roles = user.getUserRoles() != null
+                    ? user.getUserRoles().stream()
+                        .map(UserRole::getRole)
+                        .filter(java.util.Objects::nonNull)
+                        .map(Role::getName)
+                        .toList()
+                    : java.util.List.of();
+
+            return new UserSummaryDto(
+                    user.getId(),
+                    fullName.isEmpty() ? null : fullName,
+                    user.getEmail(),
+                    user.getStatus(),
+                    roles
+            );
         }
 
 }
