@@ -58,6 +58,7 @@ import java.util.List;
         "approvedBy",
         "approvedAt",
         "plannedMaterials",
+        "checkLogs",
         "status",
         "source",
         "laborEntries",
@@ -115,6 +116,8 @@ public class WorkOrderDetailsResponse {
     private String precheckNotes;
     private String approvedBy;
     private LocalDateTime approvedAt;
+
+    private java.util.List<WorkOrderCheckLogResponse> checkLogs;
 
     private WorkOrderStatus status;
     private WorkOrderSource source;

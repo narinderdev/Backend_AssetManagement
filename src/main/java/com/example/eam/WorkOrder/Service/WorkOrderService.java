@@ -19,10 +19,12 @@ import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Entity.WorkOrderLaborEntry;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialPlan;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialUsage;
+import com.example.eam.WorkOrder.Entity.WorkOrderCheckLog;
 import com.example.eam.WorkOrder.Repository.WorkOrderLaborEntryRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialPlanRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -60,6 +62,7 @@ public class WorkOrderService {
     private final WorkOrderLaborEntryRepository workOrderLaborEntryRepository;
     private final WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
     private final WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
+    private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
@@ -354,20 +357,43 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public WorkOrderDetailsResponse markInProgress(Long id, WorkOrderInProgressRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
-        if (wo.getStatus() != WorkOrderStatus.SCHEDULED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SCHEDULED work orders can be started");
+        if (wo.getStatus() != WorkOrderStatus.SCHEDULED && wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be SCHEDULED or IN_PROGRESS to log check-in/out");
         }
+
+        Technician technician = request.getTechnicianId() != null ? resolveTechnician(request.getTechnicianId()) : null;
+        TechnicianTeam team = request.getTeamId() != null ? resolveTeam(request.getTeamId()) : null;
+
         LocalDateTime checkIn = request.getCheckInAt() != null
                 ? request.getCheckInAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
-        wo.setCheckInAt(checkIn);
-        wo.setActualStartDateTime(wo.getActualStartDateTime() == null ? checkIn : wo.getActualStartDateTime());
-        wo.setCheckOutAt(request.getCheckOutAt());
-        wo.setPrecheckNotes(trim(request.getNotes()));
 
-        validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
-        handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
-        wo.setStatus(WorkOrderStatus.IN_PROGRESS);
+        WorkOrderCheckLog log = WorkOrderCheckLog.builder()
+                .workOrder(wo)
+                .technician(technician)
+                .team(team)
+                .checkInAt(checkIn)
+                .checkOutAt(request.getCheckOutAt())
+                .notes(trim(request.getNotes()))
+                .build();
+        workOrderCheckLogRepository.save(log);
+
+        // Set actual start/end to reflect the earliest/latest entries
+        if (wo.getActualStartDateTime() == null || checkIn.isBefore(wo.getActualStartDateTime())) {
+            wo.setActualStartDateTime(checkIn);
+        }
+        if (request.getCheckOutAt() != null) {
+            LocalDateTime co = request.getCheckOutAt();
+            if (wo.getActualEndDateTime() == null || co.isAfter(wo.getActualEndDateTime())) {
+                wo.setActualEndDateTime(co);
+            }
+        }
+
+        if (wo.getStatus() == WorkOrderStatus.SCHEDULED) {
+            validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
+            handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
+            wo.setStatus(WorkOrderStatus.IN_PROGRESS);
+        }
 
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
@@ -739,6 +765,17 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .build();
     }
 
+    private WorkOrderCheckLogResponse toCheckLogResponse(WorkOrderCheckLog log) {
+        return WorkOrderCheckLogResponse.builder()
+                .id(log.getId())
+                .technicianId(log.getTechnician() != null ? log.getTechnician().getId() : null)
+                .teamId(log.getTeam() != null ? log.getTeam().getId() : null)
+                .checkInAt(log.getCheckInAt())
+                .checkOutAt(log.getCheckOutAt())
+                .notes(log.getNotes())
+                .build();
+    }
+
     private WorkType mapMaintenanceTypeToWorkType(MaintenanceType mt) {
         if (mt == null) return WorkType.CORRECTIVE;
         return switch (mt) {
@@ -767,6 +804,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .map(this::toMaterialPlanResponse)
                 .toList();
 
+        List<WorkOrderCheckLogResponse> checkLogs = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId()).stream()
+                .map(this::toCheckLogResponse)
+                .toList();
+
         return WorkOrderDetailsResponse.builder()
                 .id(wo.getId())
                 .workOrderId(wo.getWorkOrderId())
@@ -789,8 +830,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .plannedEndDateTime(wo.getPlannedEndDateTime())
                 .actualStartDateTime(wo.getActualStartDateTime())
                 .actualEndDateTime(wo.getActualEndDateTime())
-                .checkInAt(wo.getCheckInAt())
-                .checkOutAt(wo.getCheckOutAt())
                 .targetCompletionDate(wo.getTargetCompletionDate())
                 .estimatedLaborHours(wo.getEstimatedLaborHours())
                 .estimatedMaterialCost(wo.getEstimatedMaterialCost())
@@ -812,6 +851,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .status(wo.getStatus())
                 .source(wo.getSource())
                 .plannedMaterials(plannedMaterials)
+                .checkLogs(checkLogs)
                 .laborEntries(laborEntries)
                 .materialUsages(materialUsages)
                 .createdAt(wo.getCreatedAt())

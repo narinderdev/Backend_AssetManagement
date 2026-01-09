@@ -15,6 +15,7 @@ import com.example.eam.WorkOrder.Dto.WorkOrderCompletionRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderCreateRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderPatchRequest;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
+import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderLaborEntryRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialPlanRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
@@ -59,6 +60,8 @@ class WorkOrderServiceTest {
     private WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
     @Mock
     private WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
+    @Mock
+    private WorkOrderCheckLogRepository workOrderCheckLogRepository;
 
     @InjectMocks
     private WorkOrderService workOrderService;
@@ -68,6 +71,7 @@ class WorkOrderServiceTest {
         lenient().when(workOrderLaborEntryRepository.findByWorkOrder_Id(any())).thenReturn(Collections.emptyList());
         lenient().when(workOrderMaterialUsageRepository.findByWorkOrder_Id(any())).thenReturn(Collections.emptyList());
         lenient().when(workOrderMaterialPlanRepository.findByWorkOrder_Id(any())).thenReturn(Collections.emptyList());
+        lenient().when(workOrderCheckLogRepository.findByWorkOrder_Id(any())).thenReturn(Collections.emptyList());
     }
 
     @Test
