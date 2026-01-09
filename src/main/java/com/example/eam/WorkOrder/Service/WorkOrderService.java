@@ -92,13 +92,8 @@ private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIO
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location is required when Asset is not selected");
         }
 
-        Technician technician = resolveTechnician(request.getAssignedTechnicianId());
-        TechnicianTeam team = resolveTeam(request.getAssignedTeamId());
-
 WorkOrderStatus status = WorkOrderStatus.NEW;
-        if (request.getStatus() != null && request.getStatus() != WorkOrderStatus.NEW) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New work orders must start in NEW status");
-        }
+        // Always NEW on creation
 
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
@@ -109,28 +104,22 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
                 .priority(request.getPriority())
                 .woTitle(request.getWoTitle())
                 .descriptionScope(request.getDescriptionScope())
-                .planner(request.getPlanner())
-                .assignedTechnician(technician)
-                .assignedTeam(team)
-                .plannedStartDateTime(request.getPlannedStartDateTime())
-                .plannedEndDateTime(request.getPlannedEndDateTime())
+                .planner(null)
+                .assignedTechnician(null)
+                .assignedTeam(null)
+                .plannedStartDateTime(null)
+                .plannedEndDateTime(null)
                 .targetCompletionDate(request.getTargetCompletionDate())
-                .estimatedLaborHours(request.getEstimatedLaborHours())
-                .estimatedMaterialCost(request.getEstimatedMaterialCost())
-                .estimatedTotalCost(request.getEstimatedTotalCost())
+                .estimatedLaborHours(null)
+                .estimatedMaterialCost(null)
+                .estimatedTotalCost(null)
                 .status(status)
-                .source(request.getSource() != null ? request.getSource() : WorkOrderSource.MANUAL)
+                .source(WorkOrderSource.MANUAL)
                 .deleted(false)
+                .beforePhotoUrl(request.getAttachmentUrl())
                 .build();
 
         WorkOrder saved = workOrderRepository.save(wo);
-
-        if (request.getPlannedMaterials() != null && !request.getPlannedMaterials().isEmpty()) {
-            List<WorkOrderMaterialPlan> plans = request.getPlannedMaterials().stream()
-                    .map(planReq -> buildMaterialPlan(saved, planReq))
-                    .toList();
-            workOrderMaterialPlanRepository.saveAll(plans);
-        }
 
         return toDetailsResponse(saved);
     }
@@ -363,16 +352,18 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     @Transactional
-    public WorkOrderDetailsResponse startWorkOrder(Long id, WorkOrderStartRequest request) {
+    public WorkOrderDetailsResponse markInProgress(Long id, WorkOrderInProgressRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
         if (wo.getStatus() != WorkOrderStatus.SCHEDULED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SCHEDULED work orders can be started");
         }
-        LocalDateTime actualStart = request.getActualStartDateTime() != null
-                ? request.getActualStartDateTime()
+        LocalDateTime checkIn = request.getCheckInAt() != null
+                ? request.getCheckInAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
-        wo.setActualStartDateTime(actualStart);
-        wo.setPrecheckNotes(trim(request.getCheckInNotes()));
+        wo.setCheckInAt(checkIn);
+        wo.setActualStartDateTime(wo.getActualStartDateTime() == null ? checkIn : wo.getActualStartDateTime());
+        wo.setCheckOutAt(request.getCheckOutAt());
+        wo.setPrecheckNotes(trim(request.getNotes()));
 
         validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
         handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
@@ -790,6 +781,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .plannedEndDateTime(wo.getPlannedEndDateTime())
                 .actualStartDateTime(wo.getActualStartDateTime())
                 .actualEndDateTime(wo.getActualEndDateTime())
+                .checkInAt(wo.getCheckInAt())
+                .checkOutAt(wo.getCheckOutAt())
                 .targetCompletionDate(wo.getTargetCompletionDate())
                 .estimatedLaborHours(wo.getEstimatedLaborHours())
                 .estimatedMaterialCost(wo.getEstimatedMaterialCost())

@@ -51,13 +51,13 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order scheduled", data));
     }
 
-    @PostMapping("/{id}/start")
-    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> start(
+    @PostMapping("/{id}/in-progress")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> markInProgress(
             @PathVariable Long id,
-            @RequestBody WorkOrderStartRequest request
+            @RequestBody WorkOrderInProgressRequest request
     ) {
-        WorkOrderDetailsResponse data = workOrderService.startWorkOrder(id, request);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order started", data));
+        WorkOrderDetailsResponse data = workOrderService.markInProgress(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order in progress", data));
     }
 
     @PostMapping("/{id}/complete")

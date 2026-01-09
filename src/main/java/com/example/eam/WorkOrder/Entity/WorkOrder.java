@@ -113,6 +113,12 @@ public class WorkOrder {
     @Column(name = "actual_end_datetime")
     private LocalDateTime actualEndDateTime;
 
+    @Column(name = "check_in_at")
+    private LocalDateTime checkInAt;
+
+    @Column(name = "check_out_at")
+    private LocalDateTime checkOutAt;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 32)
     private WorkOrderStatus status;

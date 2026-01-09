@@ -48,6 +48,8 @@ import java.util.List;
         "completionNotes",
         "failureCause",
         "remedyAction",
+        "checkInAt",
+        "checkOutAt",
         "beforePhotoUrl",
         "afterPhotoUrl",
         "supervisorNotes",
@@ -93,6 +95,8 @@ public class WorkOrderDetailsResponse {
     private LocalDateTime plannedEndDateTime;
     private LocalDateTime actualStartDateTime;
     private LocalDateTime actualEndDateTime;
+    private LocalDateTime checkInAt;
+    private LocalDateTime checkOutAt;
     private LocalDate targetCompletionDate;
     private BigDecimal estimatedLaborHours;
     private BigDecimal estimatedMaterialCost;
