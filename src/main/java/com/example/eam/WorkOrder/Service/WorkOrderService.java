@@ -598,6 +598,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         InventoryItem item = inventoryItemRepository.findById(request.getInventoryItemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Inventory item not found: " + request.getInventoryItemId()));
+        if (!item.isActive()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Inventory item is inactive: " + request.getInventoryItemId());
+        }
 
         int stock = item.getStockLevel() != null ? item.getStockLevel() : 0;
         if (stock < request.getQuantity()) {
@@ -632,6 +636,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         InventoryItem item = inventoryItemRepository.findById(request.getInventoryItemId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Inventory item not found: " + request.getInventoryItemId()));
+        if (!item.isActive()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Inventory item is inactive: " + request.getInventoryItemId());
+        }
 
         int currentStock = item.getStockLevel() != null ? item.getStockLevel() : 0;
         if (currentStock < request.getQuantityUsed()) {
