@@ -1,0 +1,13 @@
+services:
+  asset-management-app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: asset-management
+    container_name: asset-management
+
+    env_file:
+      - .env
+      
+    ports:
+      - "8081:8081"
