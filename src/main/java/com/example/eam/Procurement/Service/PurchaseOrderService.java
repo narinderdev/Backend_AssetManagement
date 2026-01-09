@@ -111,7 +111,14 @@ public class PurchaseOrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No lines available to create PO");
         }
 
-        return toResponse(poRepository.save(po));
+        PurchaseOrder saved = poRepository.save(po);
+
+        // mark MR as converted
+        mr.setStatus(MaterialRequisitionStatus.CONVERTED_TO_PO);
+        mr.setUpdatedAt(Instant.now());
+        mrRepository.save(mr);
+
+        return toResponse(saved);
     }
 
     @Transactional
