@@ -73,7 +73,7 @@ public class PurchaseOrderService {
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr.getId())
-                .status(PurchaseOrderStatus.DRAFT)
+                .status(PurchaseOrderStatus.ISSUED)
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .remarks(trim(request.getRemarks()))
                 .createdByUserId(requireText(request.getCreatedByUserId(), "createdByUserId is required"))
@@ -137,7 +137,7 @@ public class PurchaseOrderService {
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr != null ? mr.getId() : null)
-                .status(PurchaseOrderStatus.DRAFT)
+                .status(PurchaseOrderStatus.ISSUED)
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .remarks(trim(request.getRemarks()))
                 .createdByUserId(requireText(request.getCreatedByUserId(), "createdByUserId is required"))
@@ -185,13 +185,13 @@ public class PurchaseOrderService {
 
         switch (newStatus) {
             case ISSUED -> {
-                if (po.getStatus() != PurchaseOrderStatus.DRAFT) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Only DRAFT PO can be issued");
+                if (po.getStatus() == PurchaseOrderStatus.CANCELLED || po.getStatus() == PurchaseOrderStatus.CLOSED) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot issue PO from status " + po.getStatus());
                 }
             }
             case DELIVERED -> {
-                if (po.getStatus() != PurchaseOrderStatus.ISSUED) {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Only ISSUED PO can be marked DELIVERED");
+                if (po.getStatus() == PurchaseOrderStatus.CANCELLED || po.getStatus() == PurchaseOrderStatus.CLOSED) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot mark Delivered from status " + po.getStatus());
                 }
             }
             case CLOSED -> {

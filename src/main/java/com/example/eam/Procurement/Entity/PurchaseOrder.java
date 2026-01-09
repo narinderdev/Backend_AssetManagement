@@ -46,7 +46,7 @@ public class PurchaseOrder {
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)
     @Builder.Default
-    private PurchaseOrderStatus status = PurchaseOrderStatus.DRAFT;
+    private PurchaseOrderStatus status = PurchaseOrderStatus.ISSUED;
 
     @Column(name = "expected_delivery_date")
     private LocalDate expectedDeliveryDate;
