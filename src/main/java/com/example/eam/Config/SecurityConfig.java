@@ -1,8 +1,9 @@
 package com.example.eam.Config;
 
+import java.util.Arrays;
 import java.util.List;
 
-import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -20,6 +21,8 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import com.example.eam.Auth.security.JwtAuthFilter;
 
+import lombok.RequiredArgsConstructor;
+
 @Configuration
 @EnableWebSecurity
 @RequiredArgsConstructor
@@ -27,36 +30,36 @@ public class SecurityConfig {
 
     private final JwtAuthFilter jwtAuthFilter;
 
+    /**
+     * Comma-separated list of allowed origins. Defaults cover local dev and the
+     * current public IP/ports for HTTP-only deployment.
+     */
+    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://54.225.63.207:4300,http://54.225.63.207}")
+    private String allowedOrigins;
+
+    /**
+     * Comma-separated list of allowed origin patterns (supports wildcards) for dynamic hosts like ngrok.
+     */
+    @Value("${app.cors.allowed-origin-patterns:https://*.ngrok-free.app,http://*.ngrok-free.app}")
+    private String allowedOriginPatterns;
+
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
 
         http
-            // ✅ CORS
             .cors(Customizer.withDefaults())
-
-            // ❌ CSRF disabled for JWT
             .csrf(csrf -> csrf.disable())
-
-            // ❌ No session (JWT)
             .sessionManagement(sm ->
                 sm.sessionCreationPolicy(SessionCreationPolicy.STATELESS)
             )
-
-            // ✅ Authorization rules
             .authorizeHttpRequests(auth -> auth
-                // Preflight
                 .requestMatchers(HttpMethod.OPTIONS, "/**").permitAll()
-
-
-                    // Swagger (DEV ONLY)
+                .requestMatchers("/", "/health").permitAll()
                 .requestMatchers(
-                    "/",
                     "/swagger-ui.html",
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
-
-                // Public APIs
                 .requestMatchers(HttpMethod.POST, "/auth", "/auth/").permitAll()
                 .requestMatchers("/auth/signup/**").permitAll()
                 .requestMatchers(
@@ -65,38 +68,55 @@ public class SecurityConfig {
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/users", "/users/").permitAll()
                 .requestMatchers(HttpMethod.POST, "/users/invite").hasRole("Admin")
-
-                // Everything else needs JWT
                 .anyRequest().authenticated()
             )
-
-            // ✅ JWT filter
             .addFilterBefore(jwtAuthFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
     }
 
-    // ✅ Password encoder
     @Bean
     public PasswordEncoder passwordEncoder() {
         return new BCryptPasswordEncoder();
     }
 
-    // ✅ CORS config
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration config = new CorsConfiguration();
 
-        config.setAllowedOriginPatterns(List.of("*")); // ngrok-safe
-        config.setAllowedMethods(List.of(
-                "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"
-        ));
-        config.setAllowedHeaders(List.of("*"));
+        config.setAllowedOrigins(resolveAllowedOrigins());
+        config.setAllowedOriginPatterns(resolveAllowedOriginPatterns());
         config.setAllowCredentials(true);
 
-        UrlBasedCorsConfigurationSource source =
-                new UrlBasedCorsConfigurationSource();
+        config.setAllowedMethods(Arrays.asList(
+            "GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS", "HEAD"
+        ));
+
+        config.setAllowedHeaders(List.of("*"));  // Allow all headers
+
+        config.setExposedHeaders(Arrays.asList(
+            "Authorization",
+            "Content-Disposition"
+        ));
+
+        config.setMaxAge(3600L);
+
+        UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", config);
         return source;
+    }
+
+    private List<String> resolveAllowedOrigins() {
+        return Arrays.stream(allowedOrigins.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
+    }
+
+    private List<String> resolveAllowedOriginPatterns() {
+        return Arrays.stream(allowedOriginPatterns.split(","))
+                .map(String::trim)
+                .filter(s -> !s.isEmpty())
+                .toList();
     }
 }

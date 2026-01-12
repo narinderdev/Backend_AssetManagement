@@ -4,6 +4,7 @@ import com.example.eam.Asset.Dto.*;
 import com.example.eam.Asset.Entity.*;
 import com.example.eam.Asset.Repository.*;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -350,7 +351,15 @@ public class AssetService {
     @Transactional
     public void deleteAsset(Long id) {
         Asset asset = getAssetOrThrow(id);
-        assetRepository.delete(asset);
+        try {
+            assetRepository.delete(asset);
+        } catch (DataIntegrityViolationException ex) {
+            // Asset is referenced by other records (e.g., service requests/work orders)
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Asset cannot be deleted because it is referenced by other records"
+            );
+        }
     }
 
     // ---------- Helpers ----------
