@@ -25,6 +25,7 @@ import com.example.eam.WorkOrder.Repository.WorkOrderMaterialPlanRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -53,6 +54,7 @@ public class WorkOrderService {
     private static final Logger log = LoggerFactory.getLogger(WorkOrderService.class);
 
     private final WorkOrderRepository workOrderRepository;
+    private final WorkOrderChecklistItemRepository workOrderChecklistItemRepository;
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
     private final ServiceMaintenanceRepository serviceMaintenanceRepository;
@@ -792,6 +794,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         Technician technician = wo.getAssignedTechnician();
         TechnicianTeam team = wo.getAssignedTeam();
 
+        List<WorkOrderChecklistItemResponse> checklistItems = workOrderChecklistItemRepository.findByWorkOrder_Id(wo.getId()).stream()
+                .map(item -> WorkOrderChecklistItemResponse.builder()
+                        .id(item.getId())
+                        .itemText(item.getItemText())
+                        .required(item.getRequired())
+                        .completed(item.getCompleted())
+                        .build())
+                .toList();
+
         List<WorkOrderLaborEntryResponse> laborEntries = workOrderLaborEntryRepository.findByWorkOrder_Id(wo.getId()).stream()
                 .map(this::toLaborEntryResponse)
                 .toList();
@@ -813,6 +824,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .workOrderId(wo.getWorkOrderId())
                 .linkedServiceRequestDbId(sr != null ? sr.getId() : null)
                 .linkedServiceRequestId(sr != null ? sr.getRequestId() : null)
+                .pmPlanId(wo.getPmPlan() != null ? wo.getPmPlan().getId() : null)
+                .pmPlanCode(wo.getPmPlan() != null ? wo.getPmPlan().getPlanCode() : null)
+                .pmDueDate(wo.getPmDueDate())
                 .assetDbId(asset != null ? asset.getId() : null)
                 .assetId(asset != null ? asset.getAssetId() : null)
                 .assetName(asset != null ? asset.getAssetName() : null)
@@ -839,8 +853,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .actualMaterialCost(wo.getActualMaterialCost())
                 .actualTotalCost(wo.getActualTotalCost())
                 .completionNotes(wo.getCompletionNotes())
+                .failureDescription(wo.getFailureDescription())
                 .failureCause(wo.getFailureCause())
                 .remedyAction(wo.getRemedyAction())
+                .downtimeStart(wo.getDowntimeStart())
+                .downtimeEnd(wo.getDowntimeEnd())
+                .reporter(wo.getReporter())
                 .beforePhotoUrl(wo.getBeforePhotoUrl())
                 .afterPhotoUrl(wo.getAfterPhotoUrl())
                 .supervisorNotes(wo.getSupervisorNotes())
@@ -853,6 +871,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .plannedMaterials(plannedMaterials)
                 .checkLogs(checkLogs)
                 .laborEntries(laborEntries)
+                .checklistItems(checklistItems)
                 .materialUsages(materialUsages)
                 .createdAt(wo.getCreatedAt())
                 .updatedAt(wo.getUpdatedAt())

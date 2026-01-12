@@ -5,6 +5,8 @@ public enum WorkOrderSource {
     PM,
     MANUAL,
     INSPECTION,
-    IOT_ALERT
+    IOT_ALERT,
+    EMERGENCY,
+    PREDICTIVE
 }
 

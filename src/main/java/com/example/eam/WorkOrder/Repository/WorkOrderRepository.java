@@ -15,7 +15,7 @@ import java.util.Optional;
 
 public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
-    boolean existsByPmTemplate_IdAndPmDueDate(Long pmTemplateId, LocalDate pmDueDate);
+    boolean existsByPmPlan_IdAndPmDueDate(Long pmPlanId, LocalDate pmDueDate);
 
     boolean existsByWorkOrderId(String workOrderId);
 

@@ -5,7 +5,7 @@ import com.example.eam.Enum.PriorityLevel;
 import com.example.eam.Enum.WorkOrderSource;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Enum.WorkType;
-import com.example.eam.PreventiveMaintenance.Entity.PreventiveMaintenance;
+import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
 import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
@@ -24,13 +24,13 @@ import java.time.LocalDateTime;
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_work_orders_work_order_id", columnNames = "work_order_id"),
         @UniqueConstraint(name = "uk_work_orders_service_request", columnNames = "service_request_id"),
-        @UniqueConstraint(name = "uk_work_orders_pm_due", columnNames = {"pm_template_id", "pm_due_date"})
+        @UniqueConstraint(name = "uk_work_orders_pm_due", columnNames = {"pm_plan_id", "pm_due_date"})
     },
     indexes = {
         @Index(name = "idx_work_orders_asset_id", columnList = "asset_id"),
         @Index(name = "idx_work_orders_deleted", columnList = "deleted"),
         @Index(name = "idx_work_orders_status", columnList = "status"),
-        @Index(name = "idx_work_orders_pm_template", columnList = "pm_template_id")
+        @Index(name = "idx_work_orders_pm_plan", columnList = "pm_plan_id")
     }
 )
 
@@ -49,8 +49,8 @@ public class WorkOrder {
     private String workOrderId;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "pm_template_id")
-    private PreventiveMaintenance pmTemplate;
+    @JoinColumn(name = "pm_plan_id")
+    private PreventivePlan pmPlan;
 
         // Due date for this PM-generated Work Order (used to avoid duplicates)
    @Column(name = "pm_due_date")
@@ -171,6 +171,23 @@ public class WorkOrder {
     @Lob
     @Column(name = "precheck_notes")
     private String precheckNotes;
+
+    // Emergency / downtime tracking
+    @Lob
+    @Column(name = "failure_description")
+    private String failureDescription;
+
+    @Column(name = "failure_time")
+    private LocalDateTime failureTime;
+
+    @Column(name = "downtime_start")
+    private LocalDateTime downtimeStart;
+
+    @Column(name = "downtime_end")
+    private LocalDateTime downtimeEnd;
+
+    @Column(name = "reporter", length = 120)
+    private String reporter;
 
     @Column(name = "approved_by", length = 120)
     private String approvedBy;

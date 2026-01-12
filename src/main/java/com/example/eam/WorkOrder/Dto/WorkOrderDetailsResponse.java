@@ -20,6 +20,9 @@ import java.util.List;
         "workOrderId",
         "linkedServiceRequestDbId",
         "linkedServiceRequestId",
+        "pmPlanId",
+        "pmPlanCode",
+        "pmDueDate",
         "assetDbId",
         "assetId",
         "assetName",
@@ -46,8 +49,12 @@ import java.util.List;
         "actualMaterialCost",
         "actualTotalCost",
         "completionNotes",
+        "failureDescription",
         "failureCause",
         "remedyAction",
+        "downtimeStart",
+        "downtimeEnd",
+        "reporter",
         "checkInAt",
         "checkOutAt",
         "beforePhotoUrl",
@@ -62,6 +69,7 @@ import java.util.List;
         "status",
         "source",
         "laborEntries",
+        "checklistItems",
         "materialUsages",
         "createdAt",
         "updatedAt"
@@ -73,6 +81,10 @@ public class WorkOrderDetailsResponse {
 
     private Long linkedServiceRequestDbId;   // ServiceMaintenance.id
     private String linkedServiceRequestId;   // ServiceMaintenance.serviceRequestId (business id)
+
+    private Long pmPlanId;
+    private String pmPlanCode;
+    private LocalDate pmDueDate;
 
     private Long assetDbId;                  // Asset.id
     private String assetId;                  // Asset.assetId (business id)
@@ -107,8 +119,12 @@ public class WorkOrderDetailsResponse {
     private BigDecimal actualMaterialCost;
     private BigDecimal actualTotalCost;
     private String completionNotes;
+    private String failureDescription;
     private String failureCause;
     private String remedyAction;
+    private LocalDateTime downtimeStart;
+    private LocalDateTime downtimeEnd;
+    private String reporter;
     private String beforePhotoUrl;
     private String afterPhotoUrl;
     private String supervisorNotes;
@@ -124,6 +140,7 @@ public class WorkOrderDetailsResponse {
 
     private List<WorkOrderMaterialPlanResponse> plannedMaterials;
     private List<WorkOrderLaborEntryResponse> laborEntries;
+    private List<WorkOrderChecklistItemResponse> checklistItems;
     private List<WorkOrderMaterialUsageResponse> materialUsages;
 
     private LocalDateTime createdAt;
