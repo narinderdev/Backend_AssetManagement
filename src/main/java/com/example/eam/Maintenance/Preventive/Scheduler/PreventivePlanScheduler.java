@@ -11,6 +11,7 @@ public class PreventivePlanScheduler {
 
     private final PreventivePlanService planService;
 
+    // TEMP: run daily at 00:00 server time for testing PM WO generation
     @Scheduled(cron = "0 0 0 * * *")
     public void generateDue() {
         planService.generateDueWorkOrders();
