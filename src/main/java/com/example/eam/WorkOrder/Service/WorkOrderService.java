@@ -8,6 +8,7 @@ import com.example.eam.Asset.Repository.AssetRepository;
 import com.example.eam.Enum.*;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
+import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
 import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
 import com.example.eam.Technician.Entity.Technician;
@@ -26,6 +27,7 @@ import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
+import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -65,6 +67,7 @@ public class WorkOrderService {
     private final WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
     private final WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
     private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
+    private final EmergencyIncidentRepository emergencyIncidentRepository;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
@@ -819,6 +822,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .map(this::toCheckLogResponse)
                 .toList();
 
+        Long emergencyIncidentId = emergencyIncidentRepository.findByWorkOrder_Id(wo.getId())
+                .map(em -> em.getId())
+                .orElse(null);
+
         return WorkOrderDetailsResponse.builder()
                 .id(wo.getId())
                 .workOrderId(wo.getWorkOrderId())
@@ -827,6 +834,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .pmPlanId(wo.getPmPlan() != null ? wo.getPmPlan().getId() : null)
                 .pmPlanCode(wo.getPmPlan() != null ? wo.getPmPlan().getPlanCode() : null)
                 .pmDueDate(wo.getPmDueDate())
+                .emergencyIncidentId(emergencyIncidentId)
                 .assetDbId(asset != null ? asset.getId() : null)
                 .assetId(asset != null ? asset.getAssetId() : null)
                 .assetName(asset != null ? asset.getAssetName() : null)

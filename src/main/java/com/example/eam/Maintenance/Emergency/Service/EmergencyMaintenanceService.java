@@ -9,6 +9,8 @@ import com.example.eam.Enum.WorkOrderSource;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Enum.WorkType;
 import com.example.eam.Maintenance.Emergency.Dto.EmergencyWorkOrderRequest;
+import com.example.eam.Maintenance.Emergency.Entity.EmergencyIncident;
+import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import jakarta.validation.Valid;
@@ -30,6 +32,7 @@ public class EmergencyMaintenanceService {
     private final WorkOrderRepository workOrderRepository;
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
+    private final EmergencyIncidentRepository emergencyIncidentRepository;
 
     @Transactional
     public WorkOrder createEmergencyWo(@Valid EmergencyWorkOrderRequest req) {
@@ -57,7 +60,20 @@ public class EmergencyMaintenanceService {
                 .deleted(false)
                 .build();
 
-        return workOrderRepository.save(wo);
+        WorkOrder saved = workOrderRepository.save(wo);
+
+        EmergencyIncident incident = EmergencyIncident.builder()
+                .workOrder(saved)
+                .asset(asset)
+                .location(location)
+                .failureDescription(req.getFailureDescription())
+                .failureTime(wo.getFailureTime())
+                .downtimeStart(wo.getDowntimeStart())
+                .reporter(req.getReporter())
+                .build();
+        emergencyIncidentRepository.save(incident);
+
+        return saved;
     }
 
     private Asset resolveAsset(Long id) {

@@ -23,6 +23,7 @@ import java.util.List;
         "pmPlanId",
         "pmPlanCode",
         "pmDueDate",
+        "emergencyIncidentId",
         "assetDbId",
         "assetId",
         "assetName",
@@ -85,6 +86,7 @@ public class WorkOrderDetailsResponse {
     private Long pmPlanId;
     private String pmPlanCode;
     private LocalDate pmDueDate;
+    private Long emergencyIncidentId;
 
     private Long assetDbId;                  // Asset.id
     private String assetId;                  // Asset.assetId (business id)
