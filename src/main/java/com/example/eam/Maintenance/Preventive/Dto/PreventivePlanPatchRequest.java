@@ -8,7 +8,6 @@ import com.example.eam.Enum.WorkType;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
 public class PreventivePlanPatchRequest {
@@ -26,5 +25,4 @@ public class PreventivePlanPatchRequest {
     private Integer meterIntervalValue;
     private Integer currentMeterReading;
     private Boolean active;
-    private List<ChecklistItemDto> checklistItems;
 }

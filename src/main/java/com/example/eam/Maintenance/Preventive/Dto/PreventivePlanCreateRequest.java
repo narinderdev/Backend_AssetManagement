@@ -6,13 +6,11 @@ import com.example.eam.Enum.PriorityLevel;
 import com.example.eam.Enum.TimeFrequencyUnit;
 import com.example.eam.Enum.WorkType;
 import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Positive;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
 public class PreventivePlanCreateRequest {
@@ -44,7 +42,4 @@ public class PreventivePlanCreateRequest {
     @Positive
     private Integer meterIntervalValue;
     private Integer currentMeterReading;
-
-    @NotEmpty
-    private List<ChecklistItemDto> checklistItems;
 }

@@ -9,7 +9,6 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDate;
-import java.util.List;
 
 @Data
 @Builder
@@ -35,5 +34,4 @@ public class PreventivePlanResponse {
     private Integer nextDueMeter;
     private LocalDate lastGeneratedDueDate;
     private Boolean active;
-    private List<ChecklistItemDto> checklistItems;
 }

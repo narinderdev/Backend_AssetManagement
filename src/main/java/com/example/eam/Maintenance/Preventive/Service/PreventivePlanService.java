@@ -5,17 +5,12 @@ import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
 import com.example.eam.Enum.*;
-import com.example.eam.Maintenance.Preventive.Dto.ChecklistItemDto;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanCreateRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanPatchRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanResponse;
 import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
-import com.example.eam.Maintenance.Preventive.Entity.PreventivePlanChecklistItem;
-import com.example.eam.Maintenance.Preventive.Repository.PreventivePlanChecklistRepository;
 import com.example.eam.Maintenance.Preventive.Repository.PreventivePlanRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
-import com.example.eam.WorkOrder.Entity.WorkOrderChecklistItem;
-import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -29,7 +24,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
@@ -38,11 +32,9 @@ import java.util.function.Consumer;
 public class PreventivePlanService {
 
     private final PreventivePlanRepository planRepository;
-    private final PreventivePlanChecklistRepository checklistRepository;
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
     private final WorkOrderRepository workOrderRepository;
-    private final WorkOrderChecklistItemRepository workOrderChecklistItemRepository;
 
     // ---------- CREATE ----------
 
@@ -80,9 +72,7 @@ public class PreventivePlanService {
                 .build();
 
         PreventivePlan saved = planRepository.save(plan);
-        persistChecklist(saved, req.getChecklistItems());
-
-        return mapToResponse(saved, req.getChecklistItems());
+        return mapToResponse(saved);
     }
 
     // ---------- PATCH ----------
@@ -136,23 +126,7 @@ public class PreventivePlanService {
 
         planRepository.save(plan);
 
-        List<ChecklistItemDto> checklistDtos = req.getChecklistItems();
-        if (checklistDtos != null) {
-            checklistRepository.deleteByPlan(plan);
-            persistChecklist(plan, checklistDtos);
-        } else {
-            checklistDtos = checklistRepository.findByPlan_Id(plan.getId()).stream()
-                    .map(ci -> {
-                        ChecklistItemDto dto = new ChecklistItemDto();
-                        dto.setItemText(ci.getItemText());
-                        dto.setRequired(ci.getRequired());
-                        dto.setSortOrder(ci.getSortOrder());
-                        return dto;
-                    })
-                    .toList();
-        }
-
-        return mapToResponse(plan, checklistDtos);
+        return mapToResponse(plan);
     }
 
     // ---------- READ ----------
@@ -160,30 +134,13 @@ public class PreventivePlanService {
     @Transactional(readOnly = true)
     public PreventivePlanResponse get(Long id) {
         PreventivePlan plan = getPlanOrThrow(id);
-        List<ChecklistItemDto> items = checklistRepository.findByPlan_Id(id).stream()
-                .map(ci -> {
-                    ChecklistItemDto dto = new ChecklistItemDto();
-                    dto.setItemText(ci.getItemText());
-                    dto.setRequired(ci.getRequired());
-                    dto.setSortOrder(ci.getSortOrder());
-                    return dto;
-                })
-                .toList();
-        return mapToResponse(plan, items);
+        return mapToResponse(plan);
     }
 
     @Transactional(readOnly = true)
     public Page<PreventivePlanResponse> list(Pageable pageable) {
         return planRepository.findByDeletedFalse(pageable)
-                .map(plan -> mapToResponse(plan,
-                        checklistRepository.findByPlan_Id(plan.getId()).stream()
-                                .map(ci -> {
-                                    ChecklistItemDto dto = new ChecklistItemDto();
-                                    dto.setItemText(ci.getItemText());
-                                    dto.setRequired(ci.getRequired());
-                                    dto.setSortOrder(ci.getSortOrder());
-                                    return dto;
-                                }).toList()));
+                .map(this::mapToResponse);
     }
 
     // ---------- DELETE ----------
@@ -254,20 +211,6 @@ public class PreventivePlanService {
                 .build();
 
         WorkOrder saved = workOrderRepository.save(wo);
-
-        // Copy checklist items to WO
-        List<PreventivePlanChecklistItem> items = checklistRepository.findByPlan_Id(plan.getId());
-        if (!items.isEmpty()) {
-            List<WorkOrderChecklistItem> woItems = items.stream()
-                    .map(ci -> WorkOrderChecklistItem.builder()
-                            .workOrder(saved)
-                            .itemText(ci.getItemText())
-                            .required(ci.getRequired())
-                            .completed(false)
-                            .build())
-                    .toList();
-            workOrderChecklistItemRepository.saveAll(woItems);
-        }
     }
 
     private PreventivePlan getPlanOrThrow(Long id) {
@@ -319,19 +262,6 @@ public class PreventivePlanService {
         };
     }
 
-    private void persistChecklist(PreventivePlan plan, List<ChecklistItemDto> items) {
-        if (items == null || items.isEmpty()) return;
-        List<PreventivePlanChecklistItem> entities = items.stream()
-                .map(dto -> PreventivePlanChecklistItem.builder()
-                        .plan(plan)
-                        .itemText(dto.getItemText())
-                        .required(dto.getRequired())
-                        .sortOrder(dto.getSortOrder())
-                        .build())
-                .toList();
-        checklistRepository.saveAll(entities);
-    }
-
     private String generateUniquePlanCode() {
         String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         for (int i = 0; i < 30; i++) {
@@ -368,7 +298,7 @@ public class PreventivePlanService {
         if (value != null && !value.trim().isEmpty()) setter.accept(value.trim());
     }
 
-    private PreventivePlanResponse mapToResponse(PreventivePlan plan, List<ChecklistItemDto> checklist) {
+    private PreventivePlanResponse mapToResponse(PreventivePlan plan) {
         Asset asset = plan.getAsset();
         return PreventivePlanResponse.builder()
                 .id(plan.getId())
@@ -392,7 +322,6 @@ public class PreventivePlanService {
                 .nextDueMeter(plan.getNextDueMeter())
                 .lastGeneratedDueDate(plan.getLastGeneratedDueDate())
                 .active(plan.getActive())
-                .checklistItems(checklist)
                 .build();
     }
 }
