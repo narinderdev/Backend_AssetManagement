@@ -8,8 +8,10 @@ import com.example.eam.Enum.WorkOrderSource;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Enum.WorkType;
 import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdRequest;
+import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdListResponse;
 import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse;
 import com.example.eam.Maintenance.Predictive.Dto.MeterReadingRequest;
+import com.example.eam.Maintenance.Predictive.Dto.PredictiveMeterReadingResponse;
 import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
 import com.example.eam.Maintenance.Predictive.Entity.PredictiveMeterReading;
 import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
@@ -18,6 +20,8 @@ import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -26,6 +30,9 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import java.util.concurrent.ThreadLocalRandom;
 
 @Service
@@ -53,7 +60,66 @@ public class PredictiveMaintenanceService {
         threshold.setCooldownHours(req.getCooldownHours() != null ? req.getCooldownHours() : 24);
 
         AssetThreshold saved = thresholdRepository.save(threshold);
-        return toResponse(saved);
+        List<PredictiveMeterReading> readings = meterReadingRepository.findByThreshold_Id(saved.getId());
+        return toResponse(saved, readings);
+    }
+
+    @Transactional
+    public AssetThresholdResponse updateThreshold(Long id, @Valid AssetThresholdRequest req) {
+        AssetThreshold threshold = thresholdRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
+
+        Asset asset = assetRepository.findById(req.getAssetId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
+
+        threshold.setAsset(asset);
+        threshold.setMeterType(req.getMeterType());
+        threshold.setWarningThreshold(req.getWarningThreshold());
+        threshold.setCriticalThreshold(req.getCriticalThreshold());
+        threshold.setAutoCreateWo(req.getAutoCreateWo() != null ? req.getAutoCreateWo() : true);
+        threshold.setDefaultPriority(req.getDefaultPriority() != null ? req.getDefaultPriority() : PriorityLevel.MEDIUM);
+        threshold.setCooldownHours(req.getCooldownHours() != null ? req.getCooldownHours() : 24);
+
+        AssetThreshold saved = thresholdRepository.save(threshold);
+        List<PredictiveMeterReading> readings = meterReadingRepository.findByThreshold_Id(saved.getId());
+        return toResponse(saved, readings);
+    }
+
+    @Transactional(readOnly = true)
+    public AssetThresholdResponse getThreshold(Long id) {
+        AssetThreshold threshold = thresholdRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
+        List<PredictiveMeterReading> readings = meterReadingRepository.findByThreshold_Id(threshold.getId());
+        return toResponse(threshold, readings);
+    }
+
+    @Transactional(readOnly = true)
+    public AssetThresholdListResponse listThresholds(Pageable pageable) {
+        Page<AssetThreshold> page = thresholdRepository.findAll(pageable);
+        List<Long> ids = page.getContent().stream().map(AssetThreshold::getId).toList();
+        Map<Long, List<PredictiveMeterReading>> readingsByThreshold = meterReadingRepository.findByThreshold_IdIn(ids).stream()
+                .collect(Collectors.groupingBy(reading -> reading.getThreshold().getId()));
+
+        List<AssetThresholdResponse> rows = page.getContent().stream()
+                .map(th -> toResponse(th, readingsByThreshold.getOrDefault(th.getId(), List.of())))
+                .toList();
+
+        return AssetThresholdListResponse.builder()
+                .thresholds(rows)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
+    @Transactional
+    public void deleteThreshold(Long id) {
+        AssetThreshold threshold = thresholdRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
+        meterReadingRepository.deleteByThreshold_Id(threshold.getId());
+        thresholdRepository.delete(threshold);
     }
 
     @Transactional
@@ -138,7 +204,7 @@ public class PredictiveMaintenanceService {
                 "Unable to generate unique Work Order ID");
     }
 
-    private AssetThresholdResponse toResponse(AssetThreshold threshold) {
+    private AssetThresholdResponse toResponse(AssetThreshold threshold, List<PredictiveMeterReading> readings) {
         return AssetThresholdResponse.builder()
                 .id(threshold.getId())
                 .assetId(threshold.getAsset() != null ? threshold.getAsset().getId() : null)
@@ -150,6 +216,17 @@ public class PredictiveMaintenanceService {
                 .defaultPriority(threshold.getDefaultPriority())
                 .cooldownHours(threshold.getCooldownHours())
                 .lastTriggeredSeverity(threshold.getLastTriggeredSeverity())
+                .meterReadings(readings.stream()
+                        .map(r -> PredictiveMeterReadingResponse.builder()
+                                .id(r.getId())
+                                .meterType(r.getMeterType())
+                                .readingValue(r.getReadingValue())
+                                .readingTime(r.getReadingTime())
+                                .severity(r.getSeverity())
+                                .notes(r.getNotes())
+                                .createdAt(r.getCreatedAt())
+                                .build())
+                        .toList())
                 .build();
     }
 }

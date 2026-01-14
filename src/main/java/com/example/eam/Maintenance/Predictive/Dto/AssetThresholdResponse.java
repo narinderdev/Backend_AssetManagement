@@ -5,6 +5,8 @@ import com.example.eam.Enum.PriorityLevel;
 import lombok.Builder;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 @Builder
 public class AssetThresholdResponse {
@@ -18,4 +20,5 @@ public class AssetThresholdResponse {
     private PriorityLevel defaultPriority;
     private Integer cooldownHours;
     private String lastTriggeredSeverity;
+    private List<PredictiveMeterReadingResponse> meterReadings;
 }
