@@ -3,8 +3,10 @@ package com.example.eam.Technician.Service;
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
 import com.example.eam.Technician.Repository.TechnicianRepository;
-import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
+import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
+import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,7 @@ import java.util.List;
 public class TechnicianService {
 
     private final TechnicianRepository technicianRepository;
+    private final TechnicianTeamMemberRepository teamMemberRepository;
 
     @Transactional
     public TechnicianDetailsResponse createTechnician(TechnicianCreateRequest request) {
@@ -131,7 +134,7 @@ public class TechnicianService {
     }
 
     private TechnicianDetailsResponse toDetailsResponse(Technician technician) {
-        TechnicianTeam team = technician.getTeam();
+        List<TechnicianTeamMembershipResponse> teamMemberships = buildTeamMemberships(technician);
 
         return TechnicianDetailsResponse.builder()
                 .id(technician.getId())
@@ -148,10 +151,24 @@ public class TechnicianService {
                 .workShift(technician.getWorkShift())
                 .certifications(technician.getCertifications())
                 .notes(technician.getNotes())
-                .teamId(team != null ? team.getId() : null)
-                .teamName(team != null ? team.getTeamName() : null)
-                .teamLeader(technician.isTeamLeader())
+                .teamLeader(teamMemberships.stream().anyMatch(TechnicianTeamMembershipResponse::isTeamLeader))
+                .teamMemberships(teamMemberships)
                 .build();
+    }
+
+    private List<TechnicianTeamMembershipResponse> buildTeamMemberships(Technician technician) {
+        List<TechnicianTeamMember> memberships = technician.getTeamMemberships();
+        if (memberships == null || memberships.isEmpty()) {
+            memberships = teamMemberRepository.findByTechnician_Id(technician.getId());
+        }
+
+        return memberships.stream()
+                .map(membership -> TechnicianTeamMembershipResponse.builder()
+                        .teamId(membership.getTeam().getId())
+                        .teamName(membership.getTeam().getTeamName())
+                        .teamLeader(membership.isTeamLeader())
+                        .build())
+                .toList();
     }
 
     private String safeTrim(String value) {

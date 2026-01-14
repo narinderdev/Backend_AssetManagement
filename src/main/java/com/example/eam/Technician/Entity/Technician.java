@@ -2,18 +2,19 @@ package com.example.eam.Technician.Entity;
 
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
-import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
+import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDate;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(
         name = "technicians",
         uniqueConstraints = @UniqueConstraint(name = "uk_technicians_email", columnNames = "email"),
         indexes = {
-                @Index(name = "idx_technicians_team_id", columnList = "team_id"),
                 @Index(name = "idx_technicians_status", columnList = "status")
         }
 )
@@ -73,13 +74,9 @@ public class Technician {
     @Column(name = "notes")
     private String notes;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "team_id")
-    private TechnicianTeam team;
-
     @Builder.Default
-    @Column(name = "team_leader", nullable = false)
-    private boolean teamLeader = false;
+    @OneToMany(mappedBy = "technician", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TechnicianTeamMember> teamMemberships = new ArrayList<>();
 
     @PrePersist
     @PreUpdate

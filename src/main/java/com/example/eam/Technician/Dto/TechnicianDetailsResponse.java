@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 
 import java.time.LocalDate;
+import java.util.List;
 
 @Data
 @Builder
@@ -25,7 +26,6 @@ public class TechnicianDetailsResponse {
     private String workShift;
     private String certifications;
     private String notes;
-    private Long teamId;
-    private String teamName;
     private boolean teamLeader;
+    private List<TechnicianTeamMembershipResponse> teamMemberships;
 }

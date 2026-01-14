@@ -1,7 +1,7 @@
 package com.example.eam.TechnicianTeam.Entity;
 
 import com.example.eam.Enum.TechnicianTeamStatus;
-import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -50,6 +50,6 @@ public class TechnicianTeam {
     private String notes;
 
     @Builder.Default
-    @OneToMany(mappedBy = "team", fetch = FetchType.LAZY)
-    private List<Technician> technicians = new ArrayList<>();
+    @OneToMany(mappedBy = "team", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<TechnicianTeamMember> members = new ArrayList<>();
 }
