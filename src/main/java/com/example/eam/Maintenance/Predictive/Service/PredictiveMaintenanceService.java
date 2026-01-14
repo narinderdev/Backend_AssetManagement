@@ -8,9 +8,12 @@ import com.example.eam.Enum.WorkOrderSource;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Enum.WorkType;
 import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdRequest;
+import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse;
 import com.example.eam.Maintenance.Predictive.Dto.MeterReadingRequest;
 import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
+import com.example.eam.Maintenance.Predictive.Entity.PredictiveMeterReading;
 import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
+import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import jakarta.validation.Valid;
@@ -32,9 +35,10 @@ public class PredictiveMaintenanceService {
     private final AssetThresholdRepository thresholdRepository;
     private final AssetRepository assetRepository;
     private final WorkOrderRepository workOrderRepository;
+    private final PredictiveMeterReadingRepository meterReadingRepository;
 
     @Transactional
-    public AssetThreshold upsertThreshold(@Valid AssetThresholdRequest req) {
+    public AssetThresholdResponse upsertThreshold(@Valid AssetThresholdRequest req) {
         Asset asset = assetRepository.findById(req.getAssetId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
@@ -48,7 +52,8 @@ public class PredictiveMaintenanceService {
         threshold.setDefaultPriority(req.getDefaultPriority() != null ? req.getDefaultPriority() : PriorityLevel.MEDIUM);
         threshold.setCooldownHours(req.getCooldownHours() != null ? req.getCooldownHours() : 24);
 
-        return thresholdRepository.save(threshold);
+        AssetThreshold saved = thresholdRepository.save(threshold);
+        return toResponse(saved);
     }
 
     @Transactional
@@ -69,6 +74,17 @@ public class PredictiveMaintenanceService {
             severity = "WARNING";
         }
 
+        PredictiveMeterReading reading = PredictiveMeterReading.builder()
+                .threshold(threshold)
+                .asset(asset)
+                .meterType(req.getMeterType())
+                .readingValue(value)
+                .readingTime(now)
+                .severity(severity)
+                .notes(req.getNotes())
+                .build();
+        meterReadingRepository.save(reading);
+
         if (severity == null) return;
 
         if (threshold.getLastTriggeredAt() != null && threshold.getCooldownHours() != null) {
@@ -83,11 +99,12 @@ public class PredictiveMaintenanceService {
         thresholdRepository.save(threshold);
 
         if ("CRITICAL".equals(severity) && Boolean.TRUE.equals(threshold.getAutoCreateWo())) {
-            createPredictiveWorkOrder(asset, req.getMeterType(), value);
+            createPredictiveWorkOrder(asset, threshold, req.getMeterType(), value);
         }
     }
 
-    private void createPredictiveWorkOrder(Asset asset, MeterType meterType, double value) {
+    private void createPredictiveWorkOrder(Asset asset, AssetThreshold threshold, MeterType meterType, double value) {
+        PriorityLevel priority = threshold.getDefaultPriority() != null ? threshold.getDefaultPriority() : PriorityLevel.HIGH;
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .pmPlan(null)
@@ -95,7 +112,7 @@ public class PredictiveMaintenanceService {
                 .asset(asset)
                 .location(null)
                 .workType(WorkType.PREDICTIVE)
-                .priority(PriorityLevel.HIGH)
+                .priority(priority)
                 .woTitle("Predictive alert: " + meterType)
                 .descriptionScope("Meter " + meterType + " crossed threshold with value " + value)
                 .status(WorkOrderStatus.NEW)
@@ -119,5 +136,20 @@ public class PredictiveMaintenanceService {
 
         throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR,
                 "Unable to generate unique Work Order ID");
+    }
+
+    private AssetThresholdResponse toResponse(AssetThreshold threshold) {
+        return AssetThresholdResponse.builder()
+                .id(threshold.getId())
+                .assetId(threshold.getAsset() != null ? threshold.getAsset().getId() : null)
+                .assetName(threshold.getAsset() != null ? threshold.getAsset().getAssetName() : null)
+                .meterType(threshold.getMeterType())
+                .warningThreshold(threshold.getWarningThreshold())
+                .criticalThreshold(threshold.getCriticalThreshold())
+                .autoCreateWo(threshold.getAutoCreateWo())
+                .defaultPriority(threshold.getDefaultPriority())
+                .cooldownHours(threshold.getCooldownHours())
+                .lastTriggeredSeverity(threshold.getLastTriggeredSeverity())
+                .build();
     }
 }

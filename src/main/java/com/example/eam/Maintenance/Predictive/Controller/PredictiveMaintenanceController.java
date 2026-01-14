@@ -2,8 +2,8 @@ package com.example.eam.Maintenance.Predictive.Controller;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdRequest;
+import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse;
 import com.example.eam.Maintenance.Predictive.Dto.MeterReadingRequest;
-import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
 import com.example.eam.Maintenance.Predictive.Service.PredictiveMaintenanceService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -19,8 +19,8 @@ public class PredictiveMaintenanceController {
     private final PredictiveMaintenanceService service;
 
     @PostMapping("/threshold")
-    public ResponseEntity<ApiResponse<AssetThreshold>> upsertThreshold(@Valid @RequestBody AssetThresholdRequest req) {
-        AssetThreshold saved = service.upsertThreshold(req);
+    public ResponseEntity<ApiResponse<AssetThresholdResponse>> upsertThreshold(@Valid @RequestBody AssetThresholdRequest req) {
+        AssetThresholdResponse saved = service.upsertThreshold(req);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Threshold saved", saved));
     }
 
