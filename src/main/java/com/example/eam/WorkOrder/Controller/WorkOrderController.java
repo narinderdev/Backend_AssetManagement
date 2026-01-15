@@ -42,6 +42,15 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order approved", data));
     }
 
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> reject(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderRejectRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.rejectWorkOrder(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order rejected", data));
+    }
+
     @PostMapping("/{id}/schedule")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> schedule(
             @PathVariable Long id,

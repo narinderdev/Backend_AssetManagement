@@ -169,6 +169,10 @@ public class WorkOrder {
     private String approvalNotes;
 
     @Lob
+    @Column(name = "rejection_reason")
+    private String rejectionReason;
+
+    @Lob
     @Column(name = "precheck_notes")
     private String precheckNotes;
 
@@ -194,6 +198,12 @@ public class WorkOrder {
 
     @Column(name = "approved_at")
     private LocalDateTime approvedAt;
+
+    @Column(name = "rejected_by", length = 120)
+    private String rejectedBy;
+
+    @Column(name = "rejected_at")
+    private LocalDateTime rejectedAt;
 
     @Builder.Default
     @Column(name = "deleted", nullable = false)

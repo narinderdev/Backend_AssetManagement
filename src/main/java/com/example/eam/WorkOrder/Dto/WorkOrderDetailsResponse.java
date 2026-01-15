@@ -62,9 +62,12 @@ import java.util.List;
         "afterPhotoUrl",
         "supervisorNotes",
         "approvalNotes",
+        "rejectionReason",
         "precheckNotes",
         "approvedBy",
         "approvedAt",
+        "rejectedBy",
+        "rejectedAt",
         "plannedMaterials",
         "checkLogs",
         "status",
@@ -131,9 +134,12 @@ public class WorkOrderDetailsResponse {
     private String afterPhotoUrl;
     private String supervisorNotes;
     private String approvalNotes;
+    private String rejectionReason;
     private String precheckNotes;
     private String approvedBy;
     private LocalDateTime approvedAt;
+    private String rejectedBy;
+    private LocalDateTime rejectedAt;
 
     private java.util.List<WorkOrderCheckLogResponse> checkLogs;
 

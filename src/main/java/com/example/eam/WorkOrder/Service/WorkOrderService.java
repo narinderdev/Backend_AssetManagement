@@ -75,11 +75,12 @@ private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
 );
 
 private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIONS = Map.of(
-        WorkOrderStatus.NEW, Set.of(WorkOrderStatus.APPROVED),
+        WorkOrderStatus.NEW, Set.of(WorkOrderStatus.APPROVED, WorkOrderStatus.REJECTED),
         WorkOrderStatus.APPROVED, Set.of(WorkOrderStatus.SCHEDULED),
         WorkOrderStatus.SCHEDULED, Set.of(WorkOrderStatus.IN_PROGRESS),
         WorkOrderStatus.IN_PROGRESS, Set.of(WorkOrderStatus.COMPLETED),
-        WorkOrderStatus.COMPLETED, Set.of(WorkOrderStatus.CLOSED)
+        WorkOrderStatus.COMPLETED, Set.of(WorkOrderStatus.CLOSED),
+        WorkOrderStatus.REJECTED, Set.of()
 );
 
     // ---------------- CREATE (Manual) ----------------
@@ -281,6 +282,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             if (newStatus == WorkOrderStatus.CLOSED) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use supervisor close endpoint");
             }
+            if (newStatus == WorkOrderStatus.REJECTED) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Use reject endpoint");
+            }
             validateStatusTransition(wo.getStatus(), newStatus);
             handleStatusSideEffects(wo, newStatus);
             wo.setStatus(newStatus);
@@ -313,6 +317,29 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         validateStatusTransition(wo.getStatus(), WorkOrderStatus.APPROVED);
         wo.setStatus(WorkOrderStatus.APPROVED);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse rejectWorkOrder(Long id, WorkOrderRejectRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.NEW) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only NEW work orders can be rejected");
+        }
+
+        wo.setRejectionReason(trim(request.getRejectionReason()));
+        wo.setRejectedBy(trim(request.getRejectedBy()));
+        wo.setRejectedAt(LocalDateTime.now());
+
+        // Clear any previous approval metadata if present
+        wo.setApprovalNotes(null);
+        wo.setApprovedBy(null);
+        wo.setApprovedAt(null);
+
+        validateStatusTransition(wo.getStatus(), WorkOrderStatus.REJECTED);
+        wo.setStatus(WorkOrderStatus.REJECTED);
 
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
@@ -871,9 +898,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .afterPhotoUrl(wo.getAfterPhotoUrl())
                 .supervisorNotes(wo.getSupervisorNotes())
                 .approvalNotes(wo.getApprovalNotes())
+                .rejectionReason(wo.getRejectionReason())
                 .precheckNotes(wo.getPrecheckNotes())
                 .approvedBy(wo.getApprovedBy())
                 .approvedAt(wo.getApprovedAt())
+                .rejectedBy(wo.getRejectedBy())
+                .rejectedAt(wo.getRejectedAt())
                 .status(wo.getStatus())
                 .source(wo.getSource())
                 .plannedMaterials(plannedMaterials)
