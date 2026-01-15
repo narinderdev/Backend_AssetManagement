@@ -1,18 +1,9 @@
 package com.example.eam.WorkOrder.Dto;
 
-import java.time.LocalDateTime;
-
-import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
 public class WorkOrderInProgressRequest {
-    private Long technicianId;
-    private Long teamId;
-
-    @NotNull
-    private LocalDateTime checkInAt;
-
-    private LocalDateTime checkOutAt;
-    private String notes;
+    // Optional override for when the work actually started; defaults to now if not provided
+    private java.time.LocalDateTime actualStartDateTime;
 }

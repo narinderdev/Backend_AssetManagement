@@ -389,12 +389,39 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public WorkOrderDetailsResponse markInProgress(Long id, WorkOrderInProgressRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
-        if (wo.getStatus() != WorkOrderStatus.SCHEDULED && wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be SCHEDULED or IN_PROGRESS to log check-in/out");
+        if (wo.getStatus() != WorkOrderStatus.SCHEDULED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SCHEDULED work orders can be moved to IN_PROGRESS");
         }
 
-        Technician technician = request.getTechnicianId() != null ? resolveTechnician(request.getTechnicianId()) : null;
-        TechnicianTeam team = request.getTeamId() != null ? resolveTeam(request.getTeamId()) : null;
+        if (request != null && request.getActualStartDateTime() != null) {
+            wo.setActualStartDateTime(request.getActualStartDateTime());
+        }
+
+        validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
+        handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
+        wo.setStatus(WorkOrderStatus.IN_PROGRESS);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse checkIn(Long id, WorkOrderCheckInRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check-in payload is required");
+        }
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to check in");
+        }
+
+        workOrderCheckLogRepository.findFirstByWorkOrder_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id)
+                .ifPresent(open -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "An open check-in already exists for this work order");
+                });
+
+        Technician technician = resolveTechnician(request.getTechnicianId());
+        TechnicianTeam team = resolveTeam(request.getTeamId());
 
         LocalDateTime checkIn = request.getCheckInAt() != null
                 ? request.getCheckInAt()
@@ -405,26 +432,49 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .technician(technician)
                 .team(team)
                 .checkInAt(checkIn)
-                .checkOutAt(request.getCheckOutAt())
+                .checkOutAt(null)
                 .notes(trim(request.getNotes()))
                 .build();
         workOrderCheckLogRepository.save(log);
 
-        // Set actual start/end to reflect the earliest/latest entries
         if (wo.getActualStartDateTime() == null || checkIn.isBefore(wo.getActualStartDateTime())) {
             wo.setActualStartDateTime(checkIn);
         }
-        if (request.getCheckOutAt() != null) {
-            LocalDateTime co = request.getCheckOutAt();
-            if (wo.getActualEndDateTime() == null || co.isAfter(wo.getActualEndDateTime())) {
-                wo.setActualEndDateTime(co);
-            }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse checkOut(Long id, WorkOrderCheckOutRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check-out payload is required");
+        }
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to check out");
         }
 
-        if (wo.getStatus() == WorkOrderStatus.SCHEDULED) {
-            validateStatusTransition(wo.getStatus(), WorkOrderStatus.IN_PROGRESS);
-            handleStatusSideEffects(wo, WorkOrderStatus.IN_PROGRESS);
-            wo.setStatus(WorkOrderStatus.IN_PROGRESS);
+        WorkOrderCheckLog openLog = workOrderCheckLogRepository
+                .findFirstByWorkOrder_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order"));
+
+        LocalDateTime checkOut = request.getCheckOutAt() != null
+                ? request.getCheckOutAt()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        if (checkOut.isBefore(openLog.getCheckInAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOutAt cannot be before checkInAt");
+        }
+
+        openLog.setCheckOutAt(checkOut);
+        if (request.getNotes() != null) {
+            openLog.setNotes(trim(request.getNotes()));
+        }
+        workOrderCheckLogRepository.save(openLog);
+
+        if (wo.getActualEndDateTime() == null || checkOut.isAfter(wo.getActualEndDateTime())) {
+            wo.setActualEndDateTime(checkOut);
         }
 
         WorkOrder saved = workOrderRepository.save(wo);

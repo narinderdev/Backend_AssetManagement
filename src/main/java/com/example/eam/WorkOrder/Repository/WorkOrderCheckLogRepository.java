@@ -7,4 +7,6 @@ import java.util.List;
 
 public interface WorkOrderCheckLogRepository extends JpaRepository<WorkOrderCheckLog, Long> {
     List<WorkOrderCheckLog> findByWorkOrder_Id(Long workOrderId);
+
+    java.util.Optional<WorkOrderCheckLog> findFirstByWorkOrder_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(Long workOrderId);
 }

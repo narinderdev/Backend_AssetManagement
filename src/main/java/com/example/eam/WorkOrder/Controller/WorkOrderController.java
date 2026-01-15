@@ -63,10 +63,28 @@ public class WorkOrderController {
     @PostMapping("/{id}/in-progress")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> markInProgress(
             @PathVariable Long id,
-            @RequestBody WorkOrderInProgressRequest request
+            @RequestBody(required = false) WorkOrderInProgressRequest request
     ) {
         WorkOrderDetailsResponse data = workOrderService.markInProgress(id, request);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order in progress", data));
+    }
+
+    @PostMapping("/{id}/check-in")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> checkIn(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderCheckInRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.checkIn(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order check-in recorded", data));
+    }
+
+    @PostMapping("/{id}/check-out")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> checkOut(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderCheckOutRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.checkOut(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order check-out recorded", data));
     }
 
     @PostMapping("/{id}/complete")
