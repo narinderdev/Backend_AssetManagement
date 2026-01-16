@@ -21,9 +21,10 @@ public class PredictiveMaintenanceController {
     private final PredictiveMaintenanceService service;
 
     @PostMapping("/threshold")
-    public ResponseEntity<ApiResponse<AssetThresholdResponse>> upsertThreshold(@Valid @RequestBody AssetThresholdRequest req) {
-        AssetThresholdResponse saved = service.upsertThreshold(req);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Threshold saved", saved));
+    public ResponseEntity<ApiResponse<AssetThresholdResponse>> createThreshold(@Valid @RequestBody AssetThresholdRequest req) {
+        AssetThresholdResponse saved = service.createThreshold(req);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.successResponse(HttpStatus.CREATED.value(), "Threshold created", saved));
     }
 
     @PutMapping("/threshold/{id}")

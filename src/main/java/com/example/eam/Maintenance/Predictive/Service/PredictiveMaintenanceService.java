@@ -45,19 +45,24 @@ public class PredictiveMaintenanceService {
     private final PredictiveMeterReadingRepository meterReadingRepository;
 
     @Transactional
-    public AssetThresholdResponse upsertThreshold(@Valid AssetThresholdRequest req) {
+    public AssetThresholdResponse createThreshold(@Valid AssetThresholdRequest req) {
         Asset asset = assetRepository.findById(req.getAssetId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        AssetThreshold threshold = thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
-                .orElseGet(AssetThreshold::new);
-        threshold.setAsset(asset);
-        threshold.setMeterType(req.getMeterType());
-        threshold.setWarningThreshold(req.getWarningThreshold());
-        threshold.setCriticalThreshold(req.getCriticalThreshold());
-        threshold.setAutoCreateWo(req.getAutoCreateWo() != null ? req.getAutoCreateWo() : true);
-        threshold.setDefaultPriority(req.getDefaultPriority() != null ? req.getDefaultPriority() : PriorityLevel.MEDIUM);
-        threshold.setCooldownHours(req.getCooldownHours() != null ? req.getCooldownHours() : 24);
+        thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Threshold already exists for this asset and meter type");
+                });
+
+        AssetThreshold threshold = AssetThreshold.builder()
+                .asset(asset)
+                .meterType(req.getMeterType())
+                .warningThreshold(req.getWarningThreshold())
+                .criticalThreshold(req.getCriticalThreshold())
+                .autoCreateWo(req.getAutoCreateWo() != null ? req.getAutoCreateWo() : true)
+                .defaultPriority(req.getDefaultPriority() != null ? req.getDefaultPriority() : PriorityLevel.MEDIUM)
+                .cooldownHours(req.getCooldownHours() != null ? req.getCooldownHours() : 24)
+                .build();
 
         AssetThreshold saved = thresholdRepository.save(threshold);
         List<PredictiveMeterReading> readings = meterReadingRepository.findByThreshold_Id(saved.getId());
@@ -71,6 +76,12 @@ public class PredictiveMaintenanceService {
 
         Asset asset = assetRepository.findById(req.getAssetId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
+
+        thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
+                .filter(existing -> !existing.getId().equals(id))
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Another threshold already exists for this asset and meter type");
+                });
 
         threshold.setAsset(asset);
         threshold.setMeterType(req.getMeterType());
