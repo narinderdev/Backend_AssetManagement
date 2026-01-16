@@ -17,5 +17,7 @@ public class WorkOrderCheckLogResponse {
     private Long teamId;
     private LocalDateTime checkInAt;
     private LocalDateTime checkOutAt;
+    private LocalDateTime pauseAt;
+    private LocalDateTime resumeAt;
     private String notes;
 }

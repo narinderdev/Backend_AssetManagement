@@ -11,6 +11,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.NoHandlerFoundException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
+import org.springframework.http.MediaType;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
@@ -19,7 +20,9 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(AssetIdAlreadyExistsException.class)
     public ResponseEntity<ApiResponse<Void>> handleAssetIdAlreadyExistsException(AssetIdAlreadyExistsException ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.CONFLICT.value(), ex.getMessage());
-        return ResponseEntity.status(HttpStatus.CONFLICT).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.CONFLICT)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
@@ -29,7 +32,9 @@ public class GlobalExceptionHandler {
                 .map(error -> error.getField() + " " + error.getDefaultMessage())
                 .orElse("Validation failed");
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.BAD_REQUEST.value(), message);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     @ExceptionHandler(ConstraintViolationException.class)
@@ -39,33 +44,43 @@ public class GlobalExceptionHandler {
                 .map(violation -> violation.getPropertyPath() + " " + violation.getMessage())
                 .orElse("Validation failed");
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.BAD_REQUEST.value(), message);
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     // Handle resource not found exception (e.g., asset not found)
     @ExceptionHandler(ResponseStatusException.class)
     public ResponseEntity<ApiResponse<Void>> handleResponseStatusException(ResponseStatusException ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(ex.getStatusCode().value(), ex.getReason());
-        return ResponseEntity.status(ex.getStatusCode()).body(apiResponse);
+        return ResponseEntity.status(ex.getStatusCode())
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ResponseEntity<ApiResponse<Void>> handleHttpMessageNotReadableException(HttpMessageNotReadableException ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.BAD_REQUEST.value(), "Invalid request payload");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     @ExceptionHandler({NoResourceFoundException.class, NoHandlerFoundException.class})
     public ResponseEntity<ApiResponse<Void>> handleNotFoundExceptions(Exception ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.NOT_FOUND.value(), "Not found");
-        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 
     // Handle generic errors
     @ExceptionHandler(Exception.class)
     public ResponseEntity<ApiResponse<Void>> handleGenericException(Exception ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.INTERNAL_SERVER_ERROR.value(), "An unexpected error occurred");
-        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(apiResponse);
+        return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
     }
 }
 

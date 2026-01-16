@@ -446,6 +446,72 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     @Transactional
+    public WorkOrderDetailsResponse pause(Long id, WorkOrderPauseRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to pause");
+        }
+
+        LocalDateTime pauseAt = request != null && request.getPauseAt() != null
+                ? request.getPauseAt()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
+        if (openLog.getPauseAt() != null && openLog.getResumeAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is already paused");
+        }
+        if (pauseAt.isBefore(openLog.getCheckInAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
+        }
+        openLog.setPauseAt(pauseAt);
+        if (request != null && request.getNotes() != null) {
+            openLog.setNotes(trim(request.getNotes()));
+        }
+        workOrderCheckLogRepository.save(openLog);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse resume(Long id, WorkOrderResumeRequest request) {
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to resume");
+        }
+
+        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
+        if (openLog.getPauseAt() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not paused");
+        }
+        if (openLog.getResumeAt() != null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order has already been resumed");
+        }
+
+        LocalDateTime resumeAt = request != null && request.getResumeAt() != null
+                ? request.getResumeAt()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        if (resumeAt.isBefore(openLog.getPauseAt())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
+        }
+
+        Technician technician = resolveTechnician(request != null ? request.getTechnicianId() : null);
+        TechnicianTeam team = resolveTeam(request != null ? request.getTeamId() : null);
+
+        openLog.setResumeAt(resumeAt);
+        if (technician != null) openLog.setTechnician(technician);
+        if (team != null) openLog.setTeam(team);
+        if (request != null && request.getNotes() != null) {
+            openLog.setNotes(trim(request.getNotes()));
+        }
+        workOrderCheckLogRepository.save(openLog);
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
     public WorkOrderDetailsResponse checkOut(Long id, WorkOrderCheckOutRequest request) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check-out payload is required");
@@ -455,23 +521,21 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to check out");
         }
 
-        WorkOrderCheckLog openLog = workOrderCheckLogRepository
-                .findFirstByWorkOrder_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order"));
-
         LocalDateTime checkOut = request.getCheckOutAt() != null
                 ? request.getCheckOutAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
 
+        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
         if (checkOut.isBefore(openLog.getCheckInAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOutAt cannot be before checkInAt");
         }
-
         openLog.setCheckOutAt(checkOut);
         if (request.getNotes() != null) {
             openLog.setNotes(trim(request.getNotes()));
         }
         workOrderCheckLogRepository.save(openLog);
+
+        accumulateLaborHours(wo, openLog);
 
         if (wo.getActualEndDateTime() == null || checkOut.isAfter(wo.getActualEndDateTime())) {
             wo.setActualEndDateTime(checkOut);
@@ -526,7 +590,13 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             }
         }
 
-        wo.setActualLaborHours(totalLaborHours.compareTo(BigDecimal.ZERO) > 0 ? totalLaborHours : null);
+        if (totalLaborHours.compareTo(BigDecimal.ZERO) > 0) {
+            if (wo.getActualLaborHours() == null) {
+                wo.setActualLaborHours(totalLaborHours);
+            } else {
+                wo.setActualLaborHours(wo.getActualLaborHours().add(totalLaborHours));
+            }
+        }
         wo.setActualLaborCost(totalLaborCost.compareTo(BigDecimal.ZERO) > 0 ? totalLaborCost : null);
 
         BigDecimal totalMaterialCost = BigDecimal.ZERO;
@@ -655,6 +725,37 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     private void handleStatusSideEffects(WorkOrder wo, WorkOrderStatus newStatus) {
         if (newStatus == WorkOrderStatus.IN_PROGRESS && wo.getActualStartDateTime() == null) {
             wo.setActualStartDateTime(LocalDateTime.now());
+        }
+    }
+
+    private void accumulateLaborHours(WorkOrder wo, WorkOrderCheckLog log) {
+        if (log.getCheckInAt() == null || log.getCheckOutAt() == null) return;
+
+        LocalDateTime pauseAt = log.getPauseAt();
+        LocalDateTime resumeAt = log.getResumeAt();
+        long minutes;
+        if (pauseAt != null && resumeAt != null) {
+            if (pauseAt.isBefore(log.getCheckInAt())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
+            }
+            if (resumeAt.isBefore(pauseAt)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
+            }
+            long firstLeg = ChronoUnit.MINUTES.between(log.getCheckInAt(), pauseAt);
+            long secondLeg = ChronoUnit.MINUTES.between(resumeAt, log.getCheckOutAt());
+            minutes = firstLeg + secondLeg;
+        } else {
+            minutes = ChronoUnit.MINUTES.between(log.getCheckInAt(), log.getCheckOutAt());
+        }
+
+        if (minutes <= 0) return;
+        BigDecimal hours = BigDecimal.valueOf(minutes)
+                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        if (hours.compareTo(BigDecimal.ZERO) <= 0) return;
+        if (wo.getActualLaborHours() == null) {
+            wo.setActualLaborHours(hours);
+        } else {
+            wo.setActualLaborHours(wo.getActualLaborHours().add(hours));
         }
     }
 
@@ -854,6 +955,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .teamId(log.getTeam() != null ? log.getTeam().getId() : null)
                 .checkInAt(log.getCheckInAt())
                 .checkOutAt(log.getCheckOutAt())
+                .pauseAt(log.getPauseAt())
+                .resumeAt(log.getResumeAt())
                 .notes(log.getNotes())
                 .build();
     }

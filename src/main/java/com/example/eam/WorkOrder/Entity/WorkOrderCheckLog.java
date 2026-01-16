@@ -43,6 +43,12 @@ public class WorkOrderCheckLog {
     @Column(name = "check_out_at")
     private LocalDateTime checkOutAt;
 
+    @Column(name = "pause_at")
+    private LocalDateTime pauseAt;
+
+    @Column(name = "resume_at")
+    private LocalDateTime resumeAt;
+
     @Column(name = "notes", length = 500)
     private String notes;
 }

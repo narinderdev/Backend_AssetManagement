@@ -49,9 +49,9 @@ public class PredictiveMaintenanceService {
         Asset asset = assetRepository.findById(req.getAssetId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
+        thresholdRepository.findByAsset_Id(req.getAssetId())
                 .ifPresent(existing -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Threshold already exists for this asset and meter type");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
                 });
 
         AssetThreshold threshold = AssetThreshold.builder()
@@ -77,10 +77,10 @@ public class PredictiveMaintenanceService {
         Asset asset = assetRepository.findById(req.getAssetId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
+        thresholdRepository.findByAsset_Id(req.getAssetId())
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
-                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Another threshold already exists for this asset and meter type");
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
                 });
 
         threshold.setAsset(asset);

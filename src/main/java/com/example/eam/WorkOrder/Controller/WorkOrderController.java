@@ -87,6 +87,24 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order check-out recorded", data));
     }
 
+    @PostMapping("/{id}/pause")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> pause(
+            @PathVariable Long id,
+            @RequestBody(required = false) WorkOrderPauseRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.pause(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order paused", data));
+    }
+
+    @PostMapping("/{id}/resume")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> resume(
+            @PathVariable Long id,
+            @RequestBody(required = false) WorkOrderResumeRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.resume(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order resumed", data));
+    }
+
     @PostMapping("/{id}/complete")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> complete(@PathVariable Long id,
                                                                           @Valid @RequestBody WorkOrderCompletionRequest request) {
