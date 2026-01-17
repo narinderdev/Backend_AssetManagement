@@ -131,6 +131,15 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work orders fetched successfully", data));
     }
 
+    @GetMapping("/assigned-to-technician")
+    public ResponseEntity<ApiResponse<WorkOrderListResponse>> listForTechnician(
+            @RequestParam Long technicianId,
+            Pageable pageable
+    ) {
+        WorkOrderListResponse data = workOrderService.listScheduledForTechnician(technicianId, pageable);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician work orders fetched successfully", data));
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
         workOrderService.deleteWorkOrder(id);

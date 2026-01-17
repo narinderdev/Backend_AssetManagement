@@ -6,6 +6,8 @@ import com.example.eam.WorkOrder.Entity.WorkOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -43,4 +45,22 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     List<WorkOrder> findTop5ByDeletedFalseOrderByCreatedAtDesc();
 
     List<WorkOrder> findByDeletedFalseAndCreatedAtBetween(LocalDateTime start, LocalDateTime end);
+
+    @Query("""
+        select distinct wo from WorkOrder wo
+        left join wo.assignedTeam team
+        left join com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember tm
+            on tm.team = team
+        where wo.deleted = false
+          and wo.status = :status
+          and (
+                wo.assignedTechnician.id = :technicianId
+             or tm.technician.id = :technicianId
+          )
+    """)
+    Page<WorkOrder> findByTechnicianOrTeamMemberAndStatus(
+            @Param("technicianId") Long technicianId,
+            @Param("status") WorkOrderStatus status,
+            Pageable pageable
+    );
 }

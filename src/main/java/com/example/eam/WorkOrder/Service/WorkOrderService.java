@@ -409,6 +409,32 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return toDetailsResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public WorkOrderListResponse listScheduledForTechnician(Long technicianId, Pageable pageable) {
+        if (technicianId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required");
+        }
+
+        Page<WorkOrder> page = workOrderRepository.findByTechnicianOrTeamMemberAndStatus(
+                technicianId,
+                WorkOrderStatus.SCHEDULED,
+                pageable
+        );
+
+        List<WorkOrderDetailsResponse> rows = page.getContent().stream()
+                .map(this::toDetailsResponse)
+                .toList();
+
+        return WorkOrderListResponse.builder()
+                .workOrders(rows)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
     @Transactional
     public WorkOrderDetailsResponse checkIn(Long id, WorkOrderCheckInRequest request) {
         if (request == null) {
