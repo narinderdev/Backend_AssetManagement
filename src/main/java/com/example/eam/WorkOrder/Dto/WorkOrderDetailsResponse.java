@@ -46,6 +46,7 @@ import java.util.List;
         "estimatedMaterialCost",
         "estimatedTotalCost",
         "actualLaborHours",
+        "actualWorkingHours",
         "actualLaborCost",
         "actualMaterialCost",
         "actualTotalCost",
@@ -120,6 +121,7 @@ public class WorkOrderDetailsResponse {
     private BigDecimal estimatedMaterialCost;
     private BigDecimal estimatedTotalCost;
     private BigDecimal actualLaborHours;
+    private BigDecimal actualWorkingHours;
     private BigDecimal actualLaborCost;
     private BigDecimal actualMaterialCost;
     private BigDecimal actualTotalCost;

@@ -752,34 +752,47 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     private void accumulateLaborHours(WorkOrder wo, WorkOrderCheckLog log) {
         if (log.getCheckInAt() == null || log.getCheckOutAt() == null) return;
 
-        List<WorkOrderPauseLog> pauses = resolvePauseLogs(log);
-        long pausedMinutes = 0;
-        for (WorkOrderPauseLog pause : pauses) {
-            if (pause.getPauseAt() == null) continue;
-            if (pause.getResumeAt() == null) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order pause session is still open");
-            }
-            if (pause.getPauseAt().isBefore(log.getCheckInAt())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
-            }
-            if (pause.getResumeAt().isBefore(pause.getPauseAt())) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
-            }
-            pausedMinutes += ChronoUnit.MINUTES.between(pause.getPauseAt(), pause.getResumeAt());
-        }
+        long workingSeconds = computeWorkingSeconds(log);
+        if (workingSeconds <= 0) return;
 
-        long totalMinutes = ChronoUnit.MINUTES.between(log.getCheckInAt(), log.getCheckOutAt());
-        long workingMinutes = totalMinutes - pausedMinutes;
-        if (workingMinutes <= 0) return;
-
-        BigDecimal hours = BigDecimal.valueOf(workingMinutes)
-                .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
+        BigDecimal hours = BigDecimal.valueOf(workingSeconds)
+                .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
         if (hours.compareTo(BigDecimal.ZERO) <= 0) return;
         if (wo.getActualLaborHours() == null) {
             wo.setActualLaborHours(hours);
         } else {
             wo.setActualLaborHours(wo.getActualLaborHours().add(hours));
         }
+    }
+
+    private long computeWorkingSeconds(WorkOrderCheckLog log) {
+        if (log.getCheckInAt() == null) return 0;
+
+        LocalDateTime end = log.getCheckOutAt() != null ? log.getCheckOutAt() : LocalDateTime.now();
+        if (end.isBefore(log.getCheckInAt())) return 0;
+
+        long totalSeconds = ChronoUnit.SECONDS.between(log.getCheckInAt(), end);
+        List<WorkOrderPauseLog> pauses = resolvePauseLogs(log);
+        long pausedSeconds = 0;
+        for (WorkOrderPauseLog pause : pauses) {
+            if (pause.getPauseAt() == null) continue;
+            LocalDateTime pauseStart = pause.getPauseAt().isBefore(log.getCheckInAt()) ? log.getCheckInAt() : pause.getPauseAt();
+            LocalDateTime pauseEnd = pause.getResumeAt() != null ? pause.getResumeAt() : end;
+            if (pauseEnd.isBefore(pauseStart)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
+            }
+            if (pauseStart.isAfter(end)) continue;
+            pausedSeconds += ChronoUnit.SECONDS.between(pauseStart, pauseEnd);
+        }
+
+        long workingSeconds = totalSeconds - pausedSeconds;
+        return Math.max(workingSeconds, 0);
+    }
+
+    private long computeTotalWorkingSeconds(List<WorkOrderCheckLog> logs) {
+        return logs.stream()
+                .mapToLong(this::computeWorkingSeconds)
+                .sum();
     }
 
     private Technician resolveTechnician(Long technicianId) {
@@ -1027,7 +1040,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .map(this::toMaterialPlanResponse)
                 .toList();
 
-        List<WorkOrderCheckLogResponse> checkLogs = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId()).stream()
+        List<WorkOrderCheckLog> checkLogEntities = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        long actualWorkingSeconds = computeTotalWorkingSeconds(checkLogEntities);
+        BigDecimal actualWorkingHours = BigDecimal.valueOf(actualWorkingSeconds)
+                .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+
+        List<WorkOrderCheckLogResponse> checkLogs = checkLogEntities.stream()
                 .map(this::toCheckLogResponse)
                 .toList();
 
@@ -1066,6 +1084,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .estimatedMaterialCost(wo.getEstimatedMaterialCost())
                 .estimatedTotalCost(wo.getEstimatedTotalCost())
                 .actualLaborHours(wo.getActualLaborHours())
+                .actualWorkingHours(actualWorkingHours)
                 .actualLaborCost(wo.getActualLaborCost())
                 .actualMaterialCost(wo.getActualMaterialCost())
                 .actualTotalCost(wo.getActualTotalCost())
