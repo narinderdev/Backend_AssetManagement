@@ -21,12 +21,15 @@ import com.example.eam.WorkOrder.Entity.WorkOrderLaborEntry;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialPlan;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialUsage;
 import com.example.eam.WorkOrder.Entity.WorkOrderCheckLog;
+import com.example.eam.WorkOrder.Entity.WorkOrderPauseLog;
 import com.example.eam.WorkOrder.Repository.WorkOrderLaborEntryRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialPlanRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderPauseLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
+import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
 import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -67,6 +70,7 @@ public class WorkOrderService {
     private final WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
     private final WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
     private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
+    private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
@@ -457,13 +461,21 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
 
         WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
-        if (openLog.getPauseAt() != null && openLog.getResumeAt() == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is already paused");
-        }
+        workOrderPauseLogRepository.findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                .ifPresent(existing -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is already paused");
+                });
         if (pauseAt.isBefore(openLog.getCheckInAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
         }
-        openLog.setPauseAt(pauseAt);
+
+        WorkOrderPauseLog pauseLog = WorkOrderPauseLog.builder()
+                .checkLog(openLog)
+                .pauseAt(pauseAt)
+                .resumeAt(null)
+                .build();
+        openLog.getPauseLogs().add(pauseLog);
+
         if (request != null && request.getNotes() != null) {
             openLog.setNotes(trim(request.getNotes()));
         }
@@ -481,25 +493,22 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         }
 
         WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
-        if (openLog.getPauseAt() == null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not paused");
-        }
-        if (openLog.getResumeAt() != null) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order has already been resumed");
-        }
+        WorkOrderPauseLog pauseLog = workOrderPauseLogRepository
+                .findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not paused"));
 
         LocalDateTime resumeAt = request != null && request.getResumeAt() != null
                 ? request.getResumeAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
 
-        if (resumeAt.isBefore(openLog.getPauseAt())) {
+        if (resumeAt.isBefore(pauseLog.getPauseAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
         }
 
         Technician technician = resolveTechnician(request != null ? request.getTechnicianId() : null);
         TechnicianTeam team = resolveTeam(request != null ? request.getTeamId() : null);
 
-        openLog.setResumeAt(resumeAt);
+        pauseLog.setResumeAt(resumeAt);
         if (technician != null) openLog.setTechnician(technician);
         if (team != null) openLog.setTeam(team);
         if (request != null && request.getNotes() != null) {
@@ -529,6 +538,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         if (checkOut.isBefore(openLog.getCheckInAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOutAt cannot be before checkInAt");
         }
+        workOrderPauseLogRepository.findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                .ifPresent(pl -> {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Resume before checking out");
+                });
         openLog.setCheckOutAt(checkOut);
         if (request.getNotes() != null) {
             openLog.setNotes(trim(request.getNotes()));
@@ -728,28 +741,38 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         }
     }
 
+    private List<WorkOrderPauseLog> resolvePauseLogs(WorkOrderCheckLog log) {
+        List<WorkOrderPauseLog> pauses = log.getPauseLogs();
+        if (pauses == null || pauses.isEmpty()) {
+            pauses = workOrderPauseLogRepository.findByCheckLog_IdOrderByPauseAtAsc(log.getId());
+        }
+        return pauses;
+    }
+
     private void accumulateLaborHours(WorkOrder wo, WorkOrderCheckLog log) {
         if (log.getCheckInAt() == null || log.getCheckOutAt() == null) return;
 
-        LocalDateTime pauseAt = log.getPauseAt();
-        LocalDateTime resumeAt = log.getResumeAt();
-        long minutes;
-        if (pauseAt != null && resumeAt != null) {
-            if (pauseAt.isBefore(log.getCheckInAt())) {
+        List<WorkOrderPauseLog> pauses = resolvePauseLogs(log);
+        long pausedMinutes = 0;
+        for (WorkOrderPauseLog pause : pauses) {
+            if (pause.getPauseAt() == null) continue;
+            if (pause.getResumeAt() == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order pause session is still open");
+            }
+            if (pause.getPauseAt().isBefore(log.getCheckInAt())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
             }
-            if (resumeAt.isBefore(pauseAt)) {
+            if (pause.getResumeAt().isBefore(pause.getPauseAt())) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
             }
-            long firstLeg = ChronoUnit.MINUTES.between(log.getCheckInAt(), pauseAt);
-            long secondLeg = ChronoUnit.MINUTES.between(resumeAt, log.getCheckOutAt());
-            minutes = firstLeg + secondLeg;
-        } else {
-            minutes = ChronoUnit.MINUTES.between(log.getCheckInAt(), log.getCheckOutAt());
+            pausedMinutes += ChronoUnit.MINUTES.between(pause.getPauseAt(), pause.getResumeAt());
         }
 
-        if (minutes <= 0) return;
-        BigDecimal hours = BigDecimal.valueOf(minutes)
+        long totalMinutes = ChronoUnit.MINUTES.between(log.getCheckInAt(), log.getCheckOutAt());
+        long workingMinutes = totalMinutes - pausedMinutes;
+        if (workingMinutes <= 0) return;
+
+        BigDecimal hours = BigDecimal.valueOf(workingMinutes)
                 .divide(BigDecimal.valueOf(60), 2, RoundingMode.HALF_UP);
         if (hours.compareTo(BigDecimal.ZERO) <= 0) return;
         if (wo.getActualLaborHours() == null) {
@@ -949,15 +972,21 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     private WorkOrderCheckLogResponse toCheckLogResponse(WorkOrderCheckLog log) {
+        List<WorkOrderPauseWindowResponse> pauses = resolvePauseLogs(log).stream()
+                .map(p -> WorkOrderPauseWindowResponse.builder()
+                        .pauseAt(p.getPauseAt())
+                        .resumeAt(p.getResumeAt())
+                        .build())
+                .toList();
+
         return WorkOrderCheckLogResponse.builder()
                 .id(log.getId())
                 .technicianId(log.getTechnician() != null ? log.getTechnician().getId() : null)
                 .teamId(log.getTeam() != null ? log.getTeam().getId() : null)
                 .checkInAt(log.getCheckInAt())
                 .checkOutAt(log.getCheckOutAt())
-                .pauseAt(log.getPauseAt())
-                .resumeAt(log.getResumeAt())
                 .notes(log.getNotes())
+                .pauses(pauses)
                 .build();
     }
 

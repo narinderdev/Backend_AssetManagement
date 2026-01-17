@@ -39,6 +39,10 @@ public class Role {
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
+    @Builder.Default
+    @Column(name = "technician_role", nullable = false)
+    private boolean technicianRole = false;
+
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "role_permissions",

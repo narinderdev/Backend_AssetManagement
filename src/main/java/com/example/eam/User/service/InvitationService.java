@@ -5,12 +5,17 @@ import com.example.eam.Common.EmailTemplateService;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.InviteUserRequest;
+import com.example.eam.User.dto.UserRoleAssignmentResponse;
 import com.example.eam.User.dto.SetPasswordDto;
 import com.example.eam.User.entity.UserRole;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
+import com.example.eam.Enum.TechnicianStatus;
+import com.example.eam.Enum.TechnicianType;
+import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
@@ -33,6 +39,7 @@ public class InvitationService {
     private final UsersRepository usersRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final TechnicianRepository technicianRepository;
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
     private final PasswordEncoder passwordEncoder;
@@ -47,7 +54,7 @@ public class InvitationService {
     private String applicationName;
 
     @Transactional
-    public Users inviteUser(InviteUserRequest request) {
+    public UserRoleAssignmentResponse inviteUser(InviteUserRequest request) {
         String email = request.getEmail().trim().toLowerCase();
 
         Optional<Users> existingOpt = usersRepository.findByEmail(email);
@@ -72,6 +79,9 @@ public class InvitationService {
         // reset role links then add requested roles
         userRoleRepository.deleteByUserId(saved.getId());
         Set<Long> uniqueRoleIds = new HashSet<>(request.getRoleIds());
+        List<UserRoleAssignmentResponse.RoleAssignment> assignedRoles = new ArrayList<>();
+        boolean technicianRoleAssigned = false;
+
         for (Long roleId : uniqueRoleIds) {
             Role role = roleRepository.findByIdAndActiveTrue(roleId)
                     .orElseThrow(() -> new ResponseStatusException(
@@ -90,7 +100,16 @@ public class InvitationService {
                     .user(saved)
                     .role(role)
                     .build());
+            technicianRoleAssigned = technicianRoleAssigned || role.isTechnicianRole();
+            assignedRoles.add(UserRoleAssignmentResponse.RoleAssignment.builder()
+                    .id(role.getId())
+                    .name(role.getName())
+                    .build());
         }
+
+        Long technicianId = technicianRoleAssigned
+                ? ensureTechnicianProfile(saved)
+                : null;
 
         String inviteLink = buildInviteLink(email);
         String emailHtml = emailTemplateService.buildInviteEmail(
@@ -106,7 +125,15 @@ public class InvitationService {
                 null
         );
 
-        return saved;
+        return UserRoleAssignmentResponse.builder()
+                .userId(saved.getId())
+                .firstName(saved.getFirstName())
+                .lastName(saved.getLastName())
+                .email(saved.getEmail())
+                .status(saved.getStatus())
+                .roles(assignedRoles)
+                .technicianId(technicianId)
+                .build();
     }
 
     public void validateInvite(String email) {
@@ -145,5 +172,34 @@ public class InvitationService {
         String encodedEmail = URLEncoder.encode(email, StandardCharsets.UTF_8);
         String separator = acceptUrl.contains("?") ? "&" : "?";
         return acceptUrl + separator + "email=" + encodedEmail;
+    }
+
+    private Long ensureTechnicianProfile(Users user) {
+        String normalizedEmail = user.getEmail() != null ? user.getEmail().trim().toLowerCase() : null;
+        if (normalizedEmail == null || normalizedEmail.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is required to create technician profile");
+        }
+
+        return technicianRepository.findByEmailIgnoreCase(normalizedEmail)
+                .map(Technician::getId)
+                .orElseGet(() -> {
+                    Technician technician = Technician.builder()
+                            .firstName(defaultName(user.getFirstName(), "Technician"))
+                            .lastName(defaultName(user.getLastName(), "User"))
+                            .email(normalizedEmail)
+                            .technicianType(TechnicianType.FULL_TIME)
+                            .status(TechnicianStatus.ACTIVE)
+                            .build();
+                    Technician savedTechnician = technicianRepository.save(technician);
+                    return savedTechnician.getId();
+                });
+    }
+
+    private String defaultName(String value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String trimmed = value.trim();
+        return trimmed.isBlank() ? fallback : trimmed;
     }
 }

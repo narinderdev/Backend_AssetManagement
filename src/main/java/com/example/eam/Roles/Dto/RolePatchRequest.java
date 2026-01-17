@@ -9,6 +9,7 @@ public class RolePatchRequest {
     private String name;
     private String description;
     private Boolean active;
+    private Boolean technicianRole;
 
     // If provided => replace role permissions
     private Set<String> permissionCodes;

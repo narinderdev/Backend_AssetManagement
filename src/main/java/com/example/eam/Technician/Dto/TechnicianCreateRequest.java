@@ -19,7 +19,7 @@ public class TechnicianCreateRequest {
     private String lastName;
 
     @NotNull
-    private TechnicianType technicianType;
+    private TechnicianType technicianType=TechnicianType.FULL_TIME;
 
     private String skills;
 

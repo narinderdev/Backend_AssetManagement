@@ -13,6 +13,7 @@ public class RoleResponse {
     private String name;
     private String description;
     private boolean active;
+    private boolean technicianRole;
 
     private Set<String> permissionCodes;
 

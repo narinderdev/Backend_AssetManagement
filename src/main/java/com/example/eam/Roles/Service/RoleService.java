@@ -40,6 +40,7 @@ public class RoleService {
                 .name(name)
                 .description(req.getDescription())
                 .active(true)
+                .technicianRole(Boolean.TRUE.equals(req.getTechnicianRole()))
                 .permissions(new HashSet<>(permissions))
                 .build();
 
@@ -66,6 +67,10 @@ public class RoleService {
 
         if (req.getActive() != null) {
             role.setActive(req.getActive());
+        }
+
+        if (req.getTechnicianRole() != null) {
+            role.setTechnicianRole(req.getTechnicianRole());
         }
 
         if (req.getPermissionCodes() != null) {
@@ -122,6 +127,7 @@ public class RoleService {
                 .name(r.getName())
                 .description(r.getDescription())
                 .active(r.isActive())
+                .technicianRole(r.isTechnicianRole())
                 .permissionCodes(codes)
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())

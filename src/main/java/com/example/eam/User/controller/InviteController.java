@@ -2,8 +2,8 @@ package com.example.eam.User.controller;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.User.dto.InviteUserRequest;
+import com.example.eam.User.dto.UserRoleAssignmentResponse;
 import com.example.eam.User.dto.SetPasswordDto;
-import com.example.eam.User.entity.Users;
 import com.example.eam.User.service.InvitationService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -26,11 +26,11 @@ public class InviteController {
     private final InvitationService invitationService;
 
     @PostMapping("/invite")
-    public ResponseEntity<ApiResponse<Users>> inviteUser(
+    public ResponseEntity<ApiResponse<UserRoleAssignmentResponse>> inviteUser(
             @Valid @RequestBody InviteUserRequest request
     ) {
-        Users invited = invitationService.inviteUser(request);
-        ApiResponse<Users> body = ApiResponse.successResponse(
+        UserRoleAssignmentResponse invited = invitationService.inviteUser(request);
+        ApiResponse<UserRoleAssignmentResponse> body = ApiResponse.successResponse(
                 HttpStatus.OK.value(),
                 "Invitation sent successfully",
                 invited
