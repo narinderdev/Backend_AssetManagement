@@ -11,4 +11,6 @@ public interface TechnicianDeviceTokenRepository extends JpaRepository<Technicia
     Optional<TechnicianDeviceToken> findByDeviceToken(String deviceToken);
 
     List<TechnicianDeviceToken> findByTechnician_Id(Long technicianId);
+
+    Optional<TechnicianDeviceToken> findByTechnician_IdAndPlatform(Long technicianId, com.example.eam.Enum.DevicePlatform platform);
 }

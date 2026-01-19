@@ -7,6 +7,8 @@ import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.google.firebase.messaging.FirebaseMessaging;
+import com.google.firebase.messaging.FirebaseMessagingException;
+import com.google.firebase.messaging.MessagingErrorCode;
 import com.google.firebase.messaging.Message;
 import com.google.firebase.messaging.Notification;
 import lombok.RequiredArgsConstructor;
@@ -58,13 +60,28 @@ public class NotificationService {
                                 .setTitle(title)
                                 .setBody(body)
                                 .build())
-                        .putData("technicianId", String.valueOf(technician.getId()))
                         .putData("workOrderId", wo != null && wo.getId() != null ? String.valueOf(wo.getId()) : "")
                         .putData("workOrderCode", wo != null ? String.valueOf(wo.getWorkOrderId()) : "")
+                        .putData("workOrderTitle", wo != null && wo.getWoTitle() != null ? wo.getWoTitle() : "")
                         .build();
                 firebaseMessaging.send(message);
             } catch (Exception e) {
                 log.warn("Failed to send FCM to technician {} token {}", technician.getId(), token.getId(), e);
+                handleSendFailure(e, token);
+            }
+        }
+    }
+
+    private void handleSendFailure(Exception e, TechnicianDeviceToken token) {
+        if (e instanceof FirebaseMessagingException fme) {
+            MessagingErrorCode code = fme.getMessagingErrorCode();
+            if (code == MessagingErrorCode.UNREGISTERED || "UNREGISTERED".equalsIgnoreCase(fme.getErrorCode())) {
+                try {
+                    technicianDeviceTokenRepository.delete(token);
+                    log.info("Deleted unregistered device token {}", token.getId());
+                } catch (Exception ex) {
+                    log.warn("Failed to delete unregistered token {}", token.getId(), ex);
+                }
             }
         }
     }

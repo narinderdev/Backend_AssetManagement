@@ -115,13 +115,28 @@ public class LoginService {
             }
         }
 
-        TechnicianDeviceToken entity = technicianDeviceTokenRepository.findByDeviceToken(token)
-                .orElseGet(() -> TechnicianDeviceToken.builder()
-                        .technician(technicianRepository.findById(technicianId)
-                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found")))
-                        .deviceToken(token)
-                        .build());
-        entity.setPlatform(platform);
+        Technician technician = technicianRepository.findById(technicianId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found"));
+
+        TechnicianDeviceToken entity = null;
+        if (platform != null) {
+            entity = technicianDeviceTokenRepository.findByTechnician_IdAndPlatform(technicianId, platform)
+                    .orElse(null);
+        }
+        if (entity == null) {
+            entity = technicianDeviceTokenRepository.findByDeviceToken(token).orElse(null);
+        }
+        if (entity == null) {
+            entity = TechnicianDeviceToken.builder()
+                    .technician(technician)
+                    .deviceToken(token)
+                    .platform(platform)
+                    .build();
+        } else {
+            entity.setTechnician(technician);
+            entity.setDeviceToken(token);
+            entity.setPlatform(platform);
+        }
         technicianDeviceTokenRepository.save(entity);
     }
 
