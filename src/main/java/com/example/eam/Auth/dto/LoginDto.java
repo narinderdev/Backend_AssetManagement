@@ -11,4 +11,7 @@ public class LoginDto {
 
     @NotBlank(message = "password cannot be ampty")
     private String password;
+
+    private String deviceToken;
+    private String devicePlatform; // ANDROID, IOS, WEB
 }

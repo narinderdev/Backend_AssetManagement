@@ -16,6 +16,9 @@ import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.repository.UsersRepository;
+import com.example.eam.Enum.DevicePlatform;
+import com.example.eam.Technician.Repository.TechnicianDeviceTokenRepository;
+import com.example.eam.Technician.Entity.TechnicianDeviceToken;
 
 import org.springframework.security.crypto.password.PasswordEncoder;
 
@@ -30,6 +33,7 @@ public class LoginService {
     private final JwtService jwtService;
     private final PasswordEncoder passwordEncoder;
     private final TechnicianRepository technicianRepository;
+    private final TechnicianDeviceTokenRepository technicianDeviceTokenRepository;
 
     @Transactional
     public LoginResponseDto login(LoginDto dto) {
@@ -62,6 +66,9 @@ public class LoginService {
                 .stream()
                 .anyMatch(ur -> ur.getRole() != null && ur.getRole().isTechnicianRole());
         Long technicianId = hasTechnicianRole ? ensureTechnicianProfile(user) : null;
+        if (technicianId != null && dto.getDeviceToken() != null && !dto.getDeviceToken().trim().isEmpty()) {
+            registerDeviceToken(technicianId, dto.getDeviceToken(), dto.getDevicePlatform());
+        }
 
         String token = jwtService.generateToken(
                 user.getEmail(),
@@ -94,6 +101,28 @@ public class LoginService {
                     Technician saved = technicianRepository.save(technician);
                     return saved.getId();
                 });
+    }
+
+    private void registerDeviceToken(Long technicianId, String rawToken, String platformRaw) {
+        String token = rawToken.trim();
+        if (token.isEmpty()) return;
+
+        DevicePlatform platform = null;
+        if (platformRaw != null) {
+            try {
+                platform = DevicePlatform.valueOf(platformRaw.trim().toUpperCase());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        TechnicianDeviceToken entity = technicianDeviceTokenRepository.findByDeviceToken(token)
+                .orElseGet(() -> TechnicianDeviceToken.builder()
+                        .technician(technicianRepository.findById(technicianId)
+                                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found")))
+                        .deviceToken(token)
+                        .build());
+        entity.setPlatform(platform);
+        technicianDeviceTokenRepository.save(entity);
     }
 
     private String defaultName(String value, String fallback) {

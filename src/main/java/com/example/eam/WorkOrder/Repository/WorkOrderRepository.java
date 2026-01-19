@@ -52,15 +52,13 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
         left join com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember tm
             on tm.team = team
         where wo.deleted = false
-          and wo.status = :status
           and (
                 wo.assignedTechnician.id = :technicianId
              or tm.technician.id = :technicianId
           )
     """)
-    Page<WorkOrder> findByTechnicianOrTeamMemberAndStatus(
+    Page<WorkOrder> findByTechnicianOrTeamMember(
             @Param("technicianId") Long technicianId,
-            @Param("status") WorkOrderStatus status,
             Pageable pageable
     );
 }

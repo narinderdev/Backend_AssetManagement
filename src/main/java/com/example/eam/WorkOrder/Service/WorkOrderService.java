@@ -36,7 +36,7 @@ import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderPauseLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
-import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
+import com.example.eam.Common.NotificationService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -86,6 +86,7 @@ public class WorkOrderService {
     private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
     private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
+    private final NotificationService notificationService;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
@@ -244,6 +245,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public WorkOrderDetailsResponse patchWorkOrder(Long id, WorkOrderPatchRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
+        Technician prevTechnician = wo.getAssignedTechnician();
+        TechnicianTeam prevTeam = wo.getAssignedTeam();
         if (wo.getStatus() != WorkOrderStatus.NEW) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order can only be updated while in NEW status");
         }
@@ -401,6 +404,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         wo.setStatus(WorkOrderStatus.SCHEDULED);
 
         WorkOrder saved = workOrderRepository.save(wo);
+        notifyAssignment(saved);
         return toDetailsResponse(saved);
     }
 
@@ -429,9 +433,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required");
         }
 
-        Page<WorkOrder> page = workOrderRepository.findByTechnicianOrTeamMemberAndStatus(
+        Page<WorkOrder> page = workOrderRepository.findByTechnicianOrTeamMember(
                 technicianId,
-                WorkOrderStatus.SCHEDULED,
                 pageable
         );
 
@@ -1009,6 +1012,27 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return technicianTeamRepository.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Technician team not found: " + teamId));
+    }
+
+    private boolean hasAssignmentChanged(Technician previous, Technician current) {
+        if (previous == null && current == null) return false;
+        if (previous == null || current == null) return true;
+        return !previous.getId().equals(current.getId());
+    }
+
+    private boolean hasTeamChanged(TechnicianTeam previous, TechnicianTeam current) {
+        if (previous == null && current == null) return false;
+        if (previous == null || current == null) return true;
+        return !previous.getId().equals(current.getId());
+    }
+
+    private void notifyAssignment(WorkOrder workOrder) {
+        if (workOrder == null) return;
+        notificationService.sendWorkOrderAssigned(
+                workOrder,
+                workOrder.getAssignedTechnician(),
+                workOrder.getAssignedTeam() != null ? workOrder.getAssignedTeam().getId() : null
+        );
     }
 
     private WorkOrderLaborEntry buildLaborEntry(WorkOrder workOrder, WorkOrderLaborEntryRequest request) {

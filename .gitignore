@@ -51,5 +51,5 @@ logs/
 *.log
 
 # Firebase service account
-mervin--esam-firebase-adminsdk-fbsvc-388958a2c2.json
-*firebase-adminsdk*.json
+src/main/resources/*firebase-adminsdk*.json
+**/mervin--eam-firebase-adminsdk*.json
