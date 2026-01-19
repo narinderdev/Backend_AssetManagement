@@ -1,6 +1,5 @@
 package com.example.eam.InventoryManagement.Dto;
 
-import com.example.eam.Enum.InventoryCategory;
 import com.example.eam.Enum.UnitOfMeasure;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Builder;
@@ -23,7 +22,7 @@ public class InventoryItemResponse {
     private Long id;
     private String itemId;
     private String itemName;
-    private InventoryCategory category;
+    private String category;
     private UnitOfMeasure unitOfMeasure;
 
     private String manufacturer;

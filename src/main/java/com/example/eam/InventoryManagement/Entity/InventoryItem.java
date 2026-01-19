@@ -1,6 +1,5 @@
 package com.example.eam.InventoryManagement.Entity;
 
-import com.example.eam.Enum.InventoryCategory;
 import com.example.eam.Enum.UnitOfMeasure;
 import com.example.eam.VendorManagement.Entity.Vendor;
 import jakarta.persistence.*;
@@ -38,9 +37,8 @@ public class InventoryItem {
     @Column(name = "item_name", nullable = false, length = 255)
     private String itemName;
 
-    @Enumerated(EnumType.STRING)
-    @Column(name = "category", nullable = false, length = 64)
-    private InventoryCategory category;
+    @Column(name = "category", nullable = false, length = 128)
+    private String category;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "uom", nullable = false, length = 32)

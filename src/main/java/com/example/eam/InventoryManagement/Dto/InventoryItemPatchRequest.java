@@ -1,6 +1,5 @@
 package com.example.eam.InventoryManagement.Dto;
 
-import com.example.eam.Enum.InventoryCategory;
 import com.example.eam.Enum.UnitOfMeasure;
 import lombok.Data;
 
@@ -10,7 +9,7 @@ import java.math.BigDecimal;
 public class InventoryItemPatchRequest {
 
     private String itemName;
-    private InventoryCategory category;
+    private String category;
     private UnitOfMeasure unitOfMeasure;
 
     private String manufacturer;

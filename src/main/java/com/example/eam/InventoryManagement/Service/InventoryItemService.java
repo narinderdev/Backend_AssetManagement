@@ -46,7 +46,7 @@ public class InventoryItemService {
         InventoryItem item = InventoryItem.builder()
                 .itemId(itemId)
                 .itemName(dto.getItemName().trim())
-                .category(dto.getCategory())
+                .category(normalizeCategory(dto.getCategory()))
                 .unitOfMeasure(dto.getUnitOfMeasure())
                 .manufacturer(dto.getManufacturer())
                 .manufacturerPartNumber(dto.getManufacturerPartNumber())
@@ -76,7 +76,7 @@ public class InventoryItemService {
         }
 
         if (dto.getItemName() != null) item.setItemName(dto.getItemName().trim());
-        if (dto.getCategory() != null) item.setCategory(dto.getCategory());
+        if (dto.getCategory() != null) item.setCategory(normalizeCategory(dto.getCategory()));
         if (dto.getUnitOfMeasure() != null) item.setUnitOfMeasure(dto.getUnitOfMeasure());
         if (dto.getManufacturer() != null) item.setManufacturer(dto.getManufacturer());
         if (dto.getManufacturerPartNumber() != null) item.setManufacturerPartNumber(dto.getManufacturerPartNumber());
@@ -184,6 +184,15 @@ public class InventoryItemService {
     private InventoryItem getOrThrow(Long id) {
         return itemRepo.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+    }
+
+    private String normalizeCategory(String category) {
+        if (category == null) return null;
+        String trimmed = category.trim();
+        if (trimmed.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "category cannot be blank");
+        }
+        return trimmed;
     }
 
     private void validateMinMax(Integer min, Integer max) {

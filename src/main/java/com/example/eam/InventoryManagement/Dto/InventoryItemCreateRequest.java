@@ -1,6 +1,5 @@
 package com.example.eam.InventoryManagement.Dto;
 
-import com.example.eam.Enum.InventoryCategory;
 import com.example.eam.Enum.UnitOfMeasure;
 import jakarta.validation.constraints.*;
 import lombok.Data;
@@ -16,8 +15,9 @@ public class InventoryItemCreateRequest {
     @NotBlank
     private String itemName;
 
-    @NotNull
-    private InventoryCategory category;
+    @NotBlank
+    @Size(max = 128)
+    private String category;
 
     @NotNull
     private UnitOfMeasure unitOfMeasure;

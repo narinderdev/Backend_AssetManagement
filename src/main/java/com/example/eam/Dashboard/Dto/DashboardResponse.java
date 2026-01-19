@@ -9,12 +9,10 @@ import java.util.List;
 @Builder
 public class DashboardResponse {
 
-    private MetricCard openServiceRequests;
     private MetricCard activeWorkOrders;
     private MetricCard overdueTasks;
-    private MetricCard criticalAssetsDown;
+    private MetricCard inProgressWorkOrders;
 
     private WorkOrderStatusBreakdown workOrdersByStatus;
-    private List<MonthlyCostSummary> maintenanceCostSummary;
     private List<RecentWorkOrderDto> recentWorkOrders;
 }

@@ -7,7 +7,6 @@ import lombok.Data;
 @Data
 public class WorkOrderCheckOutRequest {
 
-    @NotNull
     private LocalDateTime checkOutAt;
 
     private String notes;

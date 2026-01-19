@@ -54,8 +54,11 @@ public class PredictiveMaintenanceService {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
                 });
 
+        String location = normalizeLocation(req.getLocation());
+
         AssetThreshold threshold = AssetThreshold.builder()
                 .asset(asset)
+                .location(location)
                 .meterType(req.getMeterType())
                 .warningThreshold(req.getWarningThreshold())
                 .criticalThreshold(req.getCriticalThreshold())
@@ -83,7 +86,10 @@ public class PredictiveMaintenanceService {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
                 });
 
+        String location = normalizeLocation(req.getLocation());
+
         threshold.setAsset(asset);
+        threshold.setLocation(location);
         threshold.setMeterType(req.getMeterType());
         threshold.setWarningThreshold(req.getWarningThreshold());
         threshold.setCriticalThreshold(req.getCriticalThreshold());
@@ -182,12 +188,13 @@ public class PredictiveMaintenanceService {
 
     private void createPredictiveWorkOrder(Asset asset, AssetThreshold threshold, MeterType meterType, double value) {
         PriorityLevel priority = threshold.getDefaultPriority() != null ? threshold.getDefaultPriority() : PriorityLevel.HIGH;
+        String location = resolveLocation(asset, threshold.getLocation());
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .pmPlan(null)
                 .pmDueDate(null)
                 .asset(asset)
-                .location(null)
+                .location(location)
                 .workType(WorkType.PREDICTIVE)
                 .priority(priority)
                 .woTitle("Predictive alert: " + meterType)
@@ -197,6 +204,23 @@ public class PredictiveMaintenanceService {
                 .deleted(false)
                 .build();
         workOrderRepository.save(wo);
+    }
+
+    private String normalizeLocation(String value) {
+        if (value == null) return null;
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private String resolveLocation(Asset asset, String providedLocation) {
+        String normalized = normalizeLocation(providedLocation);
+        if (normalized != null) {
+            return normalized;
+        }
+        if (asset == null || asset.getLocation() == null) {
+            return null;
+        }
+        return normalizeLocation(asset.getLocation().getLocation());
     }
 
     private String generateUniqueWorkOrderId() {
@@ -220,6 +244,7 @@ public class PredictiveMaintenanceService {
                 .id(threshold.getId())
                 .assetId(threshold.getAsset() != null ? threshold.getAsset().getId() : null)
                 .assetName(threshold.getAsset() != null ? threshold.getAsset().getAssetName() : null)
+                .location(threshold.getLocation())
                 .meterType(threshold.getMeterType())
                 .warningThreshold(threshold.getWarningThreshold())
                 .criticalThreshold(threshold.getCriticalThreshold())

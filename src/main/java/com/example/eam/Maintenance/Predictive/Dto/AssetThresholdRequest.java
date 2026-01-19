@@ -9,6 +9,7 @@ import lombok.Data;
 public class AssetThresholdRequest {
     @NotNull
     private Long assetId;
+    private String location;
     @NotNull
     private MeterType meterType;
     private Double warningThreshold;

@@ -10,7 +10,6 @@ public class WorkOrderCheckInRequest {
     private Long technicianId;
     private Long teamId;
 
-    @NotNull
     private LocalDateTime checkInAt;
 
     private String notes;

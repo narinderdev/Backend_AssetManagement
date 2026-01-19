@@ -26,6 +26,9 @@ public class AssetThreshold {
     @JoinColumn(name = "asset_id", nullable = false)
     private Asset asset;
 
+    @Column(name = "location", length = 255)
+    private String location;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "meter_type", nullable = false, length = 32)
     private MeterType meterType;

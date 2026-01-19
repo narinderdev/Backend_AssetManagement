@@ -49,3 +49,7 @@ src/.env
 Logs
 logs/
 *.log
+
+# Firebase service account
+mervin--esam-firebase-adminsdk-fbsvc-388958a2c2.json
+*firebase-adminsdk*.json

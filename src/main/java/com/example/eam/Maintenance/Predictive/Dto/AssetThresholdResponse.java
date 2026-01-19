@@ -13,6 +13,7 @@ public class AssetThresholdResponse {
     private Long id;
     private Long assetId;
     private String assetName;
+    private String location;
     private MeterType meterType;
     private Double warningThreshold;
     private Double criticalThreshold;

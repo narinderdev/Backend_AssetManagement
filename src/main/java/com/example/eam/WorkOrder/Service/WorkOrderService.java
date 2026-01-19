@@ -15,6 +15,12 @@ import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamRepository;
+import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
+import com.example.eam.Technician.Repository.TechnicianDailyWorkSummaryRepository;
+import com.example.eam.Technician.Entity.TechnicianDailyWorkSummary;
+import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
+import com.example.eam.WorkOrder.Entity.WorkOrderTechnicianDailyLog;
+import com.example.eam.WorkOrder.Repository.WorkOrderTechnicianDailyLogRepository;
 import com.example.eam.WorkOrder.Dto.*;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Entity.WorkOrderLaborEntry;
@@ -47,8 +53,13 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
@@ -65,6 +76,9 @@ public class WorkOrderService {
     private final ServiceMaintenanceRepository serviceMaintenanceRepository;
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamRepository technicianTeamRepository;
+    private final TechnicianTeamMemberRepository technicianTeamMemberRepository;
+    private final TechnicianDailyWorkSummaryRepository technicianDailyWorkSummaryRepository;
+    private final WorkOrderTechnicianDailyLogRepository workOrderTechnicianDailyLogRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final WorkOrderLaborEntryRepository workOrderLaborEntryRepository;
     private final WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
@@ -452,6 +466,28 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         Technician technician = resolveTechnician(request.getTechnicianId());
         TechnicianTeam team = resolveTeam(request.getTeamId());
+        TechnicianTeam assignedTeam = wo.getAssignedTeam();
+        if (assignedTeam != null) {
+            if (team == null) {
+                team = assignedTeam;
+            } else if (!assignedTeam.getId().equals(team.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team must match the work order assigned team");
+            }
+        }
+        if (wo.getAssignedTechnician() != null && technician != null
+                && !wo.getAssignedTechnician().getId().equals(technician.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician must match the work order assignment");
+        }
+        if (team == null && technician == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Provide technicianId or teamId for check-in");
+        }
+        if (team != null && technician != null) {
+            boolean member = getTeamMembers(team).stream()
+                    .anyMatch(t -> t.getId().equals(technician.getId()));
+            if (!member) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician is not part of the specified team");
+            }
+        }
 
         LocalDateTime checkIn = request.getCheckInAt() != null
                 ? request.getCheckInAt()
@@ -534,6 +570,22 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         Technician technician = resolveTechnician(request != null ? request.getTechnicianId() : null);
         TechnicianTeam team = resolveTeam(request != null ? request.getTeamId() : null);
 
+        if (technician != null && openLog.getTechnician() != null
+                && !technician.getId().equals(openLog.getTechnician().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change technician during an open session");
+        }
+        if (team != null && openLog.getTeam() != null
+                && !team.getId().equals(openLog.getTeam().getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Cannot change team during an open session");
+        }
+        if (team != null && technician != null) {
+            boolean member = getTeamMembers(team).stream()
+                    .anyMatch(t -> t.getId().equals(technician.getId()));
+            if (!member) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician is not part of the specified team");
+            }
+        }
+
         pauseLog.setResumeAt(resumeAt);
         if (technician != null) openLog.setTechnician(technician);
         if (team != null) openLog.setTeam(team);
@@ -575,6 +627,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         workOrderCheckLogRepository.save(openLog);
 
         accumulateLaborHours(wo, openLog);
+        updateTechnicianDailyWorkSummaries(openLog);
 
         if (wo.getActualEndDateTime() == null || checkOut.isAfter(wo.getActualEndDateTime())) {
             wo.setActualEndDateTime(checkOut);
@@ -790,6 +843,129 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             wo.setActualLaborHours(wo.getActualLaborHours().add(hours));
         }
     }
+
+    private void updateTechnicianDailyWorkSummaries(WorkOrderCheckLog checkLog) {
+        if (checkLog == null || checkLog.getCheckInAt() == null || checkLog.getCheckOutAt() == null) return;
+
+        Map<LocalDate, Long> secondsByDate = computeWorkingSecondsByDate(checkLog);
+        if (secondsByDate.isEmpty()) return;
+
+        List<Technician> technicians = resolveTechniciansForLog(checkLog);
+        if (technicians.isEmpty()) {
+            log.warn("No technician or team linked to check log {}", checkLog.getId());
+            return;
+        }
+
+        WorkOrder workOrder = checkLog.getWorkOrder();
+        for (Technician tech : technicians) {
+            if (tech == null || tech.getId() == null) continue;
+            for (Map.Entry<LocalDate, Long> entry : secondsByDate.entrySet()) {
+                TechnicianDailyWorkSummary summary = technicianDailyWorkSummaryRepository
+                        .findByTechnician_IdAndWorkDate(tech.getId(), entry.getKey())
+                        .orElseGet(() -> TechnicianDailyWorkSummary.builder()
+                                .technician(tech)
+                                .workDate(entry.getKey())
+                                .workingSeconds(0L)
+                                .build());
+                summary.setWorkingSeconds(summary.getWorkingSeconds() + entry.getValue());
+                technicianDailyWorkSummaryRepository.save(summary);
+
+                if (workOrder != null && workOrder.getId() != null) {
+                    WorkOrderTechnicianDailyLog woLog = workOrderTechnicianDailyLogRepository
+                            .findByWorkOrder_IdAndTechnician_IdAndWorkDate(workOrder.getId(), tech.getId(), entry.getKey())
+                            .orElseGet(() -> WorkOrderTechnicianDailyLog.builder()
+                                    .workOrder(workOrder)
+                                    .technician(tech)
+                                    .workDate(entry.getKey())
+                                    .workingSeconds(0L)
+                                    .build());
+                    woLog.setWorkingSeconds(woLog.getWorkingSeconds() + entry.getValue());
+                    workOrderTechnicianDailyLogRepository.save(woLog);
+                }
+            }
+        }
+    }
+
+    private Map<LocalDate, Long> computeWorkingSecondsByDate(WorkOrderCheckLog checkLog) {
+        if (checkLog.getCheckInAt() == null || checkLog.getCheckOutAt() == null) return Map.of();
+
+        List<TimeInterval> intervals = buildActiveIntervals(checkLog);
+        Map<LocalDate, Long> secondsByDate = new HashMap<>();
+        for (TimeInterval interval : intervals) {
+            LocalDateTime cursor = interval.start();
+            LocalDateTime end = interval.end();
+            while (cursor.isBefore(end)) {
+                LocalDateTime dayBoundary = cursor.toLocalDate().plusDays(1).atStartOfDay();
+                LocalDateTime sliceEnd = end.isBefore(dayBoundary) ? end : dayBoundary;
+                long seconds = ChronoUnit.SECONDS.between(cursor, sliceEnd);
+                if (seconds > 0) {
+                    secondsByDate.merge(cursor.toLocalDate(), seconds, Long::sum);
+                }
+                cursor = sliceEnd;
+            }
+        }
+        return secondsByDate;
+    }
+
+    private List<TimeInterval> buildActiveIntervals(WorkOrderCheckLog checkLog) {
+        if (checkLog.getCheckInAt() == null || checkLog.getCheckOutAt() == null) return List.of();
+
+        LocalDateTime checkIn = checkLog.getCheckInAt();
+        LocalDateTime checkOut = checkLog.getCheckOutAt();
+        List<WorkOrderPauseLog> pauses = new ArrayList<>(resolvePauseLogs(checkLog));
+        pauses.sort(Comparator.comparing(WorkOrderPauseLog::getPauseAt, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        List<TimeInterval> intervals = new ArrayList<>();
+        LocalDateTime cursor = checkIn;
+        for (WorkOrderPauseLog pause : pauses) {
+            if (pause.getPauseAt() == null || pause.getResumeAt() == null) continue;
+            if (pause.getPauseAt().isAfter(checkOut)) break;
+            LocalDateTime intervalEnd = pause.getPauseAt().isBefore(checkOut) ? pause.getPauseAt() : checkOut;
+            if (cursor.isBefore(intervalEnd)) {
+                intervals.add(new TimeInterval(cursor, intervalEnd));
+            }
+            cursor = pause.getResumeAt();
+            if (cursor.isAfter(checkOut)) {
+                cursor = checkOut;
+                break;
+            }
+        }
+        if (cursor.isBefore(checkOut)) {
+            intervals.add(new TimeInterval(cursor, checkOut));
+        }
+        return intervals;
+    }
+
+    private List<Technician> resolveTechniciansForLog(WorkOrderCheckLog log) {
+        if (log == null) return List.of();
+        if (log.getTeam() != null) {
+            return dedupeById(getTeamMembers(log.getTeam()));
+        }
+        if (log.getTechnician() != null) {
+            return List.of(log.getTechnician());
+        }
+        return List.of();
+    }
+
+    private List<Technician> getTeamMembers(TechnicianTeam team) {
+        if (team == null || team.getId() == null) return List.of();
+        return technicianTeamMemberRepository.findByTeam_Id(team.getId()).stream()
+                .map(TechnicianTeamMember::getTechnician)
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private List<Technician> dedupeById(List<Technician> technicians) {
+        if (technicians == null || technicians.isEmpty()) return List.of();
+        Map<Long, Technician> byId = new LinkedHashMap<>();
+        for (Technician tech : technicians) {
+            if (tech == null || tech.getId() == null) continue;
+            byId.putIfAbsent(tech.getId(), tech);
+        }
+        return List.copyOf(byId.values());
+    }
+
+    private record TimeInterval(LocalDateTime start, LocalDateTime end) {}
 
     private long computeWorkingSeconds(WorkOrderCheckLog log) {
         if (log.getCheckInAt() == null) return 0;
