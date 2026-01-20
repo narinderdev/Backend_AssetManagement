@@ -458,8 +458,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check-in payload is required");
         }
         WorkOrder wo = getWorkOrderOrThrow(id);
-        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to check in");
+        WorkOrderStatus status = wo.getStatus();
+        if (status == WorkOrderStatus.CLOSED || status == WorkOrderStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Check-in not allowed once work order is closed or rejected");
         }
 
         workOrderCheckLogRepository.findFirstByWorkOrder_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id)
@@ -607,8 +608,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Check-out payload is required");
         }
         WorkOrder wo = getWorkOrderOrThrow(id);
-        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to check out");
+        WorkOrderStatus status = wo.getStatus();
+        if (status == WorkOrderStatus.CLOSED || status == WorkOrderStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Check-out not allowed once work order is closed or rejected");
         }
 
         LocalDateTime checkOut = request.getCheckOutAt() != null
