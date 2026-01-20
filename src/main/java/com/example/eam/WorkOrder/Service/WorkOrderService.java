@@ -40,7 +40,9 @@ import com.example.eam.Common.NotificationService;
 import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -1001,7 +1003,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     @Transactional(readOnly = true)
     public WorkOrderListResponse listWorkOrders(Pageable pageable) {
-        Page<WorkOrder> page = workOrderRepository.findByDeletedFalse(pageable);
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort() == null || pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by("plannedEndDateTime").ascending().and(Sort.by("id").ascending())
+            );
+        }
+        Page<WorkOrder> page = workOrderRepository.findByDeletedFalse(effectivePageable);
         List<WorkOrderDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
