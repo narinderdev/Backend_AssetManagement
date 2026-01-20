@@ -72,17 +72,17 @@ public class NotificationService {
         }
     }
 
-    private void handleSendFailure(Exception e, TechnicianDeviceToken token) {
-        if (e instanceof FirebaseMessagingException fme) {
-            MessagingErrorCode code = fme.getMessagingErrorCode();
-            if (code == MessagingErrorCode.UNREGISTERED || "UNREGISTERED".equalsIgnoreCase(fme.getErrorCode())) {
-                try {
-                    technicianDeviceTokenRepository.delete(token);
-                    log.info("Deleted unregistered device token {}", token.getId());
-                } catch (Exception ex) {
-                    log.warn("Failed to delete unregistered token {}", token.getId(), ex);
-                }
+private void handleSendFailure(Exception e, TechnicianDeviceToken token) {
+    if (e instanceof FirebaseMessagingException fme) {
+        MessagingErrorCode code = fme.getMessagingErrorCode();
+        if (code == MessagingErrorCode.UNREGISTERED) {
+            try {
+                technicianDeviceTokenRepository.delete(token);
+                log.info("Deleted unregistered device token {}", token.getId());
+            } catch (Exception ex) {
+                log.warn("Failed to delete unregistered token {}", token.getId(), ex);
             }
         }
     }
+}
 }
