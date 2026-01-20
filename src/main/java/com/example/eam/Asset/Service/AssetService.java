@@ -3,6 +3,11 @@ package com.example.eam.Asset.Service;
 import com.example.eam.Asset.Dto.*;
 import com.example.eam.Asset.Entity.*;
 import com.example.eam.Asset.Repository.*;
+import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse;
+import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
+import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
+import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
+import com.example.eam.Maintenance.Predictive.Dto.PredictiveMeterReadingResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -14,8 +19,10 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -27,6 +34,8 @@ public class AssetService {
     private final AssetFinancialDetailsRepository financialRepository;
     private final AssetWarrantyLifecycleRepository warrantyRepository;
     private final AssetSafetyOperationsRepository safetyRepository;
+    private final AssetThresholdRepository assetThresholdRepository;
+    private final PredictiveMeterReadingRepository predictiveMeterReadingRepository;
 
     // ---------- CREATE (basic asset) ----------
 
@@ -470,6 +479,16 @@ public class AssetService {
             safetyDto.setOperatingInstructions(safety.getOperatingInstructions());
         }
 
+        java.util.List<AssetThresholdResponse> predictiveThresholds = assetThresholdRepository.findByAsset_Id(asset.getId())
+                .map(threshold -> {
+                    java.util.List<Long> ids = java.util.List.of(threshold.getId());
+                    Map<Long, java.util.List<com.example.eam.Maintenance.Predictive.Entity.PredictiveMeterReading>> readingsByThreshold =
+                            predictiveMeterReadingRepository.findByThreshold_IdIn(ids).stream()
+                                    .collect(Collectors.groupingBy(r -> r.getThreshold().getId()));
+                    return java.util.List.of(toThresholdResponse(threshold, readingsByThreshold.getOrDefault(threshold.getId(), java.util.List.of())));
+                })
+                .orElse(java.util.List.of());
+
         return AssetDetailsResponse.builder()
                 .id(asset.getId())
                 .assetId(asset.getAssetId())
@@ -483,10 +502,39 @@ public class AssetService {
                 .ownership(asset.getOwnership())
                 .assetTag(asset.getAssetTag())
                 .location(locDto)
+                .predictiveThresholds(predictiveThresholds)
                 .technicalDetails(techDto)
                 .financialDetails(finDto)
                 .warrantyLifecycle(wlDto)
                 .safetyOperations(safetyDto)
+                .build();
+    }
+
+    private AssetThresholdResponse toThresholdResponse(AssetThreshold threshold,
+                                                       java.util.List<com.example.eam.Maintenance.Predictive.Entity.PredictiveMeterReading> readings) {
+        return AssetThresholdResponse.builder()
+                .id(threshold.getId())
+                .assetId(threshold.getAsset() != null ? threshold.getAsset().getId() : null)
+                .assetName(threshold.getAsset() != null ? threshold.getAsset().getAssetName() : null)
+                .location(threshold.getLocation())
+                .meterType(threshold.getMeterType())
+                .warningThreshold(threshold.getWarningThreshold())
+                .criticalThreshold(threshold.getCriticalThreshold())
+                .autoCreateWo(threshold.getAutoCreateWo())
+                .defaultPriority(threshold.getDefaultPriority())
+                .cooldownHours(threshold.getCooldownHours())
+                .lastTriggeredSeverity(threshold.getLastTriggeredSeverity())
+                .meterReadings(readings.stream()
+                        .map(r -> PredictiveMeterReadingResponse.builder()
+                                .id(r.getId())
+                                .meterType(r.getMeterType())
+                                .readingValue(r.getReadingValue())
+                                .readingTime(r.getReadingTime())
+                                .severity(r.getSeverity())
+                                .notes(r.getNotes())
+                                .createdAt(r.getCreatedAt())
+                                .build())
+                        .toList())
                 .build();
     }
 }

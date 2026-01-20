@@ -23,6 +23,7 @@ import lombok.Data;
     "ownership",
     "parentAssetId",
     "location",
+    "predictiveThresholds",
     "technicalDetails",
     "financialDetails",
     "warrantyLifecycle",
@@ -43,6 +44,7 @@ public class AssetDetailsResponse {
     private String assetTag;
 
     private AssetLocationDto location;
+    private java.util.List<com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse> predictiveThresholds;
     private AssetTechnicalDetailsDto technicalDetails;
     private AssetFinancialDetailsDto financialDetails;
     private AssetWarrantyLifecycleDto warrantyLifecycle;
