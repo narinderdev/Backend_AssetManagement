@@ -87,6 +87,24 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order check-out recorded", data));
     }
 
+    @PostMapping("/{id}/team/check-in")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> teamCheckIn(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderTeamCheckInRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.teamCheckIn(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team check-in recorded", data));
+    }
+
+    @PostMapping("/{id}/team/check-out")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> teamCheckOut(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderTeamCheckOutRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.teamCheckOut(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team check-out recorded", data));
+    }
+
     @PostMapping("/{id}/pause")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> pause(
             @PathVariable Long id,
@@ -103,6 +121,24 @@ public class WorkOrderController {
     ) {
         WorkOrderDetailsResponse data = workOrderService.resume(id, request);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order resumed", data));
+    }
+
+    @PostMapping("/{id}/team/pause")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> teamPause(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderTeamPauseRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.teamPause(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team pause recorded", data));
+    }
+
+    @PostMapping("/{id}/team/resume")
+    public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> teamResume(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderTeamResumeRequest request
+    ) {
+        WorkOrderDetailsResponse data = workOrderService.teamResume(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team resume recorded", data));
     }
 
     @PostMapping("/{id}/complete")

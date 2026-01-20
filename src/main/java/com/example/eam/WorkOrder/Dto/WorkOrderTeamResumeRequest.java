@@ -5,11 +5,12 @@ import java.time.LocalDateTime;
 import lombok.Data;
 
 @Data
-public class WorkOrderCheckOutRequest {
+public class WorkOrderTeamResumeRequest {
 
-    private Long technicianId;
+    @NotNull
+    private Long teamId;
 
-    private LocalDateTime checkOutAt;
+    private LocalDateTime resumeAt;
 
     private String notes;
 }

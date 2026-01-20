@@ -526,7 +526,14 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 ? request.getPauseAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
 
-        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order");
+        }
+        if (openLogs.size() > 1) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Multiple open sessions found; use team pause endpoint");
+        }
+        WorkOrderCheckLog openLog = openLogs.get(0);
         workOrderPauseLogRepository.findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
                 .ifPresent(existing -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is already paused");
@@ -558,7 +565,23 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to resume");
         }
 
-        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order");
+        }
+        WorkOrderCheckLog openLog;
+        if (openLogs.size() > 1) {
+            Long technicianId = request != null ? request.getTechnicianId() : null;
+            if (technicianId == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Multiple open sessions found; specify technicianId or use team resume");
+            }
+            openLog = openLogs.stream()
+                    .filter(log -> log.getTechnician() != null && technicianId.equals(log.getTechnician().getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for the specified technician"));
+        } else {
+            openLog = openLogs.get(0);
+        }
         WorkOrderPauseLog pauseLog = workOrderPauseLogRepository
                 .findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not paused"));
@@ -613,11 +636,27 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Check-out not allowed once work order is closed or rejected");
         }
 
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order");
+        }
+        WorkOrderCheckLog openLog;
+        if (openLogs.size() > 1) {
+            if (request.getTechnicianId() == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Multiple open sessions found; specify technicianId or use team checkout");
+            }
+            openLog = openLogs.stream()
+                    .filter(log -> log.getTechnician() != null && request.getTechnicianId().equals(log.getTechnician().getId()))
+                    .findFirst()
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for the specified technician"));
+        } else {
+            openLog = openLogs.get(0);
+        }
+
         LocalDateTime checkOut = request.getCheckOutAt() != null
                 ? request.getCheckOutAt()
                 : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
 
-        WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLog(id);
         if (checkOut.isBefore(openLog.getCheckInAt())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOutAt cannot be before checkInAt");
         }
@@ -636,6 +675,225 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         if (wo.getActualEndDateTime() == null || checkOut.isAfter(wo.getActualEndDateTime())) {
             wo.setActualEndDateTime(checkOut);
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse teamCheckIn(Long id, WorkOrderTeamCheckInRequest request) {
+        if (request == null || request.getTechnicians() == null || request.getTechnicians().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team check-in payload is required");
+        }
+
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        ensureCheckFlowAllowed(wo);
+        TechnicianTeam team = requireAssignedTeam(wo, request.getTeamId());
+        Map<Long, Technician> membersById = mapTeamMembersById(team);
+        Set<Long> seen = new java.util.HashSet<>();
+        LocalDateTime earliestCheckIn = wo.getActualStartDateTime();
+
+        for (WorkOrderTeamCheckInEntry entry : request.getTechnicians()) {
+            if (entry == null) continue;
+            Long technicianId = entry.getTechnicianId();
+            if (technicianId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required for each check-in entry");
+            }
+            if (!seen.add(technicianId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Duplicate technicianId in team check-in: " + technicianId);
+            }
+            Technician technician = membersById.get(technicianId);
+            if (technician == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician " + technicianId + " is not part of the team");
+            }
+            workOrderCheckLogRepository.findFirstByWorkOrder_IdAndTechnician_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id, technicianId)
+                    .ifPresent(open -> {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician " + technicianId + " already has an open check-in for this work order");
+                    });
+
+            LocalDateTime checkIn = entry.getCheckInAt() != null
+                    ? entry.getCheckInAt()
+                    : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+            WorkOrderCheckLog log = WorkOrderCheckLog.builder()
+                    .workOrder(wo)
+                    .technician(technician)
+                    .team(team)
+                    .checkInAt(checkIn)
+                    .checkOutAt(null)
+                    .notes(trim(entry.getNotes()))
+                    .build();
+            workOrderCheckLogRepository.save(log);
+
+            if (earliestCheckIn == null || checkIn.isBefore(earliestCheckIn)) {
+                earliestCheckIn = checkIn;
+            }
+        }
+
+        if (earliestCheckIn != null && (wo.getActualStartDateTime() == null || earliestCheckIn.isBefore(wo.getActualStartDateTime()))) {
+            wo.setActualStartDateTime(earliestCheckIn);
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse teamCheckOut(Long id, WorkOrderTeamCheckOutRequest request) {
+        if (request == null || request.getTechnicians() == null || request.getTechnicians().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team check-out payload is required");
+        }
+
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        ensureCheckFlowAllowed(wo);
+        TechnicianTeam team = requireAssignedTeam(wo, request.getTeamId());
+        Map<Long, Technician> membersById = mapTeamMembersById(team);
+        Set<Long> seen = new java.util.HashSet<>();
+        LocalDateTime latestCheckOut = wo.getActualEndDateTime();
+
+        for (WorkOrderTeamCheckOutEntry entry : request.getTechnicians()) {
+            if (entry == null) continue;
+            Long technicianId = entry.getTechnicianId();
+            if (technicianId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required for each check-out entry");
+            }
+            if (!seen.add(technicianId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Duplicate technicianId in team check-out: " + technicianId);
+            }
+            Technician technician = membersById.get(technicianId);
+            if (technician == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician " + technicianId + " is not part of the team");
+            }
+
+            WorkOrderCheckLog openLog = workOrderCheckLogRepository.requireOpenLogForTechnician(id, technicianId);
+            if (openLog.getTeam() != null && !openLog.getTeam().getId().equals(team.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Open check-in for technician " + technicianId + " is linked to a different team");
+            }
+            LocalDateTime checkOut = entry.getCheckOutAt() != null
+                    ? entry.getCheckOutAt()
+                    : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+            if (checkOut.isBefore(openLog.getCheckInAt())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "checkOutAt cannot be before checkInAt for technician " + technicianId);
+            }
+            workOrderPauseLogRepository.findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                    .ifPresent(pl -> {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Resume before checking out for technician " + technicianId);
+                    });
+
+            openLog.setCheckOutAt(checkOut);
+            if (entry.getNotes() != null) {
+                openLog.setNotes(trim(entry.getNotes()));
+            }
+            workOrderCheckLogRepository.save(openLog);
+
+            accumulateLaborHours(wo, openLog);
+            updateTechnicianDailyWorkSummaries(openLog);
+
+            if (latestCheckOut == null || checkOut.isAfter(latestCheckOut)) {
+                latestCheckOut = checkOut;
+            }
+        }
+
+        if (latestCheckOut != null && (wo.getActualEndDateTime() == null || latestCheckOut.isAfter(wo.getActualEndDateTime()))) {
+            wo.setActualEndDateTime(latestCheckOut);
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse teamPause(Long id, WorkOrderTeamPauseRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team pause payload is required");
+        }
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        ensureCheckFlowAllowed(wo);
+        TechnicianTeam team = requireAssignedTeam(wo, request.getTeamId());
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to pause");
+        }
+
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order");
+        }
+
+        LocalDateTime pauseAt = request.getPauseAt() != null
+                ? request.getPauseAt()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        for (WorkOrderCheckLog openLog : openLogs) {
+            if (openLog.getTeam() != null && !openLog.getTeam().getId().equals(team.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Open check-in is linked to a different team");
+            }
+            workOrderPauseLogRepository.findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                    .ifPresent(existing -> {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is already paused for at least one technician");
+                    });
+            if (pauseAt.isBefore(openLog.getCheckInAt())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "pauseAt cannot be before checkInAt");
+            }
+
+            WorkOrderPauseLog pauseLog = WorkOrderPauseLog.builder()
+                    .checkLog(openLog)
+                    .pauseAt(pauseAt)
+                    .resumeAt(null)
+                    .build();
+            if (openLog.getPauseLogs() == null) {
+                openLog.setPauseLogs(new ArrayList<>());
+            }
+            openLog.getPauseLogs().add(pauseLog);
+
+            if (request.getNotes() != null) {
+                openLog.setNotes(trim(request.getNotes()));
+            }
+            workOrderCheckLogRepository.save(openLog);
+        }
+
+        WorkOrder saved = workOrderRepository.save(wo);
+        return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderDetailsResponse teamResume(Long id, WorkOrderTeamResumeRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team resume payload is required");
+        }
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        ensureCheckFlowAllowed(wo);
+        TechnicianTeam team = requireAssignedTeam(wo, request.getTeamId());
+        if (wo.getStatus() != WorkOrderStatus.IN_PROGRESS) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order must be IN_PROGRESS to resume");
+        }
+
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "No open check-in found for this work order");
+        }
+
+        LocalDateTime resumeAt = request.getResumeAt() != null
+                ? request.getResumeAt()
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        for (WorkOrderCheckLog openLog : openLogs) {
+            if (openLog.getTeam() != null && !openLog.getTeam().getId().equals(team.getId())) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Open check-in is linked to a different team");
+            }
+            WorkOrderPauseLog pauseLog = workOrderPauseLogRepository
+                    .findFirstByCheckLog_IdAndResumeAtIsNullOrderByPauseAtDesc(openLog.getId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not paused"));
+
+            if (resumeAt.isBefore(pauseLog.getPauseAt())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "resumeAt cannot be before pauseAt");
+            }
+
+            pauseLog.setResumeAt(resumeAt);
+            if (request.getNotes() != null) {
+                openLog.setNotes(trim(request.getNotes()));
+            }
+            workOrderCheckLogRepository.save(openLog);
         }
 
         WorkOrder saved = workOrderRepository.save(wo);
@@ -825,6 +1083,31 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         }
     }
 
+    private void ensureCheckFlowAllowed(WorkOrder wo) {
+        WorkOrderStatus status = wo.getStatus();
+        if (status == WorkOrderStatus.CLOSED || status == WorkOrderStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Operation not allowed once work order is closed or rejected");
+        }
+    }
+
+    private TechnicianTeam requireAssignedTeam(WorkOrder wo, Long teamId) {
+        if (teamId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "teamId is required");
+        }
+        TechnicianTeam assignedTeam = wo.getAssignedTeam();
+        if (assignedTeam == null || assignedTeam.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order is not assigned to a team");
+        }
+        TechnicianTeam requestedTeam = resolveTeam(teamId);
+        if (requestedTeam == null || requestedTeam.getId() == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Team not found: " + teamId);
+        }
+        if (!assignedTeam.getId().equals(requestedTeam.getId())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Specified team does not match the work order assignment");
+        }
+        return requestedTeam;
+    }
+
     private List<WorkOrderPauseLog> resolvePauseLogs(WorkOrderCheckLog log) {
         List<WorkOrderPauseLog> pauses = log.getPauseLogs();
         if (pauses == null || pauses.isEmpty()) {
@@ -958,6 +1241,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .map(TechnicianTeamMember::getTechnician)
                 .filter(Objects::nonNull)
                 .toList();
+    }
+
+    private Map<Long, Technician> mapTeamMembersById(TechnicianTeam team) {
+        Map<Long, Technician> byId = new LinkedHashMap<>();
+        for (Technician tech : dedupeById(getTeamMembers(team))) {
+            if (tech == null || tech.getId() == null) continue;
+            byId.putIfAbsent(tech.getId(), tech);
+        }
+        return byId;
     }
 
     private List<Technician> dedupeById(List<Technician> technicians) {
