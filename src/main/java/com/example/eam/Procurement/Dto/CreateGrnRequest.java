@@ -17,7 +17,6 @@ import java.util.List;
 @AllArgsConstructor
 public class CreateGrnRequest {
 
-    @NotNull
     private Long poId;
 
     @NotBlank

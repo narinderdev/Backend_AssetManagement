@@ -35,10 +35,10 @@ public class GoodsReceiptNote {
     @Column(name = "grn_number", nullable = false, unique = true, length = 64)
     private String grnNumber;
 
-    @Column(name = "po_id", nullable = false)
+    @Column(name = "po_id")
     private Long poId;
 
-    @Column(name = "vendor_id", nullable = false)
+    @Column(name = "vendor_id")
     private Long vendorId;
 
     @Column(name = "received_by_user_id", nullable = false, length = 150)

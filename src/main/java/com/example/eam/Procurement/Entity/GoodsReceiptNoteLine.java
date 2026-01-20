@@ -27,7 +27,7 @@ public class GoodsReceiptNoteLine {
     @JoinColumn(name = "grn_id", nullable = false)
     private GoodsReceiptNote grn;
 
-    @Column(name = "po_line_id", nullable = false)
+    @Column(name = "po_line_id")
     private Long poLineId;
 
     @Column(name = "item_id", nullable = false)

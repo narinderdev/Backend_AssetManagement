@@ -15,8 +15,9 @@ import java.math.BigDecimal;
 @AllArgsConstructor
 public class CreateGrnLineRequest {
 
-    @NotNull
     private Long poLineId;
+
+    private Long itemId;
 
     @NotNull
     @DecimalMin(value = "0", inclusive = false)

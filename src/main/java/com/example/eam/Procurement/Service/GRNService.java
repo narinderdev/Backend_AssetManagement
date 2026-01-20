@@ -44,18 +44,21 @@ public class GRNService {
 
     @Transactional
     public GrnResponse create(CreateGrnRequest request) {
-        PurchaseOrder po = poRepository.findById(request.getPoId())
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase Order not found"));
-        if (po.getStatus() != PurchaseOrderStatus.DELIVERED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "GRN can only be created when PO status is DELIVERED");
+        PurchaseOrder po = null;
+        Map<Long, PurchaseOrderLine> poLinesById = new HashMap<>();
+        if (request.getPoId() != null) {
+            po = poRepository.findById(request.getPoId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase Order not found"));
+            if (po.getStatus() != PurchaseOrderStatus.DELIVERED) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "GRN can only be created when PO status is DELIVERED");
+            }
+            List<PurchaseOrderLine> poLines = Optional.ofNullable(po.getLines()).orElseGet(Collections::emptyList);
+            if (poLines.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Purchase Order has no lines");
+            }
+            poLinesById = poLines.stream()
+                    .collect(Collectors.toMap(PurchaseOrderLine::getId, Function.identity()));
         }
-        List<PurchaseOrderLine> poLines = Optional.ofNullable(po.getLines()).orElseGet(Collections::emptyList);
-        if (poLines.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Purchase Order has no lines");
-        }
-
-        Map<Long, PurchaseOrderLine> poLinesById = poLines.stream()
-                .collect(Collectors.toMap(PurchaseOrderLine::getId, Function.identity()));
 
         if (request.getLines() == null || request.getLines().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one GRN line is required");
@@ -64,8 +67,8 @@ public class GRNService {
         Instant now = Instant.now();
         GoodsReceiptNote grn = GoodsReceiptNote.builder()
                 .grnNumber(numberGeneratorService.generateGrnNumber())
-                .poId(po.getId())
-                .vendorId(po.getVendorId())
+                .poId(po != null ? po.getId() : null)
+                .vendorId(po != null ? po.getVendorId() : null)
                 .receivedByUserId(requireText(request.getReceivedByUserId(), "receivedByUserId is required"))
                 .receivedAtUtc(now)
                 .dayKeyUtc(DateTimeFormatter.ISO_LOCAL_DATE.format(now.atZone(ZoneOffset.UTC).toLocalDate()))
@@ -74,9 +77,15 @@ public class GRNService {
 
         Map<Long, BigDecimal> qtyByItem = new HashMap<>();
         for (var lineRequest : request.getLines()) {
-            PurchaseOrderLine poLine = poLinesById.get(lineRequest.getPoLineId());
-            if (poLine == null) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PO line does not belong to this PO: " + lineRequest.getPoLineId());
+            PurchaseOrderLine poLine = null;
+            if (po != null) {
+                poLine = poLinesById.get(lineRequest.getPoLineId());
+                if (poLine == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "PO line does not belong to this PO: " + lineRequest.getPoLineId());
+                }
+            }
+            if (po == null && lineRequest.getPoLineId() != null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "poId is required when specifying poLineId");
             }
             BigDecimal receivedQty = lineRequest.getReceivedQty();
             if (receivedQty == null || receivedQty.compareTo(BigDecimal.ZERO) <= 0) {
@@ -84,31 +93,47 @@ public class GRNService {
             }
             receivedQty = receivedQty.setScale(4, RoundingMode.HALF_UP);
 
-            BigDecimal newTotal = poLine.getReceivedQty().add(receivedQty);
-            if (newTotal.compareTo(poLine.getOrderedQty()) > 0) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "Over receipt detected for PO line " + poLine.getId());
+            if (poLine != null) {
+                BigDecimal newTotal = poLine.getReceivedQty().add(receivedQty);
+                if (newTotal.compareTo(poLine.getOrderedQty()) > 0) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "Over receipt detected for PO line " + poLine.getId());
+                }
+                poLine.setReceivedQty(newTotal);
+                grn.addLine(GoodsReceiptNoteLine.builder()
+                        .grn(grn)
+                        .poLineId(poLine.getId())
+                        .itemId(poLine.getItemId())
+                        .receivedQty(receivedQty)
+                        .build());
+                qtyByItem.merge(poLine.getItemId(), receivedQty, BigDecimal::add);
+            } else {
+                // Non-PO GRN requires itemId from request
+                if (lineRequest.getPoLineId() != null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "poLineId not allowed when poId is absent");
+                }
+                if (lineRequest.getItemId() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "itemId is required for GRN lines without PO");
+                }
+                grn.addLine(GoodsReceiptNoteLine.builder()
+                        .grn(grn)
+                        .poLineId(null)
+                        .itemId(lineRequest.getItemId())
+                        .receivedQty(receivedQty)
+                        .build());
+                qtyByItem.merge(lineRequest.getItemId(), receivedQty, BigDecimal::add);
             }
-
-            poLine.setReceivedQty(newTotal);
-
-            grn.addLine(GoodsReceiptNoteLine.builder()
-                    .grn(grn)
-                    .poLineId(poLine.getId())
-                    .itemId(poLine.getItemId())
-                    .receivedQty(receivedQty)
-                    .build());
-
-            qtyByItem.merge(poLine.getItemId(), receivedQty, BigDecimal::add);
         }
 
         GoodsReceiptNote saved = grnRepository.save(grn);
         incrementStock(qtyByItem, saved.getId());
 
-        if (poLines.stream().allMatch(line -> line.getOrderedQty().compareTo(line.getReceivedQty()) == 0)) {
-            po.setStatus(PurchaseOrderStatus.CLOSED);
+        if (po != null) {
+            if (po.getLines().stream().allMatch(line -> line.getOrderedQty().compareTo(line.getReceivedQty()) == 0)) {
+                po.setStatus(PurchaseOrderStatus.CLOSED);
+            }
+            po.setUpdatedAt(Instant.now());
+            poRepository.save(po);
         }
-        po.setUpdatedAt(Instant.now());
-        poRepository.save(po);
 
         return toResponse(saved);
     }
