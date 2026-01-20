@@ -14,7 +14,9 @@ import lombok.NoArgsConstructor;
 public class WorkOrderCheckLogResponse {
     private Long id;
     private Long technicianId;
+    private String technicianName;
     private Long teamId;
+    private String teamName;
     private LocalDateTime checkInAt;
     private LocalDateTime checkOutAt;
     private String notes;

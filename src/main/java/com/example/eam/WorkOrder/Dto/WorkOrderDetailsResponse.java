@@ -37,6 +37,7 @@ import java.util.List;
         "assignedTechnicianName",
         "assignedTeamId",
         "assignedTeamName",
+        "teamMembers",
         "plannedStartDateTime",
         "plannedEndDateTime",
         "actualStartDateTime",
@@ -109,6 +110,7 @@ public class WorkOrderDetailsResponse {
     private String assignedTechnicianName;
     private Long assignedTeamId;
     private String assignedTeamName;
+    private java.util.List<WorkOrderTeamMemberResponse> teamMembers;
 
     private LocalDateTime plannedStartDateTime;
     private LocalDateTime plannedEndDateTime;

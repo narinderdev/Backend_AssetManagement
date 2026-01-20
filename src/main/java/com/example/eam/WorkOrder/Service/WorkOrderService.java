@@ -37,6 +37,7 @@ import com.example.eam.WorkOrder.Repository.WorkOrderPauseLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
 import com.example.eam.Common.NotificationService;
+import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -1252,6 +1253,23 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return byId;
     }
 
+    private List<WorkOrderTeamMemberResponse> toTeamMemberResponses(TechnicianTeam team) {
+        if (team == null || team.getId() == null) return List.of();
+        return technicianTeamMemberRepository.findByTeam_Id(team.getId()).stream()
+                .map(member -> {
+                    Technician tech = member.getTechnician();
+                    if (tech == null) return null;
+                    return WorkOrderTeamMemberResponse.builder()
+                            .technicianId(tech.getId())
+                            .technicianName(resolveTechnicianName(tech))
+                            .email(tech.getEmail())
+                            .teamLeader(member.isTeamLeader())
+                            .build();
+                })
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
     private List<Technician> dedupeById(List<Technician> technicians) {
         if (technicians == null || technicians.isEmpty()) return List.of();
         Map<Long, Technician> byId = new LinkedHashMap<>();
@@ -1263,6 +1281,18 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     private record TimeInterval(LocalDateTime start, LocalDateTime end) {}
+
+    private String resolveTechnicianName(Technician tech) {
+        if (tech == null) return null;
+        if (tech.getFullName() != null && !tech.getFullName().isBlank()) {
+            return tech.getFullName();
+        }
+        String first = tech.getFirstName() != null ? tech.getFirstName().trim() : "";
+        String last = tech.getLastName() != null ? tech.getLastName().trim() : "";
+        String combined = (first + " " + last).trim();
+        if (!combined.isBlank()) return combined;
+        return tech.getEmail();
+    }
 
     private long computeWorkingSeconds(WorkOrderCheckLog log) {
         if (log.getCheckInAt() == null) return 0;
@@ -1515,7 +1545,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return WorkOrderCheckLogResponse.builder()
                 .id(log.getId())
                 .technicianId(log.getTechnician() != null ? log.getTechnician().getId() : null)
+                .technicianName(resolveTechnicianName(log.getTechnician()))
                 .teamId(log.getTeam() != null ? log.getTeam().getId() : null)
+                .teamName(log.getTeam() != null ? log.getTeam().getTeamName() : null)
                 .checkInAt(log.getCheckInAt())
                 .checkOutAt(log.getCheckOutAt())
                 .notes(log.getNotes())
@@ -1561,6 +1593,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .toList();
 
         List<WorkOrderCheckLog> checkLogEntities = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        checkLogEntities.sort(Comparator.comparing(WorkOrderCheckLog::getCheckInAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(WorkOrderCheckLog::getId, Comparator.nullsLast(Comparator.naturalOrder())));
         long actualWorkingSeconds = computeTotalWorkingSeconds(checkLogEntities);
         BigDecimal actualWorkingHours = BigDecimal.valueOf(actualWorkingSeconds)
                 .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
@@ -1595,6 +1629,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .assignedTechnicianName(technician != null ? technician.getFullName() : null)
                 .assignedTeamId(team != null ? team.getId() : null)
                 .assignedTeamName(team != null ? team.getTeamName() : null)
+                .teamMembers(team != null ? toTeamMemberResponses(team) : null)
                 .plannedStartDateTime(wo.getPlannedStartDateTime())
                 .plannedEndDateTime(wo.getPlannedEndDateTime())
                 .actualStartDateTime(wo.getActualStartDateTime())
