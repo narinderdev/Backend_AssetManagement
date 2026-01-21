@@ -2,6 +2,7 @@ package com.example.eam.WorkOrder.Repository;
 
 
 import com.example.eam.Enum.WorkOrderStatus;
+import com.example.eam.Enum.AssetCriticality;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +47,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     List<WorkOrder> findByDeletedFalseAndCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 
+    long countByDeletedFalse();
+
     @Query("""
         select distinct wo from WorkOrder wo
         left join wo.assignedTeam team
@@ -60,5 +63,25 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     Page<WorkOrder> findByTechnicianOrTeamMember(
             @Param("technicianId") Long technicianId,
             Pageable pageable
+    );
+
+    @Query("""
+        select count(distinct wo.asset.id)
+        from WorkOrder wo
+        where wo.deleted = false
+          and wo.asset is not null
+          and wo.asset.criticality = :criticality
+          and wo.status in :statuses
+          and wo.downtimeStart is not null
+          and wo.downtimeEnd is null
+    """)
+    long countActiveCriticalAssetsDown(@Param("criticality") AssetCriticality criticality,
+                                       @Param("statuses") Collection<WorkOrderStatus> statuses);
+
+    long countByAsset_CriticalityAndStatusInAndDowntimeStartBetweenAndDeletedFalse(
+            AssetCriticality criticality,
+            Collection<WorkOrderStatus> statuses,
+            LocalDateTime start,
+            LocalDateTime end
     );
 }
