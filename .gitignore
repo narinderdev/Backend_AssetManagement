@@ -53,3 +53,6 @@ logs/
 # Firebase service account
 src/main/resources/*firebase-adminsdk*.json
 **/mervin--eam-firebase-adminsdk*.json
+
+# Test folder
+src/test/
