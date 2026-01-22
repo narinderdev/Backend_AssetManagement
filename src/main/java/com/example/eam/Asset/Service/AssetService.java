@@ -29,6 +29,7 @@ import java.util.stream.Collectors;
 public class AssetService {
 
     private final AssetRepository assetRepository;
+    private final AssetCategoryService assetCategoryService;
     private final AssetLocationRepository locationRepository;
     private final AssetTechnicalDetailsRepository technicalRepository;
     private final AssetFinancialDetailsRepository financialRepository;
@@ -43,6 +44,7 @@ public class AssetService {
     public AssetDetailsResponse createAsset(CreateAssetDto request) {
 
         String assetId = determineAssetId(request.getAssetId());
+        AssetCategory category = assetCategoryService.getOrCreateByName(request.getAssetCategory());
 
         // Asset parent = null;
         // if (request.getParentAssetId() != null) {
@@ -57,7 +59,8 @@ public class AssetService {
                 .assetId(assetId)
                 .assetName(request.getAssetName())
                 .shortDescription(request.getShortDescription())
-                .assetCategory(request.getAssetCategory())
+                .assetCategory(category)
+                .assetCategoryName(category.getName())
                 .assetType(request.getAssetType())
                 // .parentAsset(parent)
                 .status(request.getStatus())
@@ -198,7 +201,11 @@ public class AssetService {
 
             updateIfNotNull(basic.getAssetName(), asset::setAssetName);
             updateIfNotNull(basic.getShortDescription(), asset::setShortDescription);
-            updateIfNotNull(basic.getAssetCategory(), asset::setAssetCategory);
+            if (basic.getAssetCategory() != null) {
+                AssetCategory cat = assetCategoryService.getOrCreateByName(basic.getAssetCategory());
+                asset.setAssetCategory(cat);
+                asset.setAssetCategoryName(cat.getName());
+            }
             updateIfNotNull(basic.getAssetType(), asset::setAssetType);
             updateIfNotNull(basic.getOwnership(), asset::setOwnership);
             updateIfNotNull(basic.getAssetTag(), asset::setAssetTag);
@@ -489,12 +496,16 @@ public class AssetService {
                 })
                 .orElse(java.util.List.of());
 
+        String categoryName = asset.getAssetCategory() != null
+                ? asset.getAssetCategory().getName()
+                : asset.getAssetCategoryName();
+
         return AssetDetailsResponse.builder()
                 .id(asset.getId())
                 .assetId(asset.getAssetId())
                 .assetName(asset.getAssetName())
                 .shortDescription(asset.getShortDescription())
-                .assetCategory(asset.getAssetCategory())
+                .assetCategory(categoryName)
                 .assetType(asset.getAssetType())
                 // .parentAssetId(asset.getParentAsset() != null ? asset.getParentAsset().getId() : null)
                 .status(asset.getStatus())

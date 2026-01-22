@@ -29,8 +29,12 @@ public class Asset {
     @Column(name = "short_description", length = 1000)
     private String shortDescription;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "asset_category_id")
+    private AssetCategory assetCategory;
+
     @Column(name = "asset_category", nullable = false, length = 128)
-    private String assetCategory;
+    private String assetCategoryName;
 
     @Column(name = "asset_type", length = 128)
     private String assetType;
