@@ -22,5 +22,8 @@ public class DashboardResponse {
     @JsonProperty("recent_work_orders")
     private List<RecentWorkOrderDto> recentWorkOrders;
 
+    @JsonProperty("new_service_requests")
+    private List<NewServiceRequestDto> newServiceRequests;
+
     private DashboardMetadata metadata;
 }

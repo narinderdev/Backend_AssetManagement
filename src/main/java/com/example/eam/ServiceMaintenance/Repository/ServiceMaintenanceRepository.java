@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.time.LocalDateTime;
 import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface ServiceMaintenanceRepository extends JpaRepository<ServiceMaintenance, Long> {
@@ -29,4 +30,6 @@ public interface ServiceMaintenanceRepository extends JpaRepository<ServiceMaint
     long countByDeletedFalseAndStatusInAndRequestDateBetween(Collection<ServiceRequestStatus> statuses,
                                               LocalDateTime start,
                                               LocalDateTime end);
+
+    List<ServiceMaintenance> findByDeletedFalseAndStatusOrderByRequestDateDesc(ServiceRequestStatus status);
 }

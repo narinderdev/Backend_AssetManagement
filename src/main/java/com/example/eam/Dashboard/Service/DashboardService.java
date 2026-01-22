@@ -99,6 +99,7 @@ public class DashboardService {
 
         MaintenanceCostSummary maintenanceCostSummary = buildMaintenanceCostSummary();
         List<RecentWorkOrderDto> recentWorkOrders = mapRecentWorkOrders();
+        List<NewServiceRequestDto> newServiceRequests = mapNewServiceRequests();
 
         DashboardMetadata metadata = DashboardMetadata.builder()
                 .generatedAt(Instant.now().toString())
@@ -110,6 +111,7 @@ public class DashboardService {
                 .workOrdersByStatus(workOrdersByStatus)
                 .maintenanceCostSummary(maintenanceCostSummary)
                 .recentWorkOrders(recentWorkOrders)
+                .newServiceRequests(newServiceRequests)
                 .metadata(metadata)
                 .build();
     }
@@ -190,6 +192,21 @@ public class DashboardService {
                         .dueDate(wo.getTargetCompletionDate())
                         .priority(wo.getPriority())
                         .status(wo.getStatus())
+                        .build())
+                .toList();
+    }
+
+    private List<NewServiceRequestDto> mapNewServiceRequests() {
+        return serviceMaintenanceRepository.findByDeletedFalseAndStatusOrderByRequestDateDesc(ServiceRequestStatus.NEW).stream()
+                .map(sr -> NewServiceRequestDto.builder()
+                        .serviceRequestDbId(sr.getId())
+                        .serviceRequestId(sr.getRequestId())
+                        .title(sr.getShortTitle())
+                        .asset(sr.getAsset() != null ? sr.getAsset().getAssetName() : null)
+                        .requesterName(sr.getRequesterName())
+                        .requestDate(sr.getRequestDate())
+                        .priority(sr.getPriority())
+                        .status(sr.getStatus())
                         .build())
                 .toList();
     }
