@@ -228,7 +228,7 @@ public class PredictiveMaintenanceService {
 
         for (int attempt = 0; attempt < 30; attempt++) {
             int rand = ThreadLocalRandom.current().nextInt(0, 10000);
-            String candidate = String.format("WO-%s-%04d", datePart, rand);
+            String candidate = String.format("%s%04d", datePart, rand);
 
             if (!workOrderRepository.existsByWorkOrderId(candidate)) {
                 return candidate;
