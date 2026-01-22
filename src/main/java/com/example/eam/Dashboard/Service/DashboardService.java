@@ -182,6 +182,7 @@ public class DashboardService {
     private List<RecentWorkOrderDto> mapRecentWorkOrders() {
         return workOrderRepository.findTop5ByDeletedFalseOrderByCreatedAtDesc().stream()
                 .map(wo -> RecentWorkOrderDto.builder()
+                        .workOrderDbId(wo.getId())
                         .workOrderId(wo.getWorkOrderId())
                         .title(wo.getWoTitle())
                         .asset(wo.getAsset() != null ? wo.getAsset().getAssetName() : null)

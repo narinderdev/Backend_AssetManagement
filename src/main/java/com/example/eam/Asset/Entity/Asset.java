@@ -23,6 +23,9 @@ public class Asset {
     @Column(name = "asset_code", nullable = false, unique = true, length = 64)
     private String assetId;
 
+
+
+    
     @Column(name = "asset_name", nullable = false, length = 255)
     private String assetName;
 

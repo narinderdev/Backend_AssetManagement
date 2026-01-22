@@ -12,6 +12,9 @@ import java.time.LocalDate;
 @Builder
 public class RecentWorkOrderDto {
 
+    @JsonProperty("wo_db_id")
+    private Long workOrderDbId;
+
     @JsonProperty("wo_id")
     private String workOrderId;
 
