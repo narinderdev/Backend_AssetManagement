@@ -17,6 +17,8 @@ import com.example.eam.WorkOrder.Dto.WorkOrderDetailsResponse;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Service.WorkOrderService;
+import com.example.eam.WorkRequestType.Entity.WorkRequestType;
+import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -40,6 +42,7 @@ public class EmergencyMaintenanceService {
     private final AssetLocationRepository assetLocationRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
     private final WorkOrderService workOrderService;
+    private final WorkRequestTypeService workRequestTypeService;
 
     @Transactional
     public WorkOrderDetailsResponse createEmergencyWo(@Valid EmergencyWorkOrderRequest req) {
@@ -49,9 +52,12 @@ public class EmergencyMaintenanceService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset or location is required");
         }
 
+        WorkRequestType workRequestType = workRequestTypeService.getOrCreateDefaultExpenseType();
+
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .asset(asset)
+                .workRequestType(workRequestType)
                 .location(location)
                 .workType(WorkType.EMERGENCY)
                 .priority(PriorityLevel.CRITICAL)

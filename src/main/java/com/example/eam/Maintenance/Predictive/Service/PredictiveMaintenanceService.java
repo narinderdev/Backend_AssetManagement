@@ -18,6 +18,8 @@ import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepositor
 import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
+import com.example.eam.WorkRequestType.Entity.WorkRequestType;
+import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -43,6 +45,7 @@ public class PredictiveMaintenanceService {
     private final AssetRepository assetRepository;
     private final WorkOrderRepository workOrderRepository;
     private final PredictiveMeterReadingRepository meterReadingRepository;
+    private final WorkRequestTypeService workRequestTypeService;
 
     @Transactional
     public AssetThresholdResponse createThreshold(@Valid AssetThresholdRequest req) {
@@ -186,18 +189,20 @@ public class PredictiveMaintenanceService {
         }
     }
 
-    private void createPredictiveWorkOrder(Asset asset, AssetThreshold threshold, MeterType meterType, double value) {
-        PriorityLevel priority = threshold.getDefaultPriority() != null ? threshold.getDefaultPriority() : PriorityLevel.HIGH;
-        String location = resolveLocation(asset, threshold.getLocation());
-        WorkOrder wo = WorkOrder.builder()
-                .workOrderId(generateUniqueWorkOrderId())
-                .pmPlan(null)
-                .pmDueDate(null)
-                .asset(asset)
-                .location(location)
-                .workType(WorkType.PREDICTIVE)
-                .priority(priority)
-                .woTitle("Predictive alert: " + meterType)
+      private void createPredictiveWorkOrder(Asset asset, AssetThreshold threshold, MeterType meterType, double value) {
+          PriorityLevel priority = threshold.getDefaultPriority() != null ? threshold.getDefaultPriority() : PriorityLevel.HIGH;
+          String location = resolveLocation(asset, threshold.getLocation());
+          WorkRequestType workRequestType = workRequestTypeService.getOrCreateDefaultExpenseType();
+          WorkOrder wo = WorkOrder.builder()
+                  .workOrderId(generateUniqueWorkOrderId())
+                  .pmPlan(null)
+                  .pmDueDate(null)
+                  .asset(asset)
+                  .workRequestType(workRequestType)
+                  .location(location)
+                  .workType(WorkType.PREDICTIVE)
+                  .priority(priority)
+                  .woTitle("Predictive alert: " + meterType)
                 .descriptionScope("Meter " + meterType + " crossed threshold with value " + value)
                 .status(WorkOrderStatus.NEW)
                 .source(WorkOrderSource.PREDICTIVE)

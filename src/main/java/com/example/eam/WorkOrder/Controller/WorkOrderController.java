@@ -4,6 +4,8 @@ package com.example.eam.WorkOrder.Controller;
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.WorkOrder.Dto.*;
 import com.example.eam.WorkOrder.Service.WorkOrderService;
+import com.example.eam.WorkRequestType.Dto.WorkRequestTypeResponse;
+import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -18,6 +20,7 @@ import org.springframework.web.bind.annotation.*;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final WorkRequestTypeService workRequestTypeService;
 
     @PostMapping
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> create(@Valid @RequestBody WorkOrderCreateRequest request) {
@@ -159,6 +162,13 @@ public class WorkOrderController {
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> get(@PathVariable Long id) {
         WorkOrderDetailsResponse data = workOrderService.getWorkOrderDetails(id);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order details fetched successfully", data));
+    }
+
+    @GetMapping("/work-request-types")
+    public ResponseEntity<ApiResponse<java.util.List<WorkRequestTypeResponse>>> listWorkRequestTypes() {
+        java.util.List<WorkRequestTypeResponse> types = workRequestTypeService.listTypes();
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(),
+                "Work request types fetched successfully", types));
     }
 
     @GetMapping

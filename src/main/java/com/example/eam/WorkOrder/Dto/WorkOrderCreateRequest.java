@@ -34,4 +34,7 @@ public class WorkOrderCreateRequest {
 
     // optional image upload URL
     private String attachmentUrl;
+
+    @NotBlank
+    private String workRequestTypeCode;
 }

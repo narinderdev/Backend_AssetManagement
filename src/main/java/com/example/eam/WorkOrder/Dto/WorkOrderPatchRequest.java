@@ -19,6 +19,7 @@ public class WorkOrderPatchRequest {
 
     private WorkType workType;
     private PriorityLevel priority;
+    private String workRequestTypeCode;
 
     private String woTitle;
     private String descriptionScope;

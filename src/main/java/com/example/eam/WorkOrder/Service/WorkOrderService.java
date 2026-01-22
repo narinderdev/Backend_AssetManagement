@@ -38,6 +38,8 @@ import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
 import com.example.eam.Common.NotificationService;
 import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
+import com.example.eam.WorkRequestType.Entity.WorkRequestType;
+import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -90,6 +92,7 @@ public class WorkOrderService {
     private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
     private final NotificationService notificationService;
+    private final WorkRequestTypeService workRequestTypeService;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
@@ -125,11 +128,16 @@ private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIO
 
 WorkOrderStatus status = WorkOrderStatus.NEW;
         // Always NEW on creation
+        WorkRequestType workRequestType = workRequestTypeService.getOrCreateByCode(
+                request.getWorkRequestTypeCode(),
+                null
+        );
 
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .linkedRequest(null)
                 .asset(asset)
+                .workRequestType(workRequestType)
                 .location(location)
                 .workType(request.getWorkType())
                 .priority(request.getPriority())
@@ -198,6 +206,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         
         String woTitle = sr.getShortTitle();
         String desc = sr.getProblemDescription();
+        WorkRequestType workRequestType = workRequestTypeService.getOrCreateDefaultExpenseType();
 
         String generatedWoId = generateUniqueWorkOrderId();
         log.info("Generated Work Order ID: {}", generatedWoId);
@@ -206,6 +215,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         .workOrderId(generatedWoId)
         .linkedRequest(sr)
         .asset(asset)
+        .workRequestType(workRequestType)
         .location(location)
         .workType(workType != null ? workType : WorkType.CORRECTIVE)
         .priority(priority != null ? priority : PriorityLevel.MEDIUM)
@@ -274,6 +284,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         if (request.getWorkType() != null) wo.setWorkType(request.getWorkType());
         if (request.getPriority() != null) wo.setPriority(request.getPriority());
+        if (request.getWorkRequestTypeCode() != null) {
+            WorkRequestType workRequestType = workRequestTypeService.getOrCreateByCode(request.getWorkRequestTypeCode(), null);
+            wo.setWorkRequestType(workRequestType);
+        }
 
         updateIfNotNull(request.getWoTitle(), wo::setWoTitle);
         updateIfNotNull(request.getDescriptionScope(), wo::setDescriptionScope);
@@ -1580,6 +1594,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         ServiceMaintenance sr = wo.getLinkedRequest();
         Technician technician = wo.getAssignedTechnician();
         TechnicianTeam team = wo.getAssignedTeam();
+        WorkRequestType workRequestType = wo.getWorkRequestType();
 
         List<WorkOrderChecklistItemResponse> checklistItems = workOrderChecklistItemRepository.findByWorkOrder_Id(wo.getId()).stream()
                 .map(item -> WorkOrderChecklistItemResponse.builder()
@@ -1632,6 +1647,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .location(wo.getLocation())
                 .workType(wo.getWorkType())
                 .priority(wo.getPriority())
+                .workRequestTypeId(workRequestType != null ? workRequestType.getId() : null)
+                .workRequestTypeCode(workRequestType != null ? workRequestType.getCode() : null)
+                .workRequestTypeDescription(workRequestType != null ? workRequestType.getDescription() : null)
                 .woTitle(wo.getWoTitle())
                 .descriptionScope(wo.getDescriptionScope())
                 .planner(wo.getPlanner())

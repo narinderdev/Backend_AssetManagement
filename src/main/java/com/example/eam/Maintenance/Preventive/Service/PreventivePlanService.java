@@ -12,6 +12,8 @@ import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
 import com.example.eam.Maintenance.Preventive.Repository.PreventivePlanRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
+import com.example.eam.WorkRequestType.Entity.WorkRequestType;
+import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -35,6 +37,7 @@ public class PreventivePlanService {
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
     private final WorkOrderRepository workOrderRepository;
+    private final WorkRequestTypeService workRequestTypeService;
 
     // ---------- CREATE ----------
 
@@ -186,11 +189,14 @@ public class PreventivePlanService {
             return;
         }
 
+        WorkRequestType workRequestType = workRequestTypeService.getOrCreateDefaultExpenseType();
+
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .pmPlan(plan)
                 .pmDueDate(dueDate)
                 .asset(plan.getAsset())
+                .workRequestType(workRequestType)
                 .location(plan.getLocation() != null ? plan.getLocation() : resolveLocation(plan.getAsset(), null))
                 .workType(plan.getWorkType() != null ? plan.getWorkType() : WorkType.PREVENTIVE)
                 .priority(plan.getPriority() != null ? plan.getPriority() : PriorityLevel.MEDIUM)

@@ -7,6 +7,7 @@ import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Enum.WorkType;
 import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
 import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
+import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
 import jakarta.persistence.*;
@@ -66,6 +67,10 @@ public class WorkOrder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_id")
     private Asset asset;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_request_type_id")
+    private WorkRequestType workRequestType;
 
     // Snapshot of location (auto from asset if present, but editable)
     @Column(name = "location", length = 255)

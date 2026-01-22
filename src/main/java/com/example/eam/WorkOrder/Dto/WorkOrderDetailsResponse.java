@@ -30,6 +30,9 @@ import java.util.List;
         "location",
         "workType",
         "priority",
+        "workRequestTypeId",
+        "workRequestTypeCode",
+        "workRequestTypeDescription",
         "woTitle",
         "descriptionScope",
         "planner",
@@ -101,6 +104,9 @@ public class WorkOrderDetailsResponse {
 
     private WorkType workType;
     private PriorityLevel priority;
+    private Long workRequestTypeId;
+    private String workRequestTypeCode;
+    private String workRequestTypeDescription;
 
     private String woTitle;
     private String descriptionScope;
