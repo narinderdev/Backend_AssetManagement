@@ -1,7 +1,15 @@
+buildscript { 
+	dependencies 
+	{ 
+		classpath "org.flywaydb:flyway-sqlserver:11.20.2" 
+		}
+	}
+
 plugins {
 	id 'java'
 	id 'org.springframework.boot' version '4.0.0'
 	id 'io.spring.dependency-management' version '1.1.7'
+	id "org.flywaydb.flyway" version "11.20.2"
 }
 
 group = 'com.example'
@@ -43,14 +51,21 @@ dependencies {
     implementation 'io.jsonwebtoken:jjwt-api:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-impl:0.11.5'
     implementation 'io.jsonwebtoken:jjwt-jackson:0.11.5'
-	implementation 'org.springframework.boot:spring-boot-starter-jdbc'
 	// Testing
 	testImplementation 'org.springframework.boot:spring-boot-starter-test'
 	testImplementation 'org.springframework.boot:spring-boot-test'
 	testImplementation 'org.springframework.boot:spring-boot-test-autoconfigure'
 	testImplementation 'org.springframework.boot:spring-boot-webmvc-test'
 	testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+	// Flyway dependencies with version
+    implementation "org.flywaydb:flyway-core:11.20.2"
+	implementation "org.flywaydb:flyway-sqlserver:11.20.2"
 }
+
+flyway {
+    configFiles = ['src/flyway-dev.conf']
+}
+
 tasks.named('test') {
 	useJUnitPlatform()
 }
