@@ -12,6 +12,7 @@ import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
 import com.example.eam.Maintenance.Preventive.Repository.PreventivePlanRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
+import com.example.eam.WorkOrder.Service.WoNumberPoolService;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
@@ -38,6 +39,7 @@ public class PreventivePlanService {
     private final AssetLocationRepository assetLocationRepository;
     private final WorkOrderRepository workOrderRepository;
     private final WorkRequestTypeService workRequestTypeService;
+    private final WoNumberPoolService woNumberPoolService;
 
     // ---------- CREATE ----------
 
@@ -217,6 +219,9 @@ public class PreventivePlanService {
                 .build();
 
         WorkOrder saved = workOrderRepository.save(wo);
+        String woNumber = woNumberPoolService.allocateWoNumber(saved.getId());
+        saved.setWoNumber(woNumber);
+        workOrderRepository.save(saved);
     }
 
     private PreventivePlan getPlanOrThrow(Long id) {

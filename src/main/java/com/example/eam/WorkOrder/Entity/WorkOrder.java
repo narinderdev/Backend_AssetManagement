@@ -24,6 +24,7 @@ import java.time.LocalDateTime;
     name = "work_orders",
     uniqueConstraints = {
         @UniqueConstraint(name = "uk_work_orders_work_order_id", columnNames = "work_order_id"),
+        @UniqueConstraint(name = "uk_work_orders_work_order_number", columnNames = "work_order_number"),
         @UniqueConstraint(name = "uk_work_orders_service_request", columnNames = "service_request_id"),
         @UniqueConstraint(name = "uk_work_orders_pm_due", columnNames = {"pm_plan_id", "pm_due_date"})
     },
@@ -48,6 +49,9 @@ public class WorkOrder {
     // Business/display WO code (separate from DB id)
     @Column(name = "work_order_id", nullable = false, unique = true, length = 64)
     private String workOrderId;
+
+    @Column(name = "work_order_number", unique = true, length = 50)
+    private String woNumber;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pm_plan_id")

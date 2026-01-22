@@ -40,6 +40,7 @@ import com.example.eam.Common.NotificationService;
 import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
+import com.example.eam.WorkOrder.Service.WoNumberPoolService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -92,6 +93,7 @@ public class WorkOrderService {
     private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
     private final NotificationService notificationService;
+    private final WoNumberPoolService woNumberPoolService;
     private final WorkRequestTypeService workRequestTypeService;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
@@ -159,6 +161,9 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
                 .build();
 
         WorkOrder saved = workOrderRepository.save(wo);
+        String woNumber = woNumberPoolService.allocateWoNumber(saved.getId());
+        saved.setWoNumber(woNumber);
+        saved = workOrderRepository.save(saved);
 
         return toDetailsResponse(saved);
     }
@@ -237,6 +242,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         log.info("Saving Work Order...");
         WorkOrder saved = workOrderRepository.save(wo);
+        String woNumber = woNumberPoolService.allocateWoNumber(saved.getId());
+        saved.setWoNumber(woNumber);
+        saved = workOrderRepository.save(saved);
         log.info("Work Order saved with ID: {}", saved.getId());
 
         sr.setStatus(ServiceRequestStatus.CONVERTED_TO_WO);
@@ -1634,6 +1642,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         return WorkOrderDetailsResponse.builder()
                 .id(wo.getId())
+                .workOrderNumber(wo.getWoNumber())
                 .workOrderId(wo.getWorkOrderId())
                 .linkedServiceRequestDbId(sr != null ? sr.getId() : null)
                 .linkedServiceRequestId(sr != null ? sr.getRequestId() : null)

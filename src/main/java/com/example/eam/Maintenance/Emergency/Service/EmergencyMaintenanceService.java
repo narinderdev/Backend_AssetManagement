@@ -17,6 +17,7 @@ import com.example.eam.WorkOrder.Dto.WorkOrderDetailsResponse;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Service.WorkOrderService;
+import com.example.eam.WorkOrder.Service.WoNumberPoolService;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
@@ -43,6 +44,7 @@ public class EmergencyMaintenanceService {
     private final EmergencyIncidentRepository emergencyIncidentRepository;
     private final WorkOrderService workOrderService;
     private final WorkRequestTypeService workRequestTypeService;
+    private final WoNumberPoolService woNumberPoolService;
 
     @Transactional
     public WorkOrderDetailsResponse createEmergencyWo(@Valid EmergencyWorkOrderRequest req) {
@@ -74,6 +76,9 @@ public class EmergencyMaintenanceService {
                 .build();
 
         WorkOrder saved = workOrderRepository.save(wo);
+        String woNumber = woNumberPoolService.allocateWoNumber(saved.getId());
+        saved.setWoNumber(woNumber);
+        saved = workOrderRepository.save(saved);
 
         EmergencyIncident incident = EmergencyIncident.builder()
                 .workOrder(saved)

@@ -18,6 +18,7 @@ import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepositor
 import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
+import com.example.eam.WorkOrder.Service.WoNumberPoolService;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
@@ -46,6 +47,7 @@ public class PredictiveMaintenanceService {
     private final WorkOrderRepository workOrderRepository;
     private final PredictiveMeterReadingRepository meterReadingRepository;
     private final WorkRequestTypeService workRequestTypeService;
+    private final WoNumberPoolService woNumberPoolService;
 
     @Transactional
     public AssetThresholdResponse createThreshold(@Valid AssetThresholdRequest req) {
@@ -203,13 +205,16 @@ public class PredictiveMaintenanceService {
                   .workType(WorkType.PREDICTIVE)
                   .priority(priority)
                   .woTitle("Predictive alert: " + meterType)
-                .descriptionScope("Meter " + meterType + " crossed threshold with value " + value)
-                .status(WorkOrderStatus.NEW)
-                .source(WorkOrderSource.PREDICTIVE)
-                .deleted(false)
-                .build();
-        workOrderRepository.save(wo);
-    }
+                  .descriptionScope("Meter " + meterType + " crossed threshold with value " + value)
+                  .status(WorkOrderStatus.NEW)
+                  .source(WorkOrderSource.PREDICTIVE)
+                  .deleted(false)
+                  .build();
+          WorkOrder saved = workOrderRepository.save(wo);
+          String woNumber = woNumberPoolService.allocateWoNumber(saved.getId());
+          saved.setWoNumber(woNumber);
+          workOrderRepository.save(saved);
+      }
 
     private String normalizeLocation(String value) {
         if (value == null) return null;
