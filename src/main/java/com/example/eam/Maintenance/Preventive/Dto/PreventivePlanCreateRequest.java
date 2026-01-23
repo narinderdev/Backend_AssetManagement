@@ -1,6 +1,7 @@
 package com.example.eam.Maintenance.Preventive.Dto;
 
 import com.example.eam.Enum.MeterType;
+import com.example.eam.Enum.PreventiveApplyTarget;
 import com.example.eam.Enum.PreventiveScheduleType;
 import com.example.eam.Enum.PriorityLevel;
 import com.example.eam.Enum.TimeFrequencyUnit;
@@ -14,7 +15,11 @@ import java.time.LocalDate;
 
 @Data
 public class PreventivePlanCreateRequest {
+    @NotNull
+    private PreventiveApplyTarget applyTo;
+
     private Long assetId;
+    private Long assetTypeId;
     private String location;
 
     @NotBlank

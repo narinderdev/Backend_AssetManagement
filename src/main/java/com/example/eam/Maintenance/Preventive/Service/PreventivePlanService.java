@@ -10,6 +10,7 @@ import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanPatchRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanResponse;
 import com.example.eam.Maintenance.Preventive.Entity.PreventivePlan;
 import com.example.eam.Maintenance.Preventive.Repository.PreventivePlanRepository;
+import com.example.eam.Asset.Service.AssetTypeService;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
@@ -37,6 +38,7 @@ public class PreventivePlanService {
     private final PreventivePlanRepository planRepository;
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
+    private final AssetTypeService assetTypeService;
     private final WorkOrderRepository workOrderRepository;
     private final WorkRequestTypeService workRequestTypeService;
     private final WoNumberPoolService woNumberPoolService;
@@ -45,39 +47,59 @@ public class PreventivePlanService {
 
     @Transactional
     public PreventivePlanResponse create(@Valid PreventivePlanCreateRequest req) {
-        Asset asset = resolveAsset(req.getAssetId());
-        String location = resolveLocation(asset, req.getLocation());
+        PreventiveApplyTarget target = req.getApplyTo();
+        if (target == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "applyTo is required");
+        }
+
+        java.util.List<Asset> targetAssets = switch (target) {
+            case ASSET -> java.util.List.of(resolveAssetRequired(req.getAssetId()));
+            case ASSET_TYPE -> resolveAssetsByType(req.getAssetTypeId());
+        };
+
+        if (targetAssets.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "No assets found for the requested target");
+        }
 
         validateSchedule(req.getScheduleType(), req.getIntervalUnit(), req.getIntervalValue(),
                 req.getMeterType(), req.getMeterIntervalValue(), req.getStartDate());
 
-        PreventivePlan plan = PreventivePlan.builder()
-                .planCode(generateUniquePlanCode())
-                .title(req.getTitle())
-                .asset(asset)
-                .location(location)
-                .workType(req.getWorkType() != null ? req.getWorkType() : WorkType.PREVENTIVE)
-                .priority(req.getPriority() != null ? req.getPriority() : PriorityLevel.MEDIUM)
-                .scheduleType(req.getScheduleType())
-                .leadTimeDays(req.getLeadTimeDays())
-                .startDate(req.getStartDate())
-                .intervalUnit(req.getIntervalUnit())
-                .intervalValue(req.getIntervalValue())
-                .meterType(req.getMeterType())
-                .meterIntervalValue(req.getMeterIntervalValue())
-                .currentMeterReading(req.getCurrentMeterReading())
-                .nextDueDate(req.getScheduleType() == PreventiveScheduleType.TIME_BASED ? req.getStartDate() : null)
-                .nextDueMeter(req.getScheduleType() == PreventiveScheduleType.USAGE_BASED && req.getMeterIntervalValue() != null && req.getCurrentMeterReading() != null
-                        ? req.getCurrentMeterReading() + req.getMeterIntervalValue() : null)
-                .lastGeneratedDueDate(null)
-                .active(true)
-                .deleted(false)
-                .createdAt(LocalDateTime.now())
-                .updatedAt(LocalDateTime.now())
-                .build();
+        PreventivePlanResponse firstResponse = null;
+        for (Asset asset : targetAssets) {
+            String location = resolveLocation(asset, req.getLocation());
 
-        PreventivePlan saved = planRepository.save(plan);
-        return mapToResponse(saved);
+            PreventivePlan plan = PreventivePlan.builder()
+                    .planCode(generateUniquePlanCode())
+                    .title(req.getTitle())
+                    .asset(asset)
+                    .location(location)
+                    .workType(req.getWorkType() != null ? req.getWorkType() : WorkType.PREVENTIVE)
+                    .priority(req.getPriority() != null ? req.getPriority() : PriorityLevel.MEDIUM)
+                    .scheduleType(req.getScheduleType())
+                    .leadTimeDays(req.getLeadTimeDays())
+                    .startDate(req.getStartDate())
+                    .intervalUnit(req.getIntervalUnit())
+                    .intervalValue(req.getIntervalValue())
+                    .meterType(req.getMeterType())
+                    .meterIntervalValue(req.getMeterIntervalValue())
+                    .currentMeterReading(req.getCurrentMeterReading())
+                    .nextDueDate(req.getScheduleType() == PreventiveScheduleType.TIME_BASED ? req.getStartDate() : null)
+                    .nextDueMeter(req.getScheduleType() == PreventiveScheduleType.USAGE_BASED && req.getMeterIntervalValue() != null && req.getCurrentMeterReading() != null
+                            ? req.getCurrentMeterReading() + req.getMeterIntervalValue() : null)
+                    .lastGeneratedDueDate(null)
+                    .active(true)
+                    .deleted(false)
+                    .createdAt(LocalDateTime.now())
+                    .updatedAt(LocalDateTime.now())
+                    .build();
+
+            PreventivePlan saved = planRepository.save(plan);
+            if (firstResponse == null) {
+                firstResponse = mapToResponse(saved);
+            }
+        }
+
+        return firstResponse;
     }
 
     // ---------- PATCH ----------
@@ -229,6 +251,21 @@ public class PreventivePlanService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Preventive plan not found"));
     }
 
+    private Asset resolveAssetRequired(Long assetId) {
+        if (assetId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assetId is required when applyTo is ASSET");
+        }
+        return resolveAsset(assetId);
+    }
+
+    private java.util.List<Asset> resolveAssetsByType(Long assetTypeId) {
+        if (assetTypeId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assetTypeId is required when applyTo is ASSET_TYPE");
+        }
+        assetTypeService.getActiveAssetTypeOrThrow(assetTypeId);
+        return assetRepository.findByAssetTypeRef_Id(assetTypeId);
+    }
+
     private Asset resolveAsset(Long assetId) {
         if (assetId == null) return null;
         return assetRepository.findById(assetId)
@@ -318,6 +355,9 @@ public class PreventivePlanService {
                 .assetId(asset != null ? asset.getId() : null)
                 .assetCode(asset != null ? asset.getAssetId() : null)
                 .assetName(asset != null ? asset.getAssetName() : null)
+                .assetTypeId(asset != null && asset.getAssetTypeRef() != null ? asset.getAssetTypeRef().getId() : null)
+                .assetTypeCode(asset != null && asset.getAssetTypeRef() != null ? asset.getAssetTypeRef().getCode() : null)
+                .assetTypeName(asset != null && asset.getAssetTypeRef() != null ? asset.getAssetTypeRef().getName() : null)
                 .location(plan.getLocation())
                 .workType(plan.getWorkType())
                 .priority(plan.getPriority())

@@ -19,6 +19,9 @@ public class PreventivePlanResponse {
     private Long assetId;
     private String assetCode;
     private String assetName;
+    private Long assetTypeId;
+    private String assetTypeCode;
+    private String assetTypeName;
     private String location;
     private WorkType workType;
     private PriorityLevel priority;
