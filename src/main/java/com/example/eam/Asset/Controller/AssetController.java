@@ -76,6 +76,17 @@ public class AssetController {
         return ResponseEntity.ok(apiResponse);
     }
 
+    @PostMapping("/{id}/insurance")
+    public ResponseEntity<ApiResponse<AssetDetailsResponse>> saveInsurance(
+            @PathVariable Long id,
+            @Validated @RequestBody AssetInsuranceDto request) {
+
+        AssetDetailsResponse response = assetService.saveInsurance(id, request);
+        ApiResponse<AssetDetailsResponse> apiResponse = ApiResponse.successResponse(HttpStatus.OK.value(),
+                "Asset insurance saved successfully", response);
+        return ResponseEntity.ok(apiResponse);
+    }
+
     // Safety & Operations
     @PostMapping("/{id}/safety")
     public ResponseEntity<ApiResponse<AssetDetailsResponse>> saveSafetyOperations(

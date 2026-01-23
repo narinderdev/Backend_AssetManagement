@@ -8,6 +8,7 @@ import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
 import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
 import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
 import com.example.eam.Maintenance.Predictive.Dto.PredictiveMeterReadingResponse;
+import com.example.eam.Enum.InsuranceStatus;
 import lombok.RequiredArgsConstructor;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,7 @@ public class AssetService {
     private final AssetTechnicalDetailsRepository technicalRepository;
     private final AssetFinancialDetailsRepository financialRepository;
     private final AssetWarrantyLifecycleRepository warrantyRepository;
+    private final AssetInsuranceRepository insuranceRepository;
     private final AssetSafetyOperationsRepository safetyRepository;
     private final AssetThresholdRepository assetThresholdRepository;
     private final PredictiveMeterReadingRepository predictiveMeterReadingRepository;
@@ -167,6 +169,41 @@ public class AssetService {
         wl.setNextPlannedMaintenance(dto.getNextPlannedMaintenance());
 
         warrantyRepository.save(wl);
+        return getAssetDetails(assetId);
+    }
+
+    @Transactional
+    public AssetDetailsResponse saveInsurance(Long assetId, AssetInsuranceDto dto) {
+        Asset asset = getAssetOrThrow(assetId);
+
+        if (dto.getInsuranceProvider() == null || dto.getInsuranceProvider().isBlank()
+                || dto.getPolicyNumber() == null || dto.getPolicyNumber().isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Insurance provider and policy number are required");
+        }
+
+        LocalDate start = dto.getPolicyStartDate();
+        LocalDate expiry = dto.getPolicyExpiryDate();
+        validateInsuranceDates(start, expiry);
+
+        AssetInsurance insurance = insuranceRepository.findByAsset_Id(assetId)
+                .orElseGet(() -> {
+                    AssetInsurance i = new AssetInsurance();
+                    i.setAsset(asset);
+                    return i;
+                });
+
+        insurance.setInsuranceProvider(dto.getInsuranceProvider());
+        insurance.setPolicyNumber(dto.getPolicyNumber());
+        insurance.setPolicyStartDate(start);
+        insurance.setPolicyExpiryDate(expiry);
+        insurance.setInsuranceStatus(resolveInsuranceStatus(dto.getInsuranceStatus(), start, expiry));
+        insurance.setPolicyType(dto.getPolicyType());
+        insurance.setCertificateUrl(dto.getCertificateUrl());
+        insurance.setCoverageAmount(dto.getCoverageAmount());
+        insurance.setPremiumAmount(dto.getPremiumAmount());
+
+        insuranceRepository.save(insurance);
         return getAssetDetails(assetId);
     }
 
@@ -312,6 +349,63 @@ public class AssetService {
             warrantyRepository.save(wl);
         }
 
+        if (request.getInsurance() != null) {
+            AssetInsuranceDto dto = request.getInsurance();
+            AssetInsurance insurance = insuranceRepository.findByAsset_Id(id)
+                    .orElseGet(() -> {
+                        AssetInsurance i = new AssetInsurance();
+                        i.setAsset(asset);
+                        return i;
+                    });
+
+            if (dto.getInsuranceProvider() != null && dto.getInsuranceProvider().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Insurance provider cannot be blank");
+            }
+            if (dto.getPolicyNumber() != null && dto.getPolicyNumber().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Insurance policy number cannot be blank");
+            }
+
+            LocalDate updatedStart = dto.getPolicyStartDate() != null
+                    ? dto.getPolicyStartDate()
+                    : insurance.getPolicyStartDate();
+            LocalDate updatedExpiry = dto.getPolicyExpiryDate() != null
+                    ? dto.getPolicyExpiryDate()
+                    : insurance.getPolicyExpiryDate();
+
+            if (insurance.getId() == null) {
+                if (dto.getInsuranceProvider() == null || dto.getInsuranceProvider().isBlank()
+                        || dto.getPolicyNumber() == null || dto.getPolicyNumber().isBlank()
+                        || updatedStart == null || updatedExpiry == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                            "Insurance provider, policy number, start date, and expiry date are required to add insurance");
+                }
+            }
+
+            if (updatedStart != null && updatedExpiry != null) {
+                validateInsuranceDates(updatedStart, updatedExpiry);
+            }
+
+            updateIfNotNull(dto.getInsuranceProvider(), insurance::setInsuranceProvider);
+            updateIfNotNull(dto.getPolicyNumber(), insurance::setPolicyNumber);
+            updateIfNotNull(dto.getPolicyType(), insurance::setPolicyType);
+            updateIfNotNull(dto.getCertificateUrl(), insurance::setCertificateUrl);
+            updateIfNotNull(dto.getCoverageAmount(), insurance::setCoverageAmount);
+            updateIfNotNull(dto.getPremiumAmount(), insurance::setPremiumAmount);
+
+            if (updatedStart == null || updatedExpiry == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                        "Insurance start date and expiry date cannot be null");
+            }
+
+            insurance.setPolicyStartDate(updatedStart);
+            insurance.setPolicyExpiryDate(updatedExpiry);
+            insurance.setInsuranceStatus(resolveInsuranceStatus(dto.getInsuranceStatus(), updatedStart, updatedExpiry));
+
+            insuranceRepository.save(insurance);
+        }
+
         // Safety / operations
         if (request.getSafetyOperations() != null) {
             AssetSafetyOperationsDto dto = request.getSafetyOperations();
@@ -343,9 +437,10 @@ public class AssetService {
         AssetTechnicalDetails tech = technicalRepository.findByAsset_Id(id).orElse(null);
         AssetFinancialDetails fin = financialRepository.findByAsset_Id(id).orElse(null);
         AssetWarrantyLifecycle wl = warrantyRepository.findByAsset_Id(id).orElse(null);
+        AssetInsurance insurance = insuranceRepository.findByAsset_Id(id).orElse(null);
         AssetSafetyOperations safety = safetyRepository.findByAsset_Id(id).orElse(null);
 
-        return mapToDetails(asset, loc, tech, fin, wl, safety);
+        return mapToDetails(asset, loc, tech, fin, wl, insurance, safety);
     }
 
     @Transactional(readOnly = true)
@@ -357,8 +452,9 @@ public class AssetService {
                     AssetTechnicalDetails tech = technicalRepository.findByAsset_Id(id).orElse(null);
                     AssetFinancialDetails fin = financialRepository.findByAsset_Id(id).orElse(null);
                     AssetWarrantyLifecycle wl = warrantyRepository.findByAsset_Id(id).orElse(null);
+                    AssetInsurance insurance = insuranceRepository.findByAsset_Id(id).orElse(null);
                     AssetSafetyOperations safety = safetyRepository.findByAsset_Id(id).orElse(null);
-                    return mapToDetails(asset, loc, tech, fin, wl, safety);
+                    return mapToDetails(asset, loc, tech, fin, wl, insurance, safety);
                 });
     }
 
@@ -379,6 +475,41 @@ public class AssetService {
     }
 
     // ---------- Helpers ----------
+
+    private void validateInsuranceDates(LocalDate start, LocalDate expiry) {
+        if (start == null || expiry == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Insurance start date and expiry date are required");
+        }
+        if (expiry.isBefore(start)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Insurance expiry date must be on or after start date");
+        }
+    }
+
+    private InsuranceStatus resolveInsuranceStatus(InsuranceStatus requestedStatus,
+                                                   LocalDate startDate,
+                                                   LocalDate expiryDate) {
+        LocalDate today = LocalDate.now();
+
+        if (requestedStatus == InsuranceStatus.CANCELLED) {
+            return InsuranceStatus.CANCELLED;
+        }
+
+        if (expiryDate.isBefore(today)) {
+            return InsuranceStatus.EXPIRED;
+        }
+
+        if (startDate.isAfter(today)) {
+            return InsuranceStatus.PENDING_RENEWAL;
+        }
+
+        if (!expiryDate.isAfter(today.plusDays(30))) {
+            return InsuranceStatus.PENDING_RENEWAL;
+        }
+
+        return InsuranceStatus.ACTIVE;
+    }
 
     private Asset getAssetOrThrow(Long id) {
         return assetRepository.findById(id)
@@ -425,6 +556,7 @@ public class AssetService {
             AssetTechnicalDetails tech,
             AssetFinancialDetails fin,
             AssetWarrantyLifecycle wl,
+            AssetInsurance insurance,
             AssetSafetyOperations safety
     ) {
         AssetLocationDto locDto = null;
@@ -478,6 +610,20 @@ public class AssetService {
             wlDto.setNextPlannedMaintenance(wl.getNextPlannedMaintenance());
         }
 
+        AssetInsuranceDto insuranceDto = null;
+        if (insurance != null) {
+            insuranceDto = new AssetInsuranceDto();
+            insuranceDto.setInsuranceProvider(insurance.getInsuranceProvider());
+            insuranceDto.setPolicyNumber(insurance.getPolicyNumber());
+            insuranceDto.setPolicyStartDate(insurance.getPolicyStartDate());
+            insuranceDto.setPolicyExpiryDate(insurance.getPolicyExpiryDate());
+            insuranceDto.setInsuranceStatus(insurance.getInsuranceStatus());
+            insuranceDto.setPolicyType(insurance.getPolicyType());
+            insuranceDto.setCertificateUrl(insurance.getCertificateUrl());
+            insuranceDto.setCoverageAmount(insurance.getCoverageAmount());
+            insuranceDto.setPremiumAmount(insurance.getPremiumAmount());
+        }
+
         AssetSafetyOperationsDto safetyDto = null;
         if (safety != null) {
             safetyDto = new AssetSafetyOperationsDto();
@@ -517,6 +663,7 @@ public class AssetService {
                 .technicalDetails(techDto)
                 .financialDetails(finDto)
                 .warrantyLifecycle(wlDto)
+                .insurance(insuranceDto)
                 .safetyOperations(safetyDto)
                 .build();
     }

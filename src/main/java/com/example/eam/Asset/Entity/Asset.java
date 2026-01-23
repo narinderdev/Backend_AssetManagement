@@ -75,6 +75,9 @@ public class Asset {
     private AssetWarrantyLifecycle warrantyLifecycle;
 
     @OneToOne(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private AssetInsurance insurance;
+
+    @OneToOne(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private AssetSafetyOperations safetyOperations;
 
     @Override

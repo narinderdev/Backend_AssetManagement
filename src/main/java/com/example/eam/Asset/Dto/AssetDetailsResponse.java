@@ -27,6 +27,7 @@ import lombok.Data;
     "technicalDetails",
     "financialDetails",
     "warrantyLifecycle",
+    "insurance",
     "safetyOperations"
 })
 public class AssetDetailsResponse {
@@ -48,6 +49,7 @@ public class AssetDetailsResponse {
     private AssetTechnicalDetailsDto technicalDetails;
     private AssetFinancialDetailsDto financialDetails;
     private AssetWarrantyLifecycleDto warrantyLifecycle;
+    private AssetInsuranceDto insurance;
     private AssetSafetyOperationsDto safetyOperations;
 }
 

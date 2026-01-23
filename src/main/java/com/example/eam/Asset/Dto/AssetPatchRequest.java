@@ -11,5 +11,6 @@ public class AssetPatchRequest {
     private AssetFinancialDetailsDto financialDetails;
     private AssetWarrantyLifecycleDto warrantyLifecycle;
     private AssetSafetyOperationsDto safetyOperations;
+    private AssetInsuranceDto insurance;
 }
 
