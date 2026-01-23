@@ -42,6 +42,10 @@ public class Asset {
     @Column(name = "asset_type", length = 128)
     private String assetType;
 
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "asset_type_id")
+    private AssetType assetTypeRef;
+
     // // Parent Asset: hierarchical relationship
     // @ManyToOne(fetch = FetchType.LAZY)
     // @JoinColumn(name = "parent_asset_id")

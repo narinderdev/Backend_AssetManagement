@@ -28,6 +28,12 @@ public class AssetCategoryService {
                 .toList();
     }
 
+    @Transactional(readOnly = true)
+    public AssetCategory getByIdOrThrow(Long id) {
+        return assetCategoryRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset category not found"));
+    }
+
     @Transactional
     public AssetCategory getOrCreateByName(String rawName) {
         String normalized = normalizeName(rawName);

@@ -12,6 +12,7 @@ public class AssetBasicPatchRequest {
     private String shortDescription;
     private String assetCategory;
     private String assetType;
+    private Long assetTypeId;
     private Long parentAssetId;
     private AssetStatus status;
     private AssetCriticality criticality;

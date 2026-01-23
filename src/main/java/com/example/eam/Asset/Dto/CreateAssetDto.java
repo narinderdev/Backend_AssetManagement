@@ -24,6 +24,7 @@ public class CreateAssetDto {
     private String assetCategory;    // Asset Category*
 
     private String assetType;
+    private Long assetTypeId;
 
     @NotNull
     private AssetStatus status;      // Status*

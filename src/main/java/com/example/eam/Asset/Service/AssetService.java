@@ -39,6 +39,7 @@ public class AssetService {
     private final AssetSafetyOperationsRepository safetyRepository;
     private final AssetThresholdRepository assetThresholdRepository;
     private final PredictiveMeterReadingRepository predictiveMeterReadingRepository;
+    private final AssetTypeService assetTypeService;
 
     // ---------- CREATE (basic asset) ----------
 
@@ -47,6 +48,14 @@ public class AssetService {
 
         String assetId = determineAssetId(request.getAssetId());
         AssetCategory category = assetCategoryService.getOrCreateByName(request.getAssetCategory());
+        AssetType assetType = null;
+
+        if (request.getAssetTypeId() != null) {
+            assetType = assetTypeService.getActiveAssetTypeOrThrow(request.getAssetTypeId());
+            if (assetType.getAssetCategory() != null) {
+                category = assetType.getAssetCategory();
+            }
+        }
 
         // Asset parent = null;
         // if (request.getParentAssetId() != null) {
@@ -63,10 +72,13 @@ public class AssetService {
                 .shortDescription(request.getShortDescription())
                 .assetCategory(category)
                 .assetCategoryName(category.getName())
-                .assetType(request.getAssetType())
+                .assetType(assetType != null ? assetType.getName() : request.getAssetType())
+                .assetTypeRef(assetType)
                 // .parentAsset(parent)
                 .status(request.getStatus())
-                .criticality(request.getCriticality())
+                .criticality(request.getCriticality() != null
+                        ? request.getCriticality()
+                        : assetType != null ? assetType.getDefaultCriticality() : null)
                 .ownership(request.getOwnership())
                 .assetTag(request.getAssetTag())
                 .build();
@@ -243,7 +255,18 @@ public class AssetService {
                 asset.setAssetCategory(cat);
                 asset.setAssetCategoryName(cat.getName());
             }
-            updateIfNotNull(basic.getAssetType(), asset::setAssetType);
+            if (basic.getAssetTypeId() != null) {
+                AssetType assetType = assetTypeService.getActiveAssetTypeOrThrow(basic.getAssetTypeId());
+                asset.setAssetTypeRef(assetType);
+                asset.setAssetType(assetType.getName());
+                if (assetType.getAssetCategory() != null) {
+                    asset.setAssetCategory(assetType.getAssetCategory());
+                    asset.setAssetCategoryName(assetType.getAssetCategory().getName());
+                }
+            } else if (basic.getAssetType() != null) {
+                asset.setAssetType(basic.getAssetType());
+                asset.setAssetTypeRef(null);
+            }
             updateIfNotNull(basic.getOwnership(), asset::setOwnership);
             updateIfNotNull(basic.getAssetTag(), asset::setAssetTag);
             if (basic.getStatus() != null) {
@@ -646,13 +669,20 @@ public class AssetService {
                 ? asset.getAssetCategory().getName()
                 : asset.getAssetCategoryName();
 
+        AssetType assetType = asset.getAssetTypeRef();
+        String assetTypeName = assetType != null ? assetType.getName() : asset.getAssetType();
+        Long assetTypeId = assetType != null ? assetType.getId() : null;
+        String assetTypeCode = assetType != null ? assetType.getCode() : null;
+
         return AssetDetailsResponse.builder()
                 .id(asset.getId())
                 .assetId(asset.getAssetId())
                 .assetName(asset.getAssetName())
                 .shortDescription(asset.getShortDescription())
                 .assetCategory(categoryName)
-                .assetType(asset.getAssetType())
+                .assetType(assetTypeName)
+                .assetTypeId(assetTypeId)
+                .assetTypeCode(assetTypeCode)
                 // .parentAssetId(asset.getParentAsset() != null ? asset.getParentAsset().getId() : null)
                 .status(asset.getStatus())
                 .criticality(asset.getCriticality())
