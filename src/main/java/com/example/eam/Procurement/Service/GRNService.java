@@ -87,6 +87,17 @@ public class GRNService {
             if (po == null && lineRequest.getPoLineId() != null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "poId is required when specifying poLineId");
             }
+            BigDecimal orderedQty = null;
+            if (poLine != null) {
+                orderedQty = poLine.getOrderedQty();
+            } else {
+                orderedQty = lineRequest.getOrderedQty();
+                if (orderedQty == null || orderedQty.compareTo(BigDecimal.ZERO) <= 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedQty must be greater than zero when no PO is provided");
+                }
+                orderedQty = orderedQty.setScale(4, RoundingMode.HALF_UP);
+            }
+
             BigDecimal receivedQty = lineRequest.getReceivedQty();
             if (receivedQty == null || receivedQty.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "receivedQty must be greater than zero");
@@ -111,6 +122,7 @@ public class GRNService {
                         .grn(grn)
                         .poLineId(poLine.getId())
                         .itemId(poLine.getItemId())
+                        .orderedQty(orderedQty)
                         .receivedQty(receivedQty)
                         .returnQty(returnQty)
                         .build());
@@ -127,6 +139,7 @@ public class GRNService {
                         .grn(grn)
                         .poLineId(null)
                         .itemId(lineRequest.getItemId())
+                        .orderedQty(orderedQty)
                         .receivedQty(receivedQty)
                         .returnQty(returnQty)
                         .build());
@@ -237,6 +250,7 @@ public class GRNService {
                         .id(line.getId())
                         .poLineId(line.getPoLineId())
                         .itemId(line.getItemId())
+                        .orderedQty(line.getOrderedQty())
                         .receivedQty(line.getReceivedQty())
                         .returnQty(line.getReturnQty())
                         .build())

@@ -19,6 +19,9 @@ public class CreateGrnLineRequest {
 
     private Long itemId;
 
+    @DecimalMin(value = "0", inclusive = false)
+    private BigDecimal orderedQty; // optional when poLineId is present; required when no PO
+
     @NotNull
     @DecimalMin(value = "0", inclusive = false)
     private BigDecimal receivedQty;
