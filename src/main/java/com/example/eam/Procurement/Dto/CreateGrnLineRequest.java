@@ -22,4 +22,8 @@ public class CreateGrnLineRequest {
     @NotNull
     @DecimalMin(value = "0", inclusive = false)
     private BigDecimal receivedQty;
+
+    // Quantity being returned to vendor (informational); stock is updated only by receivedQty
+    @DecimalMin(value = "0", inclusive = true)
+    private BigDecimal returnQty;
 }

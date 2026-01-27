@@ -93,6 +93,14 @@ public class GRNService {
             }
             receivedQty = receivedQty.setScale(4, RoundingMode.HALF_UP);
 
+            BigDecimal returnQty = lineRequest.getReturnQty();
+            if (returnQty != null) {
+                if (returnQty.compareTo(BigDecimal.ZERO) < 0) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "returnQty cannot be negative");
+                }
+                returnQty = returnQty.setScale(4, RoundingMode.HALF_UP);
+            }
+
             if (poLine != null) {
                 BigDecimal newTotal = poLine.getReceivedQty().add(receivedQty);
                 if (newTotal.compareTo(poLine.getOrderedQty()) > 0) {
@@ -104,6 +112,7 @@ public class GRNService {
                         .poLineId(poLine.getId())
                         .itemId(poLine.getItemId())
                         .receivedQty(receivedQty)
+                        .returnQty(returnQty)
                         .build());
                 qtyByItem.merge(poLine.getItemId(), receivedQty, BigDecimal::add);
             } else {
@@ -119,6 +128,7 @@ public class GRNService {
                         .poLineId(null)
                         .itemId(lineRequest.getItemId())
                         .receivedQty(receivedQty)
+                        .returnQty(returnQty)
                         .build());
                 qtyByItem.merge(lineRequest.getItemId(), receivedQty, BigDecimal::add);
             }
@@ -228,6 +238,7 @@ public class GRNService {
                         .poLineId(line.getPoLineId())
                         .itemId(line.getItemId())
                         .receivedQty(line.getReceivedQty())
+                        .returnQty(line.getReturnQty())
                         .build())
                 .toList();
 

@@ -17,4 +17,5 @@ public class GrnLineResponse {
     private Long poLineId;
     private Long itemId;
     private BigDecimal receivedQty;
+    private BigDecimal returnQty;
 }

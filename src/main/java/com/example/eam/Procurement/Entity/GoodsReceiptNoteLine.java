@@ -35,4 +35,7 @@ public class GoodsReceiptNoteLine {
 
     @Column(name = "received_qty", nullable = false, precision = 19, scale = 4)
     private BigDecimal receivedQty;
+
+    @Column(name = "return_qty", precision = 19, scale = 4)
+    private BigDecimal returnQty;
 }
