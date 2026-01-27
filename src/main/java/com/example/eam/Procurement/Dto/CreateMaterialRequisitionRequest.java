@@ -24,6 +24,8 @@ public class CreateMaterialRequisitionRequest {
 
     private String notes;
 
+    private String department;
+
     private String shipToType; // WAREHOUSE or WORK_SITE
     private Long shipToWarehouseId;
     private Long shipToWorkOrderId;

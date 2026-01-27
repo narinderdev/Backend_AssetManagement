@@ -20,6 +20,7 @@ public class PurchaseOrderResponse {
     private String poNumber;
     private Long vendorId;
     private Long mrId;
+    private String department;
     private String shipToType;
     private Long shipToWarehouseId;
     private Long shipToWorkOrderId;

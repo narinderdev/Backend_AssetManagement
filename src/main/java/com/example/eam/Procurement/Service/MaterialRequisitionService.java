@@ -46,6 +46,7 @@ public class MaterialRequisitionService {
                 .requestedByUserId(requireText(request.getRequestedByUserId(), "requestedByUserId is required"))
                 .neededByDate(request.getNeededByDate())
                 .notes(trim(request.getNotes()))
+                .department(trim(request.getDepartment()))
                 .shipToType(shipping.type)
                 .shipToWarehouseId(shipping.warehouseId)
                 .shipToWorkOrderId(shipping.workOrderId)
@@ -77,6 +78,9 @@ public class MaterialRequisitionService {
         }
         if (request.getNotes() != null) {
             mr.setNotes(trim(request.getNotes()));
+        }
+        if (request.getDepartment() != null) {
+            mr.setDepartment(trim(request.getDepartment()));
         }
         if (request.getShipToType() != null || request.getShipToWarehouseId() != null || request.getShipToWorkOrderId() != null) {
             ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
@@ -252,6 +256,7 @@ public class MaterialRequisitionService {
                 .status(mr.getStatus())
                 .neededByDate(mr.getNeededByDate())
                 .notes(mr.getNotes())
+                .department(mr.getDepartment())
                 .shipToType(mr.getShipToType() != null ? mr.getShipToType().name() : null)
                 .shipToWarehouseId(mr.getShipToWarehouseId())
                 .shipToWorkOrderId(mr.getShipToWorkOrderId())

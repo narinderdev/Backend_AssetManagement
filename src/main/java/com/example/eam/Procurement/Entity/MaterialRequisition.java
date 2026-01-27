@@ -51,6 +51,9 @@ public class MaterialRequisition {
     @Column(name = "notes", length = 1000)
     private String notes;
 
+    @Column(name = "department", length = 255)
+    private String department;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "ship_to_type", length = 20)
     private MaterialRequisitionShipToType shipToType;

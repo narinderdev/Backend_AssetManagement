@@ -22,6 +22,7 @@ public class MaterialRequisitionResponse {
     private MaterialRequisitionStatus status;
     private LocalDate neededByDate;
     private String notes;
+    private String department;
     private String shipToType;
     private Long shipToWarehouseId;
     private Long shipToWorkOrderId;

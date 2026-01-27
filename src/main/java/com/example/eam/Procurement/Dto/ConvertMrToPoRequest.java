@@ -27,6 +27,8 @@ public class ConvertMrToPoRequest {
 
     private String remarks;
 
+    private String department; // optional; defaults from MR if null
+
     private String shipToType; // optional; defaults from MR if null
     private Long shipToWarehouseId;
     private Long shipToWorkOrderId;

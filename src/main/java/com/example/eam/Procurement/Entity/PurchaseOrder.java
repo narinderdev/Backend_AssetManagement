@@ -45,6 +45,9 @@ public class PurchaseOrder {
     @Column(name = "mr_id")
     private Long mrId;
 
+    @Column(name = "department", length = 255)
+    private String department;
+
     @Enumerated(EnumType.STRING)
     @Column(name = "ship_to_type", length = 20)
     private PurchaseOrderShipToType shipToType;
