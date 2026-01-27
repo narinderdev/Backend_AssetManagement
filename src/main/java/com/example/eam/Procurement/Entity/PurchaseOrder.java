@@ -1,5 +1,6 @@
 package com.example.eam.Procurement.Entity;
 
+import com.example.eam.Procurement.Enum.PurchaseOrderShipToType;
 import com.example.eam.Procurement.Enum.PurchaseOrderStatus;
 import jakarta.persistence.*;
 import lombok.*;
@@ -20,7 +21,8 @@ import java.util.List;
         indexes = {
                 @Index(name = "idx_po_status", columnList = "status"),
                 @Index(name = "idx_po_vendor", columnList = "vendor_id"),
-                @Index(name = "idx_po_mr", columnList = "mr_id")
+                @Index(name = "idx_po_mr", columnList = "mr_id"),
+                @Index(name = "idx_po_ship_to_type", columnList = "ship_to_type")
         }
 )
 @Getter
@@ -42,6 +44,16 @@ public class PurchaseOrder {
 
     @Column(name = "mr_id")
     private Long mrId;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ship_to_type", length = 20)
+    private PurchaseOrderShipToType shipToType;
+
+    @Column(name = "ship_to_warehouse_id")
+    private Long shipToWarehouseId;
+
+    @Column(name = "ship_to_work_order_id")
+    private Long shipToWorkOrderId;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "status", nullable = false, length = 20)

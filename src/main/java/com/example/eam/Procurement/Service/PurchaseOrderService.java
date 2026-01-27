@@ -7,6 +7,7 @@ import com.example.eam.Procurement.Entity.MaterialRequisition;
 import com.example.eam.Procurement.Entity.MaterialRequisitionLine;
 import com.example.eam.Procurement.Entity.PurchaseOrder;
 import com.example.eam.Procurement.Entity.PurchaseOrderLine;
+import com.example.eam.Procurement.Enum.PurchaseOrderShipToType;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Enum.PurchaseOrderStatus;
 import com.example.eam.Procurement.Repository.GoodsReceiptNoteRepository;
@@ -15,6 +16,8 @@ import com.example.eam.Procurement.Repository.PurchaseOrderRepository;
 import com.example.eam.Procurement.Repository.PurchaseOrderLineRepository;
 import com.example.eam.VendorManagement.Entity.Vendor;
 import com.example.eam.VendorManagement.Repository.VendorRepository;
+import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageImpl;
@@ -41,6 +44,8 @@ public class PurchaseOrderService {
     private final VendorRepository vendorRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final GoodsReceiptNoteRepository grnRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final WorkOrderRepository workOrderRepository;
     private final NumberGeneratorService numberGeneratorService;
 
     @Transactional
@@ -53,6 +58,11 @@ public class PurchaseOrderService {
         if (poRepository.existsByMrId(mrId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "MR already converted to PO");
         }
+
+        ShippingTarget shipping = resolveShippingTarget(
+                request.getShipToType() != null ? request.getShipToType() : (mr.getShipToType() != null ? mr.getShipToType().name() : null),
+                request.getShipToWarehouseId() != null ? request.getShipToWarehouseId() : mr.getShipToWarehouseId(),
+                request.getShipToWorkOrderId() != null ? request.getShipToWorkOrderId() : mr.getShipToWorkOrderId());
 
         Vendor vendor = validateVendor(request.getVendorId());
         Map<Long, PoLineOverrideRequest> overrides = buildOverrideMap(request.getLineOverrides());
@@ -73,6 +83,9 @@ public class PurchaseOrderService {
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr.getId())
+                .shipToType(shipping.type)
+                .shipToWarehouseId(shipping.warehouseId)
+                .shipToWorkOrderId(shipping.workOrderId)
                 .status(PurchaseOrderStatus.ISSUED)
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .remarks(trim(request.getRemarks()))
@@ -127,6 +140,8 @@ public class PurchaseOrderService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one PO line is required");
         }
 
+        ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
+
         Vendor vendor = validateVendor(request.getVendorId());
         MaterialRequisition mr = null;
         if (request.getMrId() != null) {
@@ -144,6 +159,9 @@ public class PurchaseOrderService {
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr != null ? mr.getId() : null)
+                .shipToType(shipping.type)
+                .shipToWarehouseId(shipping.warehouseId)
+                .shipToWorkOrderId(shipping.workOrderId)
                 .status(PurchaseOrderStatus.ISSUED)
                 .expectedDeliveryDate(request.getExpectedDeliveryDate())
                 .remarks(trim(request.getRemarks()))
@@ -305,6 +323,9 @@ public class PurchaseOrderService {
                 .poNumber(po.getPoNumber())
                 .vendorId(po.getVendorId())
                 .mrId(po.getMrId())
+                .shipToType(po.getShipToType() != null ? po.getShipToType().name() : null)
+                .shipToWarehouseId(po.getShipToWarehouseId())
+                .shipToWorkOrderId(po.getShipToWorkOrderId())
                 .status(po.getStatus())
                 .expectedDeliveryDate(po.getExpectedDeliveryDate())
                 .remarks(po.getRemarks())
@@ -328,4 +349,42 @@ public class PurchaseOrderService {
         }
         return t;
     }
+
+    private ShippingTarget resolveShippingTarget(String shipToTypeRaw, Long warehouseId, Long workOrderId) {
+        if (shipToTypeRaw == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipToType is required (WAREHOUSE or WORK_SITE)");
+        }
+        PurchaseOrderShipToType type;
+        try {
+            type = PurchaseOrderShipToType.valueOf(shipToTypeRaw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shipToType. Allowed: WAREHOUSE, WORK_SITE");
+        }
+
+        Long resolvedWarehouseId = null;
+        Long resolvedWorkOrderId = null;
+
+        if (type == PurchaseOrderShipToType.WAREHOUSE) {
+            if (warehouseId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "warehouseId is required when shipToType=WAREHOUSE");
+            }
+            var warehouse = warehouseRepository.findById(warehouseId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
+            if (!warehouse.isActive()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
+            }
+            resolvedWarehouseId = warehouse.getId();
+        } else {
+            if (workOrderId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderId is required when shipToType=WORK_SITE");
+            }
+            workOrderRepository.findByIdAndDeletedFalse(workOrderId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order not found"));
+            resolvedWorkOrderId = workOrderId;
+        }
+
+        return new ShippingTarget(type, resolvedWarehouseId, resolvedWorkOrderId);
+    }
+
+    private record ShippingTarget(PurchaseOrderShipToType type, Long warehouseId, Long workOrderId) { }
 }

@@ -27,6 +27,10 @@ public class ConvertMrToPoRequest {
 
     private String remarks;
 
+    private String shipToType; // optional; defaults from MR if null
+    private Long shipToWarehouseId;
+    private Long shipToWorkOrderId;
+
     @Valid
     private List<PoLineOverrideRequest> lineOverrides;
 }
