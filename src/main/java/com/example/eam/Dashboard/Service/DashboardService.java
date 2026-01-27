@@ -100,6 +100,7 @@ public class DashboardService {
         MaintenanceCostSummary maintenanceCostSummary = buildMaintenanceCostSummary();
         List<RecentWorkOrderDto> recentWorkOrders = mapRecentWorkOrders();
         List<NewServiceRequestDto> newServiceRequests = mapNewServiceRequests();
+        long requestsNotAcceptedCount = workOrderRepository.countByStatusAndDeletedFalse(WorkOrderStatus.NEW);
 
         DashboardMetadata metadata = DashboardMetadata.builder()
                 .generatedAt(Instant.now().toString())
@@ -112,6 +113,7 @@ public class DashboardService {
                 .maintenanceCostSummary(maintenanceCostSummary)
                 .recentWorkOrders(recentWorkOrders)
                 .newServiceRequests(newServiceRequests)
+                .requestsNotAcceptedCount(requestsNotAcceptedCount)
                 .metadata(metadata)
                 .build();
     }
@@ -210,4 +212,5 @@ public class DashboardService {
                         .build())
                 .toList();
     }
+
 }

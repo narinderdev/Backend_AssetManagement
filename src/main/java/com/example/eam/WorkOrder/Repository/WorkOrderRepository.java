@@ -49,6 +49,7 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     long countByDeletedFalse();
 
+
     @Query("""
         select distinct wo from WorkOrder wo
         left join wo.assignedTeam team

@@ -25,5 +25,8 @@ public class DashboardResponse {
     @JsonProperty("new_service_requests")
     private List<NewServiceRequestDto> newServiceRequests;
 
+    @JsonProperty("requests_not_accepted_count")
+    private Long requestsNotAcceptedCount;
+
     private DashboardMetadata metadata;
 }
