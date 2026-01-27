@@ -207,6 +207,7 @@ public class TechnicianService {
                         .teamId(membership.getTeam().getId())
                         .teamName(membership.getTeam().getTeamName())
                         .teamLeader(membership.isTeamLeader())
+                        .teamLeaderNames(resolveTeamLeaderNames(membership.getTeam().getId()))
                         .build())
                 .toList();
     }
@@ -275,5 +276,19 @@ public class TechnicianService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "terminationDate allowed only for CONTRACT technicians");
         }
         return null;
+    }
+
+    private List<String> resolveTeamLeaderNames(Long teamId) {
+        return teamMemberRepository.findByTeam_Id(teamId).stream()
+                .filter(TechnicianTeamMember::isTeamLeader)
+                .map(tm -> {
+                    var tech = tm.getTechnician();
+                    if (tech.getFullName() != null && !tech.getFullName().isBlank()) return tech.getFullName();
+                    String first = tech.getFirstName() != null ? tech.getFirstName() : "";
+                    String last = tech.getLastName() != null ? tech.getLastName() : "";
+                    return (first + " " + last).trim();
+                })
+                .filter(name -> name != null && !name.isBlank())
+                .toList();
     }
 }
