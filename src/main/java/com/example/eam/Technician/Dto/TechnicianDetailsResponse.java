@@ -13,6 +13,8 @@ import java.util.List;
 public class TechnicianDetailsResponse {
 
     private Long id;
+    private String technicianId;
+    private String badgeNumber;
     private String firstName;
     private String lastName;
     private String fullName;
@@ -24,6 +26,11 @@ public class TechnicianDetailsResponse {
     private TechnicianStatus status;
     private LocalDate hireDate;
     private String workShift;
+    private String technicianPhotoUrl;
+    private String certificateUrl;
+    private LocalDate certificateIssueDate;
+    private LocalDate certificateExpiryDate;
+    private LocalDate terminationDate;
     private String certifications;
     private String notes;
     private boolean teamLeader;

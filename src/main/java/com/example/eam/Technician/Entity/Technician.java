@@ -13,9 +13,15 @@ import java.util.List;
 @Entity
 @Table(
         name = "technicians",
-        uniqueConstraints = @UniqueConstraint(name = "uk_technicians_email", columnNames = "email"),
+        uniqueConstraints = {
+                @UniqueConstraint(name = "uk_technicians_email", columnNames = "email"),
+                @UniqueConstraint(name = "uk_technicians_badge", columnNames = "badge_number"),
+                @UniqueConstraint(name = "uk_technicians_identifier", columnNames = "technician_id")
+        },
         indexes = {
-                @Index(name = "idx_technicians_status", columnList = "status")
+                @Index(name = "idx_technicians_status", columnList = "status"),
+                @Index(name = "idx_technicians_badge", columnList = "badge_number"),
+                @Index(name = "idx_technicians_identifier", columnList = "technician_id")
         }
 )
 @Getter
@@ -28,6 +34,12 @@ public class Technician {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "technician_id", nullable = false, length = 64)
+    private String technicianId;
+
+    @Column(name = "badge_number", nullable = false, length = 64)
+    private String badgeNumber;
 
     @Column(name = "first_name", nullable = false, length = 100)
     private String firstName;
@@ -65,6 +77,21 @@ public class Technician {
 
     @Column(name = "work_shift", length = 64)
     private String workShift;
+
+    @Column(name = "technician_photo_url", length = 512)
+    private String technicianPhotoUrl;
+
+    @Column(name = "certificate_url", length = 512)
+    private String certificateUrl;
+
+    @Column(name = "certificate_issue_date")
+    private LocalDate certificateIssueDate;
+
+    @Column(name = "certificate_expiry_date")
+    private LocalDate certificateExpiryDate;
+
+    @Column(name = "termination_date")
+    private LocalDate terminationDate;
 
     @Lob
     @Column(name = "certifications")

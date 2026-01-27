@@ -18,6 +18,12 @@ public class TechnicianCreateRequest {
     @NotBlank
     private String lastName;
 
+    @NotBlank
+    private String badgeNumber;
+
+    // Optional; if omitted, backend will generate a simple technicianId
+    private String technicianId;
+
     @NotNull
     private TechnicianType technicianType=TechnicianType.FULL_TIME;
 
@@ -35,6 +41,13 @@ public class TechnicianCreateRequest {
     private LocalDate hireDate;
 
     private String workShift;
+
+    private String technicianPhotoUrl;
+    private String certificateUrl;
+    private LocalDate certificateIssueDate;
+    private LocalDate certificateExpiryDate;
+
+    private LocalDate terminationDate; // Only relevant for CONTRACT type
 
     private String certifications;
 

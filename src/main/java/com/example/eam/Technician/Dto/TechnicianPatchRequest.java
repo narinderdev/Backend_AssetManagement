@@ -14,6 +14,9 @@ public class TechnicianPatchRequest {
 
     private String lastName;
 
+    private String badgeNumber;
+    private String technicianId;
+
     private TechnicianType technicianType;
 
     private String skills;
@@ -30,6 +33,13 @@ public class TechnicianPatchRequest {
     private LocalDate hireDate;
 
     private String workShift;
+
+    private String technicianPhotoUrl;
+    private String certificateUrl;
+    private LocalDate certificateIssueDate;
+    private LocalDate certificateExpiryDate;
+
+    private LocalDate terminationDate; // Only relevant for CONTRACT type
 
     private String certifications;
 

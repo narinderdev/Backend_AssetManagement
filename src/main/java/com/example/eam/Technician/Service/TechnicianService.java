@@ -1,6 +1,7 @@
 package com.example.eam.Technician.Service;
 
 import com.example.eam.Enum.TechnicianStatus;
+import com.example.eam.Enum.TechnicianType;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
@@ -15,6 +16,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.time.LocalDate;
 import java.util.List;
 
 @Service
@@ -31,6 +33,8 @@ public class TechnicianService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician with the same email already exists");
         }
 
+        String badgeNumber = requireBadgeUnique(request.getBadgeNumber());
+        String technicianId = determineTechnicianId(request.getTechnicianId());
 
 
         TechnicianStatus status = request.getStatus() != null ? request.getStatus() : TechnicianStatus.ACTIVE;
@@ -40,6 +44,8 @@ public class TechnicianService {
         Technician technician = Technician.builder()
                 .firstName(firstName)
                 .lastName(lastName)
+                .badgeNumber(badgeNumber)
+                .technicianId(technicianId)
                 .technicianType(request.getTechnicianType())
                 .skills(request.getSkills())
                 .phoneNumber(safeTrim(request.getPhoneNumber()))
@@ -48,6 +54,11 @@ public class TechnicianService {
                 .status(status)
                 .hireDate(request.getHireDate())
                 .workShift(safeTrim(request.getWorkShift()))
+                .technicianPhotoUrl(safeTrim(request.getTechnicianPhotoUrl()))
+                .certificateUrl(safeTrim(request.getCertificateUrl()))
+                .certificateIssueDate(request.getCertificateIssueDate())
+                .certificateExpiryDate(request.getCertificateExpiryDate())
+                .terminationDate(resolveTerminationDate(request.getTechnicianType(), request.getTerminationDate()))
                 .certifications(request.getCertifications())
                 .notes(request.getNotes())
                 .build();
@@ -102,6 +113,20 @@ public class TechnicianService {
         if (request.getSkills() != null) technician.setSkills(request.getSkills());
         if (request.getPhoneNumber() != null) technician.setPhoneNumber(safeTrim(request.getPhoneNumber()));
 
+        if (request.getBadgeNumber() != null) {
+            String badge = requireBadgeUnique(request.getBadgeNumber(), technician.getId());
+            technician.setBadgeNumber(badge);
+        }
+
+        if (request.getTechnicianId() != null) {
+            String techId = request.getTechnicianId().trim();
+            if (techId.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId cannot be blank");
+            }
+            ensureTechnicianIdUnique(techId, technician.getId());
+            technician.setTechnicianId(techId);
+        }
+
         if (request.getEmail() != null) {
             String email = safeTrim(request.getEmail());
             if (email != null && !email.equalsIgnoreCase(safeTrim(technician.getEmail()))
@@ -115,6 +140,14 @@ public class TechnicianService {
         if (request.getStatus() != null) technician.setStatus(request.getStatus());
         if (request.getHireDate() != null) technician.setHireDate(request.getHireDate());
         if (request.getWorkShift() != null) technician.setWorkShift(safeTrim(request.getWorkShift()));
+        if (request.getTechnicianPhotoUrl() != null) technician.setTechnicianPhotoUrl(safeTrim(request.getTechnicianPhotoUrl()));
+        if (request.getCertificateUrl() != null) technician.setCertificateUrl(safeTrim(request.getCertificateUrl()));
+        if (request.getCertificateIssueDate() != null) technician.setCertificateIssueDate(request.getCertificateIssueDate());
+        if (request.getCertificateExpiryDate() != null) technician.setCertificateExpiryDate(request.getCertificateExpiryDate());
+        if (request.getTerminationDate() != null || request.getTechnicianType() != null) {
+            TechnicianType type = request.getTechnicianType() != null ? request.getTechnicianType() : technician.getTechnicianType();
+            technician.setTerminationDate(resolveTerminationDate(type, request.getTerminationDate() != null ? request.getTerminationDate() : technician.getTerminationDate()));
+        }
         if (request.getCertifications() != null) technician.setCertifications(request.getCertifications());
         if (request.getNotes() != null) technician.setNotes(request.getNotes());
 
@@ -141,6 +174,8 @@ public class TechnicianService {
                 .firstName(technician.getFirstName())
                 .lastName(technician.getLastName())
                 .fullName(technician.getFullName())
+                .badgeNumber(technician.getBadgeNumber())
+                .technicianId(technician.getTechnicianId())
                 .technicianType(technician.getTechnicianType())
                 .skills(technician.getSkills())
                 .phoneNumber(technician.getPhoneNumber())
@@ -149,6 +184,11 @@ public class TechnicianService {
                 .status(technician.getStatus())
                 .hireDate(technician.getHireDate())
                 .workShift(technician.getWorkShift())
+                .technicianPhotoUrl(technician.getTechnicianPhotoUrl())
+                .certificateUrl(technician.getCertificateUrl())
+                .certificateIssueDate(technician.getCertificateIssueDate())
+                .certificateExpiryDate(technician.getCertificateExpiryDate())
+                .terminationDate(technician.getTerminationDate())
                 .certifications(technician.getCertifications())
                 .notes(technician.getNotes())
                 .teamLeader(teamMemberships.stream().anyMatch(TechnicianTeamMembershipResponse::isTeamLeader))
@@ -177,4 +217,63 @@ public class TechnicianService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 
+    private String requireBadgeUnique(String badgeNumber) {
+        return requireBadgeUnique(badgeNumber, null);
+    }
+
+    private String requireBadgeUnique(String badgeNumber, Long currentId) {
+        if (badgeNumber == null || badgeNumber.trim().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "badgeNumber is required");
+        }
+        String trimmed = badgeNumber.trim();
+        if (technicianRepository.existsByBadgeNumberIgnoreCase(trimmed)) {
+            if (currentId == null || technicianRepository.findById(currentId).stream()
+                    .noneMatch(t -> trimmed.equalsIgnoreCase(t.getBadgeNumber()))) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "badgeNumber already exists");
+            }
+        }
+        return trimmed;
+    }
+
+    private String determineTechnicianId(String provided) {
+        if (provided != null && !provided.trim().isEmpty()) {
+            String trimmed = provided.trim();
+            ensureTechnicianIdUnique(trimmed, null);
+            return trimmed;
+        }
+        // simple auto id: TECH-YYYYMMDD-XXXX
+        String date = java.time.LocalDate.now().format(java.time.format.DateTimeFormatter.BASIC_ISO_DATE);
+        for (int i = 0; i < 30; i++) {
+            int rand = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 10000);
+            String candidate = String.format("TECH-%s-%04d", date, rand);
+            if (!technicianRepository.existsByTechnicianIdIgnoreCase(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate technicianId");
+    }
+
+    private void ensureTechnicianIdUnique(String technicianId, Long currentId) {
+        boolean exists = technicianRepository.existsByTechnicianIdIgnoreCase(technicianId);
+        if (exists) {
+            if (currentId == null) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
+            }
+            technicianRepository.findById(currentId).ifPresent(t -> {
+                if (!technicianId.equalsIgnoreCase(t.getTechnicianId())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
+                }
+            });
+        }
+    }
+
+    private LocalDate resolveTerminationDate(TechnicianType type, LocalDate terminationDate) {
+        if (type == TechnicianType.CONTRACT) {
+            return terminationDate;
+        }
+        if (terminationDate != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "terminationDate allowed only for CONTRACT technicians");
+        }
+        return null;
+    }
 }

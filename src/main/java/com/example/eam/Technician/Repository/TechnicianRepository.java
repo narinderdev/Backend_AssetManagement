@@ -9,4 +9,8 @@ public interface TechnicianRepository extends JpaRepository<Technician, Long> {
     boolean existsByEmailIgnoreCase(String email);
 
     Optional<Technician> findByEmailIgnoreCase(String email);
+
+    boolean existsByBadgeNumberIgnoreCase(String badgeNumber);
+
+    boolean existsByTechnicianIdIgnoreCase(String technicianId);
 }
