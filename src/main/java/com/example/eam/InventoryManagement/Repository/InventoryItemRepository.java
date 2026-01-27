@@ -11,9 +11,13 @@ public interface InventoryItemRepository extends JpaRepository<InventoryItem, Lo
 
     boolean existsByItemId(String itemId);
 
+    boolean existsBySkuNumberAndDeletedFalse(String skuNumber);
+
     Optional<InventoryItem> findByIdAndDeletedFalse(Long id);
 
     Optional<InventoryItem> findByItemIdAndDeletedFalse(String itemId);
+
+    Optional<InventoryItem> findBySkuNumberAndDeletedFalse(String skuNumber);
 
     Page<InventoryItem> findByDeletedFalse(Pageable pageable);
 }

@@ -4,8 +4,10 @@ import com.example.eam.Enum.ReorderStatus;
 import com.example.eam.InventoryManagement.Dto.*;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Entity.InventoryReorderRequest;
+import com.example.eam.InventoryManagement.Entity.Warehouse;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.InventoryManagement.Repository.InventoryReorderRequestRepository;
+import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
 import com.example.eam.VendorManagement.Entity.Vendor;
 import com.example.eam.VendorManagement.Repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +28,7 @@ import java.util.concurrent.ThreadLocalRandom;
 public class InventoryItemService {
 
     private final InventoryItemRepository itemRepo;
+    private final WarehouseRepository warehouseRepo;
     private final VendorRepository vendorRepo;
     private final InventoryReorderRequestRepository reorderRepo;
 
@@ -34,6 +37,7 @@ public class InventoryItemService {
     public InventoryItemResponse create(InventoryItemCreateRequest dto) {
 
         String itemId = determineItemId(dto.getItemId());
+        String skuNumber = normalizeSkuForCreate(dto.getSkuNumber());
 
         Vendor vendor = null;
         if (dto.getPrimaryVendorDbId() != null) {
@@ -41,10 +45,20 @@ public class InventoryItemService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
         }
 
+        Warehouse warehouse = null;
+        if (dto.getWarehouseId() != null) {
+            warehouse = warehouseRepo.findById(dto.getWarehouseId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
+            if (!warehouse.isActive()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
+            }
+        }
+
         validateMinMax(dto.getMinStockLevel(), dto.getMaxStockLevel());
 
         InventoryItem item = InventoryItem.builder()
                 .itemId(itemId)
+                .skuNumber(skuNumber)
                 .itemName(dto.getItemName().trim())
                 .category(normalizeCategory(dto.getCategory()))
                 .unitOfMeasure(dto.getUnitOfMeasure())
@@ -57,6 +71,7 @@ public class InventoryItemService {
                 .minStockLevel(dto.getMinStockLevel())
                 .maxStockLevel(dto.getMaxStockLevel())
                 .primaryVendor(vendor)
+                .warehouse(warehouse)
                 .active(dto.getActive() == null || dto.getActive())
                 .deleted(false)
                 .build();
@@ -75,11 +90,34 @@ public class InventoryItemService {
             item.setPrimaryVendor(vendor);
         }
 
+        if (dto.getSkuNumber() != null) {
+            String trimmed = dto.getSkuNumber().trim();
+            if (trimmed.isEmpty()) {
+                item.setSkuNumber(null);
+            } else {
+                ensureSkuUnique(trimmed, item.getId());
+                item.setSkuNumber(trimmed);
+            }
+        }
+
         if (dto.getItemName() != null) item.setItemName(dto.getItemName().trim());
         if (dto.getCategory() != null) item.setCategory(normalizeCategory(dto.getCategory()));
         if (dto.getUnitOfMeasure() != null) item.setUnitOfMeasure(dto.getUnitOfMeasure());
         if (dto.getManufacturer() != null) item.setManufacturer(dto.getManufacturer());
         if (dto.getManufacturerPartNumber() != null) item.setManufacturerPartNumber(dto.getManufacturerPartNumber());
+
+        if (dto.getWarehouseId() != null) {
+            if (dto.getWarehouseId() <= 0) {
+                item.setWarehouse(null);
+            } else {
+                Warehouse warehouse = warehouseRepo.findById(dto.getWarehouseId())
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
+                if (!warehouse.isActive()) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
+                }
+                item.setWarehouse(warehouse);
+            }
+        }
 
         if (dto.getStockLevel() != null) {
             if (dto.getStockLevel() < 0) throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "stockLevel cannot be negative");
@@ -205,9 +243,11 @@ public class InventoryItemService {
 
     private InventoryItemResponse toResponse(InventoryItem item) {
         Vendor v = item.getPrimaryVendor();
+        Warehouse wh = item.getWarehouse();
         return InventoryItemResponse.builder()
                 .id(item.getId())
                 .itemId(item.getItemId())
+                .skuNumber(item.getSkuNumber())
                 .itemName(item.getItemName())
                 .category(item.getCategory())
                 .unitOfMeasure(item.getUnitOfMeasure())
@@ -221,6 +261,12 @@ public class InventoryItemService {
                 .costPerUnit(item.getCostPerUnit())
                 .primaryVendorDbId(v != null ? v.getId() : null)
                 .primaryVendorName(v != null ? v.getVendorName() : null)
+                .warehouseId(wh != null ? wh.getId() : null)
+                .warehouseName(wh != null ? wh.getName() : null)
+                .zoneAisle(wh != null ? wh.getZoneAisle() : null)
+                .rackShelf(wh != null ? wh.getRackShelf() : null)
+                .binCode(wh != null ? wh.getBinCode() : null)
+                .binDescription(wh != null ? wh.getBinDescription() : null)
                 .active(item.isActive())
                 .createdAt(item.getCreatedAt())
                 .updatedAt(item.getUpdatedAt())
@@ -278,6 +324,24 @@ public class InventoryItemService {
             if (!reorderRepo.existsByReorderId(candidate)) return candidate;
         }
         throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate unique reorder ID");
+    }
+
+    private String normalizeSkuForCreate(String skuNumber) {
+        if (skuNumber == null) return null;
+        String trimmed = skuNumber.trim();
+        if (trimmed.isEmpty()) return null;
+        if (itemRepo.existsBySkuNumberAndDeletedFalse(trimmed)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + trimmed);
+        }
+        return trimmed;
+    }
+
+    private void ensureSkuUnique(String skuNumber, Long currentItemId) {
+        itemRepo.findBySkuNumberAndDeletedFalse(skuNumber).ifPresent(existing -> {
+            if (!existing.getId().equals(currentItemId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + skuNumber);
+            }
+        });
     }
 }
 

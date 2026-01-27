@@ -15,6 +15,8 @@ public class InventoryItemPatchRequest {
     private String manufacturer;
     private String manufacturerPartNumber;
 
+    private String skuNumber;
+
     private Integer stockLevel;
     private Integer reorderPoint;
     private Integer reorderQuantity;
@@ -25,6 +27,7 @@ public class InventoryItemPatchRequest {
     private Integer maxStockLevel;
 
     private Long primaryVendorDbId;
+    private Long warehouseId;
     private Boolean active;
 }
 

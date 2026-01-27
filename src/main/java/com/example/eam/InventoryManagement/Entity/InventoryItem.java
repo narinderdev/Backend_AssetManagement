@@ -1,6 +1,7 @@
 package com.example.eam.InventoryManagement.Entity;
 
 import com.example.eam.Enum.UnitOfMeasure;
+import com.example.eam.InventoryManagement.Entity.Warehouse;
 import com.example.eam.VendorManagement.Entity.Vendor;
 import jakarta.persistence.*;
 import lombok.*;
@@ -18,7 +19,9 @@ import java.time.LocalDateTime;
         },
         indexes = {
                 @Index(name = "idx_inventory_items_deleted", columnList = "deleted"),
-                @Index(name = "idx_inventory_items_category", columnList = "category")
+                @Index(name = "idx_inventory_items_category", columnList = "category"),
+                @Index(name = "idx_inventory_items_sku", columnList = "sku_number"),
+                @Index(name = "idx_inventory_items_warehouse", columnList = "warehouse_id")
         }
 )
 @Data
@@ -33,6 +36,9 @@ public class InventoryItem {
 
     @Column(name = "item_id", nullable = false, unique = true, length = 64)
     private String itemId; // Business ID
+
+    @Column(name = "sku_number", length = 128)
+    private String skuNumber; // Stock keeping unit code
 
     @Column(name = "item_name", nullable = false, length = 255)
     private String itemName;
@@ -71,6 +77,10 @@ public class InventoryItem {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "primary_vendor_id")
     private Vendor primaryVendor;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "warehouse_id")
+    private Warehouse warehouse;
 
     @Builder.Default
     @Column(name = "active", nullable = false)

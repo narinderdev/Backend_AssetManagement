@@ -12,6 +12,9 @@ public class InventoryItemCreateRequest {
     @Size(max = 64)
     private String itemId;
 
+    @Size(max = 128)
+    private String skuNumber;
+
     @NotBlank
     private String itemName;
 
@@ -45,6 +48,9 @@ public class InventoryItemCreateRequest {
 
     // Vendor lookup
     private Long primaryVendorDbId;
+
+    // Warehouse lookup
+    private Long warehouseId;
 
     // optional
     private Boolean active;

@@ -11,16 +11,18 @@ import java.time.LocalDateTime;
 @Data
 @Builder
 @JsonPropertyOrder({
-        "id","itemId","itemName","category","unitOfMeasure",
+        "id","itemId","skuNumber","itemName","category","unitOfMeasure",
         "manufacturer","manufacturerPartNumber",
         "stockLevel","reorderPoint","reorderQuantity",
         "minStockLevel","maxStockLevel","costPerUnit",
         "primaryVendorDbId","primaryVendorName",
+        "warehouseId","warehouseName","zoneAisle","rackShelf","binCode","binDescription",
         "active","createdAt","updatedAt"
 })
 public class InventoryItemResponse {
     private Long id;
     private String itemId;
+    private String skuNumber;
     private String itemName;
     private String category;
     private UnitOfMeasure unitOfMeasure;
@@ -39,6 +41,13 @@ public class InventoryItemResponse {
 
     private Long primaryVendorDbId;
     private String primaryVendorName;
+
+    private Long warehouseId;
+    private String warehouseName;
+    private String zoneAisle;
+    private String rackShelf;
+    private String binCode;
+    private String binDescription;
 
     private boolean active;
 
