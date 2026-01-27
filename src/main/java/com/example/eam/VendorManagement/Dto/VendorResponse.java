@@ -14,6 +14,7 @@ public class VendorResponse {
     private String vendorId;
 
     private String vendorName;
+    private String taxId;
     private String address;
     private String contactPerson;
     private String email;

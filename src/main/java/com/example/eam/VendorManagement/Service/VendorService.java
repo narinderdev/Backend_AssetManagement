@@ -30,6 +30,7 @@ public class VendorService {
         Vendor vendor = Vendor.builder()
                 .vendorId(vendorId)
                 .vendorName(req.getVendorName().trim())
+                .taxId(normalizeAndEnsureUniqueTaxId(req.getTaxId(), null))
                 .address(req.getAddress())
                 .contactPerson(req.getContactPerson().trim())
                 .email(req.getEmail().trim())
@@ -52,6 +53,14 @@ public class VendorService {
         updateIfNotBlank(req.getContactPerson(), vendor::setContactPerson);
         updateIfNotBlank(req.getEmail(), vendor::setEmail);
         updateIfNotBlank(req.getPhone(), vendor::setPhone);
+        if (req.getTaxId() != null) {
+            String taxId = req.getTaxId().trim();
+            if (taxId.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId cannot be blank");
+            }
+            ensureTaxIdUnique(taxId, vendor.getId());
+            vendor.setTaxId(taxId);
+        }
 
         if (req.getPaymentTerms() != null) vendor.setPaymentTerms(req.getPaymentTerms());
         if (req.getRating() != null) vendor.setRating(req.getRating());
@@ -141,6 +150,7 @@ public class VendorService {
                 .id(v.getId())
                 .vendorId(v.getVendorId())
                 .vendorName(v.getVendorName())
+                .taxId(v.getTaxId())
                 .address(v.getAddress())
                 .contactPerson(v.getContactPerson())
                 .email(v.getEmail())
@@ -151,5 +161,25 @@ public class VendorService {
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())
                 .build();
+    }
+
+    private String normalizeAndEnsureUniqueTaxId(String taxId, Long currentId) {
+        if (taxId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId is required");
+        }
+        String trimmed = taxId.trim();
+        if (trimmed.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId cannot be blank");
+        }
+        ensureTaxIdUnique(trimmed, currentId);
+        return trimmed;
+    }
+
+    private void ensureTaxIdUnique(String taxId, Long currentId) {
+        vendorRepository.findByTaxIdIgnoreCase(taxId).ifPresent(existing -> {
+            if (currentId == null || !existing.getId().equals(currentId)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Tax ID already exists");
+            }
+        });
     }
 }

@@ -12,11 +12,13 @@ import java.time.LocalDateTime;
 @Table(
         name = "vendors",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_vendors_vendor_id", columnNames = "vendor_id")
+                @UniqueConstraint(name = "uk_vendors_vendor_id", columnNames = "vendor_id"),
+                @UniqueConstraint(name = "uk_vendors_tax_id", columnNames = "tax_id")
         },
         indexes = {
                 @Index(name = "idx_vendors_vendor_id", columnList = "vendor_id"),
-                @Index(name = "idx_vendors_active", columnList = "active")
+                @Index(name = "idx_vendors_active", columnList = "active"),
+                @Index(name = "idx_vendors_tax_id", columnList = "tax_id")
         }
 )
 @Data
@@ -34,6 +36,9 @@ public class Vendor {
 
     @Column(name = "vendor_name", nullable = false, length = 255)
     private String vendorName;
+
+    @Column(name = "tax_id", nullable = false, length = 128)
+    private String taxId;
 
     @Column(name = "address", length = 1000)
     private String address;

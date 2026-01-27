@@ -13,6 +13,9 @@ public class VendorCreateRequest {
 
     private String vendorId;
 
+    @NotBlank
+    private String taxId;
+
     private String address;
 
     @NotBlank

@@ -11,6 +11,8 @@ import java.util.Optional;
 public interface VendorRepository extends JpaRepository<Vendor, Long> {
 
     boolean existsByVendorId(String vendorId);
+    boolean existsByTaxIdIgnoreCase(String taxId);
+    Optional<Vendor> findByTaxIdIgnoreCase(String taxId);
 
     Optional<Vendor> findByIdAndActiveTrue(Long id);
 

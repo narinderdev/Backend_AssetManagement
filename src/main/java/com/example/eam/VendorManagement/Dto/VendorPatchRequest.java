@@ -18,6 +18,7 @@ public class VendorPatchRequest {
     private String email;
 
     private String phone;
+    private String taxId;
     private PaymentTerms paymentTerms;
 
     @Min(1)
