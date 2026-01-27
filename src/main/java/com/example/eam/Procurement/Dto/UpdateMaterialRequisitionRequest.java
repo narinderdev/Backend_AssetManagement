@@ -21,6 +21,10 @@ public class UpdateMaterialRequisitionRequest {
 
     private String notes;
 
+    private String shipToType; // WAREHOUSE or WORK_SITE
+    private Long shipToWarehouseId;
+    private Long shipToWorkOrderId;
+
     @Valid
     private List<MaterialRequisitionLineRequest> lines;
 }

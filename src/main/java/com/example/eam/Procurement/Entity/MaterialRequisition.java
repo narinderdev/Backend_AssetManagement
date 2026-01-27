@@ -1,6 +1,7 @@
 package com.example.eam.Procurement.Entity;
 
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
+import com.example.eam.Procurement.Enum.MaterialRequisitionShipToType;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -18,7 +19,8 @@ import java.util.List;
                 @UniqueConstraint(name = "uk_mr_number", columnNames = "mr_number")
         },
         indexes = {
-                @Index(name = "idx_mr_status", columnList = "status")
+                @Index(name = "idx_mr_status", columnList = "status"),
+                @Index(name = "idx_mr_ship_to_type", columnList = "ship_to_type")
         }
 )
 @Getter
@@ -48,6 +50,16 @@ public class MaterialRequisition {
 
     @Column(name = "notes", length = 1000)
     private String notes;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "ship_to_type", length = 20)
+    private MaterialRequisitionShipToType shipToType;
+
+    @Column(name = "ship_to_warehouse_id")
+    private Long shipToWarehouseId;
+
+    @Column(name = "ship_to_work_order_id")
+    private Long shipToWorkOrderId;
 
     @Column(name = "approved_by_user_id", length = 150)
     private String approvedByUserId;

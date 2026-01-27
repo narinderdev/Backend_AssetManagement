@@ -6,7 +6,10 @@ import com.example.eam.Procurement.Dto.*;
 import com.example.eam.Procurement.Entity.MaterialRequisition;
 import com.example.eam.Procurement.Entity.MaterialRequisitionLine;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
+import com.example.eam.Procurement.Enum.MaterialRequisitionShipToType;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
+import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,11 +31,14 @@ public class MaterialRequisitionService {
 
     private final MaterialRequisitionRepository mrRepository;
     private final InventoryItemRepository inventoryItemRepository;
+    private final WarehouseRepository warehouseRepository;
+    private final WorkOrderRepository workOrderRepository;
     private final NumberGeneratorService numberGeneratorService;
 
     @Transactional
     public MaterialRequisitionResponse create(CreateMaterialRequisitionRequest request) {
         validateLines(request.getLines());
+        ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
 
         String mrNumber = numberGeneratorService.generateMrNumber();
         MaterialRequisition mr = MaterialRequisition.builder()
@@ -40,6 +46,9 @@ public class MaterialRequisitionService {
                 .requestedByUserId(requireText(request.getRequestedByUserId(), "requestedByUserId is required"))
                 .neededByDate(request.getNeededByDate())
                 .notes(trim(request.getNotes()))
+                .shipToType(shipping.type)
+                .shipToWarehouseId(shipping.warehouseId)
+                .shipToWorkOrderId(shipping.workOrderId)
                 // Direct submission on create as requested
                 .status(MaterialRequisitionStatus.SUBMITTED)
                 .build();
@@ -68,6 +77,12 @@ public class MaterialRequisitionService {
         }
         if (request.getNotes() != null) {
             mr.setNotes(trim(request.getNotes()));
+        }
+        if (request.getShipToType() != null || request.getShipToWarehouseId() != null || request.getShipToWorkOrderId() != null) {
+            ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
+            mr.setShipToType(shipping.type);
+            mr.setShipToWarehouseId(shipping.warehouseId);
+            mr.setShipToWorkOrderId(shipping.workOrderId);
         }
 
         if (request.getLines() != null) {
@@ -237,6 +252,9 @@ public class MaterialRequisitionService {
                 .status(mr.getStatus())
                 .neededByDate(mr.getNeededByDate())
                 .notes(mr.getNotes())
+                .shipToType(mr.getShipToType() != null ? mr.getShipToType().name() : null)
+                .shipToWarehouseId(mr.getShipToWarehouseId())
+                .shipToWorkOrderId(mr.getShipToWorkOrderId())
                 .approvedByUserId(mr.getApprovedByUserId())
                 .approvedAt(mr.getApprovedAt())
                 .rejectedByUserId(mr.getRejectedByUserId())
@@ -261,4 +279,42 @@ public class MaterialRequisitionService {
         }
         return trimmed;
     }
+
+    private ShippingTarget resolveShippingTarget(String shipToTypeRaw, Long warehouseId, Long workOrderId) {
+        if (shipToTypeRaw == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipToType is required (WAREHOUSE or WORK_SITE)");
+        }
+        MaterialRequisitionShipToType type;
+        try {
+            type = MaterialRequisitionShipToType.valueOf(shipToTypeRaw.trim().toUpperCase());
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid shipToType. Allowed: WAREHOUSE, WORK_SITE");
+        }
+
+        Long resolvedWarehouseId = null;
+        Long resolvedWorkOrderId = null;
+
+        if (type == MaterialRequisitionShipToType.WAREHOUSE) {
+            if (warehouseId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "warehouseId is required when shipToType=WAREHOUSE");
+            }
+            var warehouse = warehouseRepository.findById(warehouseId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
+            if (!warehouse.isActive()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
+            }
+            resolvedWarehouseId = warehouse.getId();
+        } else {
+            if (workOrderId == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderId is required when shipToType=WORK_SITE");
+            }
+            workOrderRepository.findByIdAndDeletedFalse(workOrderId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order not found"));
+            resolvedWorkOrderId = workOrderId;
+        }
+
+        return new ShippingTarget(type, resolvedWarehouseId, resolvedWorkOrderId);
+    }
+
+    private record ShippingTarget(MaterialRequisitionShipToType type, Long warehouseId, Long workOrderId) { }
 }
