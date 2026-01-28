@@ -101,17 +101,19 @@ public class WoNumberPoolService {
 
     private String claimNextAvailable(Long workOrderId) {
         Query q = entityManager.createNativeQuery("""
-                DECLARE @claimed TABLE (wo_number NVARCHAR(50));
-
-                UPDATE TOP (1) wo_number_pool WITH (UPDLOCK, READPAST, ROWLOCK)
+                WITH next_wo AS (
+                    SELECT TOP (1) id
+                    FROM wo_number_pool WITH (UPDLOCK, READPAST, ROWLOCK)
+                    WHERE is_assigned = 0
+                    ORDER BY id
+                )
+                UPDATE wp
                 SET is_assigned = 1,
                     assigned_to_wo_id = :workOrderId,
                     assigned_at = SYSUTCDATETIME()
-                OUTPUT inserted.wo_number INTO @claimed(wo_number)
-                WHERE is_assigned = 0
-                ORDER BY id;
-
-                SELECT wo_number FROM @claimed;
+                OUTPUT inserted.wo_number
+                FROM wo_number_pool wp
+                INNER JOIN next_wo n ON wp.id = n.id;
                 """);
         q.setParameter("workOrderId", workOrderId);
         @SuppressWarnings("unchecked")

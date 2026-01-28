@@ -13,6 +13,7 @@ import com.example.eam.Maintenance.Emergency.Dto.EmergencyIncidentResponse;
 import com.example.eam.Maintenance.Emergency.Dto.EmergencyWorkOrderRequest;
 import com.example.eam.Maintenance.Emergency.Entity.EmergencyIncident;
 import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
+import com.example.eam.WorkOrder.Dto.WorkOrderScheduleRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderDetailsResponse;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
@@ -69,7 +70,7 @@ public class EmergencyMaintenanceService {
                 .failureTime(req.getFailureTime() != null ? req.getFailureTime() : LocalDateTime.now())
                 .downtimeStart(req.getFailureTime() != null ? req.getFailureTime() : LocalDateTime.now())
                 .reporter(req.getReporter())
-                .status(WorkOrderStatus.NEW)
+                .status(WorkOrderStatus.APPROVED) // directly schedule after creation
                 .source(WorkOrderSource.EMERGENCY)
                 .targetCompletionDate(LocalDate.now())
                 .deleted(false)
@@ -91,7 +92,16 @@ public class EmergencyMaintenanceService {
                 .build();
         emergencyIncidentRepository.save(incident);
 
-        return workOrderService.getWorkOrderDetails(saved.getId());
+        WorkOrderScheduleRequest scheduleRequest = new WorkOrderScheduleRequest();
+        scheduleRequest.setAssignedTechnicianId(req.getAssignedTechnicianId());
+        scheduleRequest.setAssignedTeamId(req.getAssignedTeamId());
+        scheduleRequest.setPlannedStartDateTime(req.getPlannedStartDateTime());
+        scheduleRequest.setPlannedEndDateTime(req.getPlannedEndDateTime());
+        scheduleRequest.setPlanner(req.getPlanner());
+        scheduleRequest.setPreCheckNotes(req.getPreCheckNotes());
+        scheduleRequest.setPlannedMaterials(req.getPlannedMaterials());
+
+        return workOrderService.scheduleWorkOrder(saved.getId(), scheduleRequest);
     }
 
     @Transactional(readOnly = true)
