@@ -84,6 +84,7 @@ public class PurchaseOrderService {
                 .vendorId(vendor.getId())
                 .mrId(mr.getId())
                 .department(trim(request.getDepartment() != null ? request.getDepartment() : mr.getDepartment()))
+                .glAccountString(trim(request.getGlAccountString()))
                 .shipToType(shipping.type)
                 .shipToWarehouseId(shipping.warehouseId)
                 .shipToWorkOrderId(shipping.workOrderId)
@@ -161,6 +162,7 @@ public class PurchaseOrderService {
                 .vendorId(vendor.getId())
                 .mrId(mr != null ? mr.getId() : null)
                 .department(trim(request.getDepartment()))
+                .glAccountString(trim(request.getGlAccountString()))
                 .shipToType(shipping.type)
                 .shipToWarehouseId(shipping.warehouseId)
                 .shipToWorkOrderId(shipping.workOrderId)
@@ -320,16 +322,27 @@ public class PurchaseOrderService {
                         .build())
                 .toList();
 
+        Vendor vendor = null;
+        if (po.getVendorId() != null) {
+            vendor = vendorRepository.findById(po.getVendorId()).orElse(null);
+        }
+
         return PurchaseOrderResponse.builder()
                 .id(po.getId())
                 .poNumber(po.getPoNumber())
                 .vendorId(po.getVendorId())
+                .vendorCode(vendor != null ? vendor.getVendorId() : null)
+                .vendorName(vendor != null ? vendor.getVendorName() : null)
+                .vendorEmail(vendor != null ? vendor.getEmail() : null)
+                .vendorPhone(vendor != null ? vendor.getPhone() : null)
+                .vendorContactPerson(vendor != null ? vendor.getContactPerson() : null)
                 .mrId(po.getMrId())
                 .department(po.getDepartment())
                 .shipToType(po.getShipToType() != null ? po.getShipToType().name() : null)
                 .shipToWarehouseId(po.getShipToWarehouseId())
                 .shipToWorkOrderId(po.getShipToWorkOrderId())
                 .status(po.getStatus())
+                .glAccountString(po.getGlAccountString())
                 .expectedDeliveryDate(po.getExpectedDeliveryDate())
                 .remarks(po.getRemarks())
                 .createdByUserId(po.getCreatedByUserId())

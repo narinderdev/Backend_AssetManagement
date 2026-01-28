@@ -69,6 +69,9 @@ public class PurchaseOrder {
     @Column(name = "remarks", length = 1000)
     private String remarks;
 
+    @Column(name = "gl_account_string", length = 255)
+    private String glAccountString;
+
     @Column(name = "created_by_user_id", nullable = false, length = 150)
     private String createdByUserId;
 

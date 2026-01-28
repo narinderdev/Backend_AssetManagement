@@ -19,6 +19,12 @@ public class PurchaseOrderResponse {
     private Long id;
     private String poNumber;
     private Long vendorId;
+    private String vendorCode;
+    private String vendorName;
+    private String vendorEmail;
+    private String vendorPhone;
+    private String vendorContactPerson;
+    private String glAccountString;
     private Long mrId;
     private String department;
     private String shipToType;
