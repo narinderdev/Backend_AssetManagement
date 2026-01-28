@@ -15,6 +15,7 @@ import java.time.LocalDateTime;
         "manufacturer","manufacturerPartNumber",
         "stockLevel","reorderPoint","reorderQuantity",
         "minStockLevel","maxStockLevel","costPerUnit",
+        "glAccountString","expenseCode",
         "primaryVendorDbId","primaryVendorName",
         "warehouseId","warehouseName","zoneAisle","rackShelf","binCode","binDescription",
         "active","createdAt","updatedAt"
@@ -38,6 +39,9 @@ public class InventoryItemResponse {
     private Integer maxStockLevel;
 
     private BigDecimal costPerUnit;
+
+    private String glAccountString;
+    private String expenseCode;
 
     private Long primaryVendorDbId;
     private String primaryVendorName;

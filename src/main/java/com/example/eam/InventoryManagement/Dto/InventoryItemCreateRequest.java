@@ -52,6 +52,10 @@ public class InventoryItemCreateRequest {
     // Warehouse lookup
     private Long warehouseId;
 
+    // Accounting
+    private String glAccountString;
+    private String expenseCode;
+
     // optional
     private Boolean active;
 }

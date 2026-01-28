@@ -29,5 +29,8 @@ public class InventoryItemPatchRequest {
     private Long primaryVendorDbId;
     private Long warehouseId;
     private Boolean active;
+
+    private String glAccountString;
+    private String expenseCode;
 }
 

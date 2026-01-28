@@ -70,6 +70,8 @@ public class InventoryItemService {
                 .costPerUnit(dto.getCostPerUnit())
                 .minStockLevel(dto.getMinStockLevel())
                 .maxStockLevel(dto.getMaxStockLevel())
+                .glAccountString(dto.getGlAccountString() != null ? dto.getGlAccountString().trim() : null)
+                .expenseCode(dto.getExpenseCode() != null ? dto.getExpenseCode().trim() : null)
                 .primaryVendor(vendor)
                 .warehouse(warehouse)
                 .active(dto.getActive() == null || dto.getActive())
@@ -143,6 +145,13 @@ public class InventoryItemService {
         validateMinMax(item.getMinStockLevel(), item.getMaxStockLevel());
 
         if (dto.getActive() != null) item.setActive(dto.getActive());
+
+        if (dto.getGlAccountString() != null) {
+            item.setGlAccountString(dto.getGlAccountString().trim());
+        }
+        if (dto.getExpenseCode() != null) {
+            item.setExpenseCode(dto.getExpenseCode().trim());
+        }
 
         return toResponse(itemRepo.save(item));
     }
@@ -259,6 +268,8 @@ public class InventoryItemService {
                 .minStockLevel(item.getMinStockLevel())
                 .maxStockLevel(item.getMaxStockLevel())
                 .costPerUnit(item.getCostPerUnit())
+                .glAccountString(item.getGlAccountString())
+                .expenseCode(item.getExpenseCode())
                 .primaryVendorDbId(v != null ? v.getId() : null)
                 .primaryVendorName(v != null ? v.getVendorName() : null)
                 .warehouseId(wh != null ? wh.getId() : null)

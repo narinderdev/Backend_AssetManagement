@@ -82,6 +82,12 @@ public class InventoryItem {
     @JoinColumn(name = "warehouse_id")
     private Warehouse warehouse;
 
+    @Column(name = "gl_account_string", length = 255)
+    private String glAccountString;
+
+    @Column(name = "expense_code", length = 64)
+    private String expenseCode;
+
     @Builder.Default
     @Column(name = "active", nullable = false)
     private boolean active = true;
