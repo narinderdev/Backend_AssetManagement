@@ -41,6 +41,14 @@ import java.util.List;
         "assignedTechnicianName",
         "assignedTeamId",
         "assignedTeamName",
+        "workOrderTypeId",
+        "workOrderTypeName",
+        "glAccount",
+        "utilityAccount",
+        "laborGlAccount",
+        "laborUtilityAccount",
+        "inventoryGlAccount",
+        "inventoryUtilityAccount",
         "teamMembers",
         "plannedStartDateTime",
         "plannedEndDateTime",
@@ -118,6 +126,14 @@ public class WorkOrderDetailsResponse {
     private String assignedTechnicianName;
     private Long assignedTeamId;
     private String assignedTeamName;
+    private Long workOrderTypeId;
+    private String workOrderTypeName;
+    private String glAccount;
+    private String utilityAccount;
+    private String laborGlAccount;
+    private String laborUtilityAccount;
+    private String inventoryGlAccount;
+    private String inventoryUtilityAccount;
     private java.util.List<WorkOrderTeamMemberResponse> teamMembers;
 
     private LocalDateTime plannedStartDateTime;

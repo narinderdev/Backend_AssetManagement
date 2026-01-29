@@ -37,4 +37,9 @@ public class WorkOrderCreateRequest {
 
     @NotBlank
     private String workRequestTypeCode;
+
+    // Accounting / type
+    private Long workOrderTypeId;
+    private String glAccount;
+    private String utilityAccount;
 }

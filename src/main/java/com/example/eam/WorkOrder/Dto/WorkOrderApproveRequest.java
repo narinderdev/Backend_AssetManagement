@@ -19,4 +19,9 @@ public class WorkOrderApproveRequest {
 
     @NotBlank
     private String approvedBy;
+
+    private String laborGlAccount;
+    private String laborUtilityAccount;
+    private String inventoryGlAccount;
+    private String inventoryUtilityAccount;
 }

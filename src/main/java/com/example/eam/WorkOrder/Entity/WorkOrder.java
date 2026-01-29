@@ -10,6 +10,7 @@ import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
+import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
@@ -75,6 +76,10 @@ public class WorkOrder {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_request_type_id")
     private WorkRequestType workRequestType;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "work_order_type_id")
+    private WorkOrderTypeTemplate workOrderTypeTemplate;
 
     // Snapshot of location (auto from asset if present, but editable)
     @Column(name = "location", length = 255)
@@ -184,6 +189,24 @@ public class WorkOrder {
     @Lob
     @Column(name = "precheck_notes")
     private String precheckNotes;
+
+    @Column(name = "gl_account", length = 255)
+    private String glAccount;
+
+    @Column(name = "utility_account", length = 255)
+    private String utilityAccount;
+
+    @Column(name = "labor_gl_account", length = 255)
+    private String laborGlAccount;
+
+    @Column(name = "labor_utility_account", length = 255)
+    private String laborUtilityAccount;
+
+    @Column(name = "inventory_gl_account", length = 255)
+    private String inventoryGlAccount;
+
+    @Column(name = "inventory_utility_account", length = 255)
+    private String inventoryUtilityAccount;
 
     // Emergency / downtime tracking
     @Lob

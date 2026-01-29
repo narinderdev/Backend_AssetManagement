@@ -38,6 +38,8 @@ import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
 import com.example.eam.Common.NotificationService;
 import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
+import com.example.eam.WorkOrder.Repository.WorkOrderTypeTemplateRepository;
+import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
@@ -95,6 +97,7 @@ public class WorkOrderService {
     private final NotificationService notificationService;
     private final WoNumberPoolService woNumberPoolService;
     private final WorkRequestTypeService workRequestTypeService;
+    private final WorkOrderTypeTemplateRepository workOrderTypeTemplateRepository;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
@@ -135,11 +138,26 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
                 null
         );
 
+        WorkOrderTypeTemplate woType = null;
+        if (request.getWorkOrderTypeId() != null) {
+            woType = workOrderTypeTemplateRepository.findById(request.getWorkOrderTypeId())
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order type not found"));
+            if (!woType.isActive()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order type is inactive");
+            }
+        }
+
+        String glAccount = trim(request.getGlAccount());
+        String utilityAccount = trim(request.getUtilityAccount());
+        if (glAccount == null && woType != null) glAccount = woType.getDefaultGlAccount();
+        if (utilityAccount == null && woType != null) utilityAccount = woType.getDefaultUtilityAccount();
+
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
                 .linkedRequest(null)
                 .asset(asset)
                 .workRequestType(workRequestType)
+                .workOrderTypeTemplate(woType)
                 .location(location)
                 .workType(request.getWorkType())
                 .priority(request.getPriority())
@@ -148,6 +166,8 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
                 .planner(null)
                 .assignedTechnician(null)
                 .assignedTeam(null)
+                .glAccount(glAccount)
+                .utilityAccount(utilityAccount)
                 .plannedStartDateTime(null)
                 .plannedEndDateTime(null)
                 .targetCompletionDate(request.getTargetCompletionDate())
@@ -363,6 +383,29 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         validateStatusTransition(wo.getStatus(), WorkOrderStatus.APPROVED);
         wo.setStatus(WorkOrderStatus.APPROVED);
+
+        // set accounting for labor/material from request or template defaults
+        WorkOrderTypeTemplate woType = wo.getWorkOrderTypeTemplate();
+        if (request.getLaborGlAccount() != null) {
+            wo.setLaborGlAccount(trim(request.getLaborGlAccount()));
+        } else if (woType != null && wo.getLaborGlAccount() == null) {
+            wo.setLaborGlAccount(woType.getLaborGlAccount());
+        }
+        if (request.getLaborUtilityAccount() != null) {
+            wo.setLaborUtilityAccount(trim(request.getLaborUtilityAccount()));
+        } else if (woType != null && wo.getLaborUtilityAccount() == null) {
+            wo.setLaborUtilityAccount(woType.getLaborUtilityAccount());
+        }
+        if (request.getInventoryGlAccount() != null) {
+            wo.setInventoryGlAccount(trim(request.getInventoryGlAccount()));
+        } else if (woType != null && wo.getInventoryGlAccount() == null) {
+            wo.setInventoryGlAccount(woType.getInventoryGlAccount());
+        }
+        if (request.getInventoryUtilityAccount() != null) {
+            wo.setInventoryUtilityAccount(trim(request.getInventoryUtilityAccount()));
+        } else if (woType != null && wo.getInventoryUtilityAccount() == null) {
+            wo.setInventoryUtilityAccount(woType.getInventoryUtilityAccount());
+        }
 
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
@@ -1603,6 +1646,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         Technician technician = wo.getAssignedTechnician();
         TechnicianTeam team = wo.getAssignedTeam();
         WorkRequestType workRequestType = wo.getWorkRequestType();
+        WorkOrderTypeTemplate woType = wo.getWorkOrderTypeTemplate();
 
         List<WorkOrderChecklistItemResponse> checklistItems = workOrderChecklistItemRepository.findByWorkOrder_Id(wo.getId()).stream()
                 .map(item -> WorkOrderChecklistItemResponse.builder()
@@ -1666,6 +1710,14 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .assignedTechnicianName(technician != null ? technician.getFullName() : null)
                 .assignedTeamId(team != null ? team.getId() : null)
                 .assignedTeamName(team != null ? team.getTeamName() : null)
+                .workOrderTypeId(woType != null ? woType.getId() : null)
+                .workOrderTypeName(woType != null ? woType.getWorkOrderType() : null)
+                .glAccount(wo.getGlAccount())
+                .utilityAccount(wo.getUtilityAccount())
+                .laborGlAccount(wo.getLaborGlAccount())
+                .laborUtilityAccount(wo.getLaborUtilityAccount())
+                .inventoryGlAccount(wo.getInventoryGlAccount())
+                .inventoryUtilityAccount(wo.getInventoryUtilityAccount())
                 .teamMembers(team != null ? toTeamMemberResponses(team) : null)
                 .plannedStartDateTime(wo.getPlannedStartDateTime())
                 .plannedEndDateTime(wo.getPlannedEndDateTime())
