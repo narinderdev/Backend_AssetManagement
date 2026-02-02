@@ -2,6 +2,7 @@ package com.example.eam.WorkOrder.Dto;
 
 
 import com.example.eam.Enum.*;
+import com.example.eam.Asset.Dto.AssetWarrantyLifecycleDto;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
 import lombok.Builder;
@@ -25,10 +26,11 @@ import java.util.List;
         "pmPlanCode",
         "pmDueDate",
         "emergencyIncidentId",
-        "assetDbId",
-        "assetId",
-        "assetName",
-        "location",
+         "assetDbId",
+         "assetId",
+         "assetName",
+         "warrantyLifecycle",
+         "location",
         "workType",
         "priority",
         "workRequestTypeId",
@@ -109,6 +111,7 @@ public class WorkOrderDetailsResponse {
     private Long assetDbId;                  // Asset.id
     private String assetId;                  // Asset.assetId (business id)
     private String assetName;
+    private AssetWarrantyLifecycleDto warrantyLifecycle;
 
     private String location;
 

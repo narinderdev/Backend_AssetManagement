@@ -2,6 +2,8 @@ package com.example.eam.WorkOrder.Service;
 
 
 import com.example.eam.Asset.Entity.Asset;
+import com.example.eam.Asset.Entity.AssetWarrantyLifecycle;
+import com.example.eam.Asset.Dto.AssetWarrantyLifecycleDto;
 import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
@@ -1648,6 +1650,21 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         WorkRequestType workRequestType = wo.getWorkRequestType();
         WorkOrderTypeTemplate woType = wo.getWorkOrderTypeTemplate();
 
+        AssetWarrantyLifecycleDto warrantyDto = null;
+        AssetWarrantyLifecycle wl = asset != null ? asset.getWarrantyLifecycle() : null;
+        if (wl != null) {
+            warrantyDto = new AssetWarrantyLifecycleDto();
+            warrantyDto.setCommissioningDate(wl.getCommissioningDate());
+            warrantyDto.setWarrantyStart(wl.getWarrantyStart());
+            warrantyDto.setWarrantyEnd(wl.getWarrantyEnd());
+            warrantyDto.setWarrantyProvider(wl.getWarrantyProvider());
+            warrantyDto.setServiceContract(wl.getServiceContract());
+            warrantyDto.setExpectedUsefulLifeYears(wl.getExpectedUsefulLifeYears());
+            warrantyDto.setPlannedReplacementDate(wl.getPlannedReplacementDate());
+            warrantyDto.setLastMaintenanceDate(wl.getLastMaintenanceDate());
+            warrantyDto.setNextPlannedMaintenance(wl.getNextPlannedMaintenance());
+        }
+
         List<WorkOrderChecklistItemResponse> checklistItems = workOrderChecklistItemRepository.findByWorkOrder_Id(wo.getId()).stream()
                 .map(item -> WorkOrderChecklistItemResponse.builder()
                         .id(item.getId())
@@ -1697,6 +1714,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .assetDbId(asset != null ? asset.getId() : null)
                 .assetId(asset != null ? asset.getAssetId() : null)
                 .assetName(asset != null ? asset.getAssetName() : null)
+                .warrantyLifecycle(warrantyDto)
                 .location(wo.getLocation())
                 .workType(wo.getWorkType())
                 .priority(wo.getPriority())
