@@ -18,4 +18,6 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
     long countByCriticalityAndStatusIn(AssetCriticality criticality, Collection<AssetStatus> statuses);
 
     List<Asset> findByAssetTypeRef_Id(Long assetTypeId);
+
+    boolean existsByAssetTypeRef_Id(Long assetTypeId);
 }

@@ -13,4 +13,8 @@ public interface AssetTypeRepository extends JpaRepository<AssetType, Long> {
     boolean existsByCodeIgnoreCase(String code);
 
     boolean existsByNameIgnoreCase(String name);
+
+    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+
+    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
 }
