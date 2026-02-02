@@ -89,7 +89,7 @@ public class PurchaseOrderService {
                 .shipToWarehouseId(shipping.warehouseId)
                 .shipToWorkOrderId(shipping.workOrderId)
                 .status(PurchaseOrderStatus.ISSUED)
-                .expectedDeliveryDate(request.getExpectedDeliveryDate())
+                .requiredDeliveryDate(request.getRequiredDeliveryDate())
                 .remarks(trim(request.getRemarks()))
                 .createdByUserId(requireText(request.getCreatedByUserId(), "createdByUserId is required"))
                 .build();
@@ -167,7 +167,7 @@ public class PurchaseOrderService {
                 .shipToWarehouseId(shipping.warehouseId)
                 .shipToWorkOrderId(shipping.workOrderId)
                 .status(PurchaseOrderStatus.ISSUED)
-                .expectedDeliveryDate(request.getExpectedDeliveryDate())
+                .requiredDeliveryDate(request.getRequiredDeliveryDate())
                 .remarks(trim(request.getRemarks()))
                 .createdByUserId(requireText(request.getCreatedByUserId(), "createdByUserId is required"))
                 .build();
@@ -343,7 +343,7 @@ public class PurchaseOrderService {
                 .shipToWorkOrderId(po.getShipToWorkOrderId())
                 .status(po.getStatus())
                 .glAccountString(po.getGlAccountString())
-                .expectedDeliveryDate(po.getExpectedDeliveryDate())
+                .requiredDeliveryDate(po.getRequiredDeliveryDate())
                 .remarks(po.getRemarks())
                 .createdByUserId(po.getCreatedByUserId())
                 .createdAt(po.getCreatedAt())

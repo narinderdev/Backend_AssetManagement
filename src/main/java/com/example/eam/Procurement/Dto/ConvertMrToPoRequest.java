@@ -23,7 +23,7 @@ public class ConvertMrToPoRequest {
     @NotBlank
     private String createdByUserId;
 
-    private LocalDate expectedDeliveryDate;
+    private LocalDate requiredDeliveryDate;
 
     private String remarks;
 

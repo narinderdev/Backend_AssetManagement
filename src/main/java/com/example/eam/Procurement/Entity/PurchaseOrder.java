@@ -63,8 +63,9 @@ public class PurchaseOrder {
     @Builder.Default
     private PurchaseOrderStatus status = PurchaseOrderStatus.ISSUED;
 
+    // Keep column name for backward compatibility; semantic name is now "required delivery date".
     @Column(name = "expected_delivery_date")
-    private LocalDate expectedDeliveryDate;
+    private LocalDate requiredDeliveryDate;
 
     @Column(name = "remarks", length = 1000)
     private String remarks;

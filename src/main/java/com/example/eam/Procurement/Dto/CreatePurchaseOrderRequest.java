@@ -26,7 +26,7 @@ public class CreatePurchaseOrderRequest {
 
     private Long mrId;
 
-    private LocalDate expectedDeliveryDate;
+    private LocalDate requiredDeliveryDate;
 
     private String remarks;
 
