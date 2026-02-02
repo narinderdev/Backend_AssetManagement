@@ -24,6 +24,11 @@ import lombok.Data;
     "shortDescription",
     "ownership",
     "parentAssetId",
+    "functionalClass",
+    "retirementUnit",
+    "utilityAccount",
+    "propertyGroup",
+    "serialNumber",
     "location",
     "predictiveThresholds",
     "technicalDetails",
@@ -47,6 +52,11 @@ public class AssetDetailsResponse {
     private AssetCriticality criticality;
     private String ownership;
     private String assetTag;
+    private String functionalClass;
+    private String retirementUnit;
+    private String utilityAccount;
+    private String propertyGroup;
+    private String serialNumber;
 
     private AssetLocationDto location;
     private java.util.List<com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse> predictiveThresholds;

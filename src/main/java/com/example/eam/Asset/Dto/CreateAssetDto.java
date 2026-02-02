@@ -32,5 +32,20 @@ public class CreateAssetDto {
     private AssetCriticality criticality;
     private String ownership;
     private String assetTag;         // Tag / Barcode / RFID
+
+    @Size(max = 128)
+    private String functionalClass;
+
+    @Size(max = 128)
+    private String retirementUnit;
+
+    @Size(max = 128)
+    private String utilityAccount;
+
+    @Size(max = 128)
+    private String propertyGroup;
+
+    @Size(max = 128)
+    private String serialNumber;
 }
 

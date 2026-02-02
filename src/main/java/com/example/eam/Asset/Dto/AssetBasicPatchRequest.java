@@ -18,5 +18,10 @@ public class AssetBasicPatchRequest {
     private AssetCriticality criticality;
     private String ownership;
     private String assetTag;
+    private String functionalClass;
+    private String retirementUnit;
+    private String utilityAccount;
+    private String propertyGroup;
+    private String serialNumber;
 }
 

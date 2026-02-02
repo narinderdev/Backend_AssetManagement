@@ -65,6 +65,21 @@ public class Asset {
     @Column(name = "asset_tag", length = 128)
     private String assetTag; // Tag / Barcode / RFID
 
+    @Column(name = "functional_class", length = 128)
+    private String functionalClass;
+
+    @Column(name = "retirement_unit", length = 128)
+    private String retirementUnit;
+
+    @Column(name = "utility_account", length = 128)
+    private String utilityAccount;
+
+    @Column(name = "property_group", length = 128)
+    private String propertyGroup;
+
+    @Column(name = "serial_number", length = 128)
+    private String serialNumber;
+
     // 1:1 sections
     @OneToOne(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private AssetLocation location;

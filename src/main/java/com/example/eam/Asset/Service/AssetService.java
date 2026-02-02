@@ -81,6 +81,11 @@ public class AssetService {
                         : assetType != null ? assetType.getDefaultCriticality() : null)
                 .ownership(request.getOwnership())
                 .assetTag(request.getAssetTag())
+                .functionalClass(request.getFunctionalClass())
+                .retirementUnit(request.getRetirementUnit())
+                .utilityAccount(request.getUtilityAccount())
+                .propertyGroup(request.getPropertyGroup())
+                .serialNumber(request.getSerialNumber())
                 .build();
 
         Asset saved = assetRepository.save(asset);
@@ -269,6 +274,11 @@ public class AssetService {
             }
             updateIfNotNull(basic.getOwnership(), asset::setOwnership);
             updateIfNotNull(basic.getAssetTag(), asset::setAssetTag);
+            updateIfNotNull(basic.getFunctionalClass(), asset::setFunctionalClass);
+            updateIfNotNull(basic.getRetirementUnit(), asset::setRetirementUnit);
+            updateIfNotNull(basic.getUtilityAccount(), asset::setUtilityAccount);
+            updateIfNotNull(basic.getPropertyGroup(), asset::setPropertyGroup);
+            updateIfNotNull(basic.getSerialNumber(), asset::setSerialNumber);
             if (basic.getStatus() != null) {
                 asset.setStatus(basic.getStatus());
             }
@@ -688,6 +698,11 @@ public class AssetService {
                 .criticality(asset.getCriticality())
                 .ownership(asset.getOwnership())
                 .assetTag(asset.getAssetTag())
+                .functionalClass(asset.getFunctionalClass())
+                .retirementUnit(asset.getRetirementUnit())
+                .utilityAccount(asset.getUtilityAccount())
+                .propertyGroup(asset.getPropertyGroup())
+                .serialNumber(asset.getSerialNumber())
                 .location(locDto)
                 .predictiveThresholds(predictiveThresholds)
                 .technicalDetails(techDto)
