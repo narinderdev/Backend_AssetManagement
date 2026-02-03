@@ -85,4 +85,25 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             LocalDateTime start,
             LocalDateTime end
     );
+
+    @Query("""
+        select wo from WorkOrder wo
+        where wo.deleted = false
+          and wo.plannedStartDateTime is not null
+          and wo.plannedEndDateTime is not null
+          and wo.status in :statuses
+          and wo.plannedEndDateTime > :rangeStart
+          and wo.plannedStartDateTime < :rangeEnd
+          and (
+                (:technicianId is not null and wo.assignedTechnician.id = :technicianId)
+             or (:teamId is not null and wo.assignedTeam.id = :teamId)
+          )
+    """)
+    List<WorkOrder> findBookingsForAssignments(
+            @Param("technicianId") Long technicianId,
+            @Param("teamId") Long teamId,
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEnd") LocalDateTime rangeEnd,
+            @Param("statuses") Collection<WorkOrderStatus> statuses
+    );
 }

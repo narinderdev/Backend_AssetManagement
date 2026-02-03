@@ -478,6 +478,18 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return toDetailsResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getTechnicianAvailability(Long technicianId, WorkOrderAvailabilityRequest request) {
+        Technician technician = resolveTechnician(technicianId);
+        return computeAvailabilitySlots(technicianId, null, technician, null, request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getTeamAvailability(Long teamId, WorkOrderAvailabilityRequest request) {
+        TechnicianTeam team = resolveTeam(teamId);
+        return computeAvailabilitySlots(null, teamId, null, team, request);
+    }
+
     @Transactional
     public WorkOrderDetailsResponse markInProgress(Long id, WorkOrderInProgressRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
@@ -1557,6 +1569,99 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         if (right == null) return left;
         return left.add(right);
     }
+
+    private List<AvailabilitySlotResponse> computeAvailabilitySlots(Long technicianId,
+                                                                    Long teamId,
+                                                                    Technician technician,
+                                                                    TechnicianTeam team,
+                                                                    WorkOrderAvailabilityRequest request) {
+        LocalDate fromDate = request.getFromDate() != null ? request.getFromDate() : LocalDate.now();
+        LocalDate toDate = request.getToDate() != null ? request.getToDate() : fromDate.plusDays(14);
+        if (toDate.isBefore(fromDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "toDate must be on or after fromDate");
+        }
+
+        int slotMinutes = request.getSlotMinutes() != null ? request.getSlotMinutes() : 60;
+        if (slotMinutes <= 0 || slotMinutes > 24 * 60) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "slotMinutes must be between 1 and 1440");
+        }
+
+        LocalDateTime rangeStart = fromDate.atStartOfDay();
+        LocalDateTime rangeEnd = toDate.plusDays(1).atStartOfDay(); // inclusive end-of-day
+
+        List<WorkOrder> bookings = workOrderRepository.findBookingsForAssignments(
+                technicianId,
+                teamId,
+                rangeStart,
+                rangeEnd,
+                Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+
+        List<TimeWindow> mergedBusy = mergeIntervals(
+                bookings.stream()
+                        .map(wo -> new TimeWindow(wo.getPlannedStartDateTime(), wo.getPlannedEndDateTime()))
+                        .sorted(Comparator.comparing(TimeWindow::start))
+                        .toList()
+        );
+
+        List<TimeWindow> freeWindows = computeFreeWindows(rangeStart, rangeEnd, mergedBusy);
+
+        List<AvailabilitySlotResponse> slots = new ArrayList<>();
+        for (TimeWindow window : freeWindows) {
+            LocalDateTime cursor = window.start();
+            while (cursor.plusMinutes(slotMinutes).isBefore(window.end()) || cursor.plusMinutes(slotMinutes).equals(window.end())) {
+                LocalDateTime slotEnd = cursor.plusMinutes(slotMinutes);
+                slots.add(AvailabilitySlotResponse.builder()
+                        .start(cursor)
+                        .end(slotEnd)
+                        .technicianId(technician != null ? technician.getId() : null)
+                        .technicianName(technician != null ? technician.getFullName() : null)
+                        .teamId(team != null ? team.getId() : null)
+                        .teamName(team != null ? team.getTeamName() : null)
+                        .build());
+                cursor = slotEnd;
+            }
+        }
+        return slots;
+    }
+
+    private List<TimeWindow> mergeIntervals(List<TimeWindow> intervals) {
+        if (intervals.isEmpty()) return List.of();
+        List<TimeWindow> merged = new ArrayList<>();
+        TimeWindow current = intervals.get(0);
+
+        for (int i = 1; i < intervals.size(); i++) {
+            TimeWindow next = intervals.get(i);
+            if (!next.start().isAfter(current.end())) {
+                LocalDateTime newEnd = next.end().isAfter(current.end()) ? next.end() : current.end();
+                current = new TimeWindow(current.start(), newEnd);
+            } else {
+                merged.add(current);
+                current = next;
+            }
+        }
+        merged.add(current);
+        return merged;
+    }
+
+    private List<TimeWindow> computeFreeWindows(LocalDateTime rangeStart, LocalDateTime rangeEnd, List<TimeWindow> busy) {
+        List<TimeWindow> free = new ArrayList<>();
+        LocalDateTime cursor = rangeStart;
+        for (TimeWindow block : busy) {
+            if (cursor.isBefore(block.start())) {
+                free.add(new TimeWindow(cursor, block.start()));
+            }
+            if (cursor.isBefore(block.end())) {
+                cursor = block.end();
+            }
+        }
+        if (cursor.isBefore(rangeEnd)) {
+            free.add(new TimeWindow(cursor, rangeEnd));
+        }
+        return free;
+    }
+
+    private record TimeWindow(LocalDateTime start, LocalDateTime end) { }
 
     private String trim(String val) {
         if (val == null) return null;

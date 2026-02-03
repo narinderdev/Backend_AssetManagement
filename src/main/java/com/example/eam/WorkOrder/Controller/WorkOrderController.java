@@ -63,6 +63,24 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order scheduled", data));
     }
 
+    @PostMapping("/availability/technician/{technicianId}")
+    public ResponseEntity<ApiResponse<java.util.List<AvailabilitySlotResponse>>> technicianAvailability(
+            @PathVariable Long technicianId,
+            @Valid @RequestBody WorkOrderAvailabilityRequest request
+    ) {
+        java.util.List<AvailabilitySlotResponse> data = workOrderService.getTechnicianAvailability(technicianId, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician availability slots fetched", data));
+    }
+
+    @PostMapping("/availability/team/{teamId}")
+    public ResponseEntity<ApiResponse<java.util.List<AvailabilitySlotResponse>>> teamAvailability(
+            @PathVariable Long teamId,
+            @Valid @RequestBody WorkOrderAvailabilityRequest request
+    ) {
+        java.util.List<AvailabilitySlotResponse> data = workOrderService.getTeamAvailability(teamId, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team availability slots fetched", data));
+    }
+
     @PostMapping("/{id}/in-progress")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> markInProgress(
             @PathVariable Long id,
