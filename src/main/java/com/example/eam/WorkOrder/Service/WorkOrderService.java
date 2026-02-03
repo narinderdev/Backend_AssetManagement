@@ -1582,8 +1582,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         }
 
         int slotMinutes = request.getSlotMinutes() != null ? request.getSlotMinutes() : 60;
-        if (slotMinutes <= 0 || slotMinutes > 24 * 60) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "slotMinutes must be between 1 and 1440");
+        if (slotMinutes <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "slotMinutes must be greater than 0");
         }
 
         LocalDateTime rangeStart = fromDate.atStartOfDay();
