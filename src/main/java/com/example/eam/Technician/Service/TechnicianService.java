@@ -2,12 +2,15 @@ package com.example.eam.Technician.Service;
 
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
+import com.example.eam.Enum.TechnicianWorkStatus;
+import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -17,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
 import java.util.List;
 
 @Service
@@ -25,6 +30,7 @@ public class TechnicianService {
 
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamMemberRepository teamMemberRepository;
+    private final WorkOrderRepository workOrderRepository;
 
     @Transactional
     public TechnicianDetailsResponse createTechnician(TechnicianCreateRequest request) {
@@ -168,6 +174,7 @@ public class TechnicianService {
 
     private TechnicianDetailsResponse toDetailsResponse(Technician technician) {
         List<TechnicianTeamMembershipResponse> teamMemberships = buildTeamMemberships(technician);
+        TechnicianWorkStatus workStatusToday = computeWorkStatusToday(technician.getId());
 
         return TechnicianDetailsResponse.builder()
                 .id(technician.getId())
@@ -182,6 +189,7 @@ public class TechnicianService {
                 .email(technician.getEmail())
                 .address(technician.getAddress())
                 .status(technician.getStatus())
+                .workStatus(workStatusToday)
                 .hireDate(technician.getHireDate())
                 .workShift(technician.getWorkShift())
                 .technicianPhotoUrl(technician.getTechnicianPhotoUrl())
@@ -194,6 +202,21 @@ public class TechnicianService {
                 .teamLeader(teamMemberships.stream().anyMatch(TechnicianTeamMembershipResponse::isTeamLeader))
                 .teamMemberships(teamMemberships)
                 .build();
+    }
+
+    private TechnicianWorkStatus computeWorkStatusToday(Long technicianId) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+        long activeBookings = workOrderRepository.countActiveBookingsForTechnician(
+                technicianId,
+                start,
+                end,
+                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+
+        return activeBookings > 0 ? TechnicianWorkStatus.WORKING : TechnicianWorkStatus.AVAILABLE;
     }
 
     private List<TechnicianTeamMembershipResponse> buildTeamMemberships(Technician technician) {

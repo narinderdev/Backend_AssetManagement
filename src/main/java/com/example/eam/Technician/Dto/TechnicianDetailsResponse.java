@@ -2,6 +2,7 @@ package com.example.eam.Technician.Dto;
 
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
+import com.example.eam.Enum.TechnicianWorkStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -24,6 +25,7 @@ public class TechnicianDetailsResponse {
     private String email;
     private String address;
     private TechnicianStatus status;
+    private TechnicianWorkStatus workStatus;
     private LocalDate hireDate;
     private String workShift;
     private String technicianPhotoUrl;

@@ -87,6 +87,26 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     );
 
     @Query("""
+        select count(distinct wo.id) from WorkOrder wo
+        left join com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember tm
+            on tm.team = wo.assignedTeam
+        where wo.deleted = false
+          and wo.status in :statuses
+          and wo.plannedEndDateTime > :rangeStart
+          and wo.plannedStartDateTime < :rangeEnd
+          and (
+                wo.assignedTechnician.id = :technicianId
+             or tm.technician.id = :technicianId
+          )
+    """)
+    long countActiveBookingsForTechnician(
+            @Param("technicianId") Long technicianId,
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEnd") LocalDateTime rangeEnd,
+            @Param("statuses") Collection<WorkOrderStatus> statuses
+    );
+
+    @Query("""
         select wo from WorkOrder wo
         where wo.deleted = false
           and wo.plannedStartDateTime is not null
