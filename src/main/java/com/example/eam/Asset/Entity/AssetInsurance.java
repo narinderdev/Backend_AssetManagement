@@ -2,6 +2,7 @@ package com.example.eam.Asset.Entity;
 
 
 import com.example.eam.Enum.InsuranceStatus;
+import com.example.eam.Enum.InsurancePolicyType;
 import jakarta.persistence.*;
 import lombok.*;
 
@@ -41,8 +42,9 @@ public class AssetInsurance {
     @Column(name = "insurance_status", nullable = false, length = 32)
     private InsuranceStatus insuranceStatus;
 
+    @Enumerated(EnumType.STRING)
     @Column(name = "policy_type", length = 128)
-    private String policyType;
+    private InsurancePolicyType policyType;
 
     @Column(name = "certificate_url", length = 512)
     private String certificateUrl;

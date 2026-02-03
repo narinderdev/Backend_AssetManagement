@@ -2,6 +2,7 @@ package com.example.eam.Asset.Dto;
 
 
 import com.example.eam.Enum.InsuranceStatus;
+import com.example.eam.Enum.InsurancePolicyType;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
@@ -25,7 +26,7 @@ public class AssetInsuranceDto {
     private LocalDate policyExpiryDate;
 
     private InsuranceStatus insuranceStatus;
-    private String policyType;
+    private InsurancePolicyType policyType;
     private String certificateUrl;
     private BigDecimal coverageAmount;
     private BigDecimal premiumAmount;
