@@ -1659,7 +1659,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             warrantyDto.setWarrantyEnd(wl.getWarrantyEnd());
             warrantyDto.setWarrantyProvider(wl.getWarrantyProvider());
             warrantyDto.setServiceContract(wl.getServiceContract());
-            warrantyDto.setExpectedUsefulLifeYears(wl.getExpectedUsefulLifeYears());
             warrantyDto.setPlannedReplacementDate(wl.getPlannedReplacementDate());
             warrantyDto.setLastMaintenanceDate(wl.getLastMaintenanceDate());
             warrantyDto.setNextPlannedMaintenance(wl.getNextPlannedMaintenance());

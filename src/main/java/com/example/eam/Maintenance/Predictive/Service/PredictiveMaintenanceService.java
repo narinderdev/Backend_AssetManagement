@@ -175,7 +175,8 @@ public class PredictiveMaintenanceService {
 
         if (severity == null) return;
 
-        if (threshold.getLastTriggeredAt() != null && threshold.getCooldownHours() != null) {
+        boolean skipCooldown = MeterType.TEMPERATURE.equals(threshold.getMeterType());
+        if (!skipCooldown && threshold.getLastTriggeredAt() != null && threshold.getCooldownHours() != null) {
             LocalDateTime nextAllowed = threshold.getLastTriggeredAt().plusHours(threshold.getCooldownHours());
             if (now.isBefore(nextAllowed)) {
                 return;
