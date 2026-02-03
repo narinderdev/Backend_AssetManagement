@@ -180,7 +180,6 @@ public class AssetService {
         wl.setWarrantyEnd(dto.getWarrantyEnd());
         wl.setWarrantyProvider(dto.getWarrantyProvider());
         wl.setServiceContract(dto.getServiceContract());
-        wl.setExpectedUsefulLifeYears(dto.getExpectedUsefulLifeYears());
         wl.setPlannedReplacementDate(dto.getPlannedReplacementDate());
         wl.setLastMaintenanceDate(dto.getLastMaintenanceDate());
         wl.setNextPlannedMaintenance(dto.getNextPlannedMaintenance());
@@ -374,7 +373,6 @@ public class AssetService {
             updateIfNotNull(dto.getWarrantyEnd(), wl::setWarrantyEnd);
             updateIfNotNull(dto.getWarrantyProvider(), wl::setWarrantyProvider);
             updateIfNotNull(dto.getServiceContract(), wl::setServiceContract);
-            updateIfNotNull(dto.getExpectedUsefulLifeYears(), wl::setExpectedUsefulLifeYears);
             updateIfNotNull(dto.getPlannedReplacementDate(), wl::setPlannedReplacementDate);
             updateIfNotNull(dto.getLastMaintenanceDate(), wl::setLastMaintenanceDate);
             updateIfNotNull(dto.getNextPlannedMaintenance(), wl::setNextPlannedMaintenance);
@@ -637,7 +635,6 @@ public class AssetService {
             wlDto.setWarrantyEnd(wl.getWarrantyEnd());
             wlDto.setWarrantyProvider(wl.getWarrantyProvider());
             wlDto.setServiceContract(wl.getServiceContract());
-            wlDto.setExpectedUsefulLifeYears(wl.getExpectedUsefulLifeYears());
             wlDto.setPlannedReplacementDate(wl.getPlannedReplacementDate());
             wlDto.setLastMaintenanceDate(wl.getLastMaintenanceDate());
             wlDto.setNextPlannedMaintenance(wl.getNextPlannedMaintenance());

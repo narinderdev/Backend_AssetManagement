@@ -13,7 +13,6 @@ public class AssetWarrantyLifecycleDto {
     private LocalDate warrantyEnd;           // from duplicate Warranty Start
     private String warrantyProvider;
     private String serviceContract;
-    private Integer expectedUsefulLifeYears;
     private LocalDate plannedReplacementDate;
     private LocalDate lastMaintenanceDate;
     private LocalDate nextPlannedMaintenance;

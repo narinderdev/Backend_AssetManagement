@@ -38,9 +38,6 @@ public class AssetWarrantyLifecycle {
     @Column(name = "service_contract", length = 255)
     private String serviceContract;
 
-    @Column(name = "expected_useful_life_years")
-    private Integer expectedUsefulLifeYears;
-
     @Column(name = "planned_replacement_date")
     private LocalDate plannedReplacementDate;
 
