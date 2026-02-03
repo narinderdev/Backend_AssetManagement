@@ -38,6 +38,15 @@ public class TechnicianController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technicians fetched successfully", data));
     }
 
+    @GetMapping("/{id}/availability/monthly")
+    public ResponseEntity<ApiResponse<java.util.List<DailyAvailabilityDto>>> monthlyAvailability(
+            @PathVariable Long id,
+            @RequestParam(name = "days", required = false) Integer daysAhead
+    ) {
+        java.util.List<DailyAvailabilityDto> data = technicianService.getMonthlyAvailability(id, daysAhead);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician monthly availability fetched", data));
+    }
+
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<TechnicianDetailsResponse>> patch(@PathVariable Long id,
                                                                         @RequestBody TechnicianPatchRequest request) {

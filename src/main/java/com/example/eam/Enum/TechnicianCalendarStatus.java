@@ -1,0 +1,8 @@
+package com.example.eam.Enum;
+
+public enum TechnicianCalendarStatus {
+    AVAILABLE,
+    WORKING,
+    LEAVE,
+    HOLIDAY
+}

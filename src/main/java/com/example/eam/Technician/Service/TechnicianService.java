@@ -3,6 +3,7 @@ package com.example.eam.Technician.Service;
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
 import com.example.eam.Enum.TechnicianWorkStatus;
+import com.example.eam.Enum.TechnicianCalendarStatus;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
@@ -21,8 +22,11 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.ArrayList;
 import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.HashMap;
 
 @Service
 @RequiredArgsConstructor
@@ -94,6 +98,57 @@ public class TechnicianService {
                 .totalPages(page.getTotalPages())
                 .last(page.isLast())
                 .build();
+    }
+
+    @Transactional(readOnly = true)
+    public List<DailyAvailabilityDto> getMonthlyAvailability(Long technicianId, Integer daysAhead) {
+        Technician tech = getTechnicianOrThrow(technicianId);
+        int days = (daysAhead == null || daysAhead < 1) ? 31 : daysAhead;
+
+        LocalDate startDate = LocalDate.now();
+        LocalDate endDate = startDate.plusDays(days); // exclusive
+
+        // Seed calendar with base status (Sunday -> HOLIDAY, others -> AVAILABLE)
+        Map<LocalDate, TechnicianCalendarStatus> calendar = new HashMap<>();
+        for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
+            TechnicianCalendarStatus base = d.getDayOfWeek().getValue() == 7
+                    ? TechnicianCalendarStatus.HOLIDAY
+                    : TechnicianCalendarStatus.AVAILABLE;
+            calendar.put(d, base);
+        }
+
+        // TODO: integrate technician leave/holiday tables when available
+        // markLeaveAndHolidays(calendar, technicianId, startDate, endDate);
+
+        // Mark working days from booked work orders (direct or via team)
+        List<com.example.eam.WorkOrder.Entity.WorkOrder> bookings =
+                workOrderRepository.findBookingsForTechnicianCalendar(
+                        technicianId,
+                        startDate.atStartOfDay(),
+                        endDate.atStartOfDay(),
+                        EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                );
+
+        for (var wo : bookings) {
+            LocalDate workStart = wo.getPlannedStartDateTime().toLocalDate();
+            LocalDate workEnd = wo.getPlannedEndDateTime().toLocalDate();
+            LocalDate cursor = workStart;
+            while (!cursor.isAfter(workEnd)) {
+                if (!cursor.isBefore(startDate) && cursor.isBefore(endDate)) {
+                    calendar.put(cursor, TechnicianCalendarStatus.WORKING);
+                }
+                cursor = cursor.plusDays(1);
+            }
+        }
+
+        List<DailyAvailabilityDto> result = new ArrayList<>();
+        for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
+            result.add(DailyAvailabilityDto.builder()
+                    .date(d)
+                    .status(calendar.get(d))
+                    .build());
+        }
+        return result;
     }
 
     @Transactional
