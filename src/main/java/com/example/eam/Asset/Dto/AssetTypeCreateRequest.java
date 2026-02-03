@@ -17,6 +17,8 @@ public class AssetTypeCreateRequest {
     private Long assetCategoryId;
     private AssetCriticality defaultCriticality;
     private String defaultGlAccount;
+    private String utilityAccount;
+    private String retirementAccount;
     private Boolean insuranceRequired;
     private Boolean active;
 }

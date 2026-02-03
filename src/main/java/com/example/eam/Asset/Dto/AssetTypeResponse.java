@@ -15,6 +15,8 @@ public class AssetTypeResponse {
     private String assetCategory;
     private AssetCriticality defaultCriticality;
     private String defaultGlAccount;
+    private String utilityAccount;
+    private String retirementAccount;
     private Boolean insuranceRequired;
     private Boolean active;
 }

@@ -39,6 +39,12 @@ public class AssetType {
     @Column(name = "default_gl_account", length = 255)
     private String defaultGlAccount;
 
+    @Column(name = "utility_account", length = 128)
+    private String utilityAccount;
+
+    @Column(name = "retirement_account", length = 128)
+    private String retirementAccount;
+
     @Column(name = "insurance_required", nullable = false)
     private Boolean insuranceRequired;
 

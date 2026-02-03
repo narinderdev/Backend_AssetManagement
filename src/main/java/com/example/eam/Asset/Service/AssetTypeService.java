@@ -60,6 +60,8 @@ public class AssetTypeService {
                 .assetCategory(category)
                 .defaultCriticality(request.getDefaultCriticality())
                 .defaultGlAccount(trimToNull(request.getDefaultGlAccount()))
+                .utilityAccount(trimToNull(request.getUtilityAccount()))
+                .retirementAccount(trimToNull(request.getRetirementAccount()))
                 .insuranceRequired(request.getInsuranceRequired() != null ? request.getInsuranceRequired() : Boolean.FALSE)
                 .active(request.getActive() != null ? request.getActive() : Boolean.TRUE)
                 .build();
@@ -107,6 +109,8 @@ public class AssetTypeService {
         existing.setAssetCategory(category);
         existing.setDefaultCriticality(request.getDefaultCriticality());
         existing.setDefaultGlAccount(trimToNull(request.getDefaultGlAccount()));
+        existing.setUtilityAccount(trimToNull(request.getUtilityAccount()));
+        existing.setRetirementAccount(trimToNull(request.getRetirementAccount()));
         existing.setInsuranceRequired(request.getInsuranceRequired() != null ? request.getInsuranceRequired() : Boolean.FALSE);
         existing.setActive(request.getActive() != null ? request.getActive() : Boolean.TRUE);
 
@@ -135,6 +139,8 @@ public class AssetTypeService {
                 .assetCategory(assetType.getAssetCategory() != null ? assetType.getAssetCategory().getName() : null)
                 .defaultCriticality(assetType.getDefaultCriticality())
                 .defaultGlAccount(assetType.getDefaultGlAccount())
+                .utilityAccount(assetType.getUtilityAccount())
+                .retirementAccount(assetType.getRetirementAccount())
                 .insuranceRequired(assetType.getInsuranceRequired())
                 .active(assetType.getActive())
                 .build();
