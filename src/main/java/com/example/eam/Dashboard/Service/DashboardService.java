@@ -6,6 +6,8 @@ import com.example.eam.Enum.ServiceRequestStatus;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
+import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
@@ -20,6 +22,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -47,6 +50,7 @@ public class DashboardService {
     private final WorkOrderRepository workOrderRepository;
     private final ServiceMaintenanceRepository serviceMaintenanceRepository;
     private final MaterialRequisitionRepository materialRequisitionRepository;
+    private final TechnicianRepository technicianRepository;
 
     public DashboardResponse getDashboard() {
         LocalDateTime now = LocalDateTime.now();
@@ -116,6 +120,79 @@ public class DashboardService {
                 .requestsNotAcceptedCount(requestsNotAcceptedCount)
                 .metadata(metadata)
                 .build();
+    }
+
+    public TechnicianDashboardResponse getTechnicianDashboard(Integer limit) {
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+
+        long totalTechnicians = technicianRepository.count();
+
+        // technicians busy today (direct or via team)
+        List<Long> busyIds = workOrderRepository.findDistinctTechnicianIdsWithBookings(
+                start,
+                end,
+                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+
+        long availableToday = totalTechnicians - busyIds.size();
+        long onLeave = 0; // placeholder until leave module available
+
+        long totalWorkOrders = workOrderRepository.countByDeletedFalse();
+
+        int resolvedLimit = resolveLimit(limit);
+        List<TechnicianActivityDto> activities = buildRecentTechnicianActivities(resolvedLimit);
+
+        return TechnicianDashboardResponse.builder()
+                .totalTechnicians(totalTechnicians)
+                .availableToday(Math.max(availableToday, 0))
+                .onLeave(onLeave)
+                .workOrders(totalWorkOrders)
+                .recentActivities(activities)
+                .build();
+    }
+
+    private List<TechnicianActivityDto> buildRecentTechnicianActivities(int limit) {
+        return workOrderRepository.findByDeletedFalseOrderByUpdatedAtDesc(org.springframework.data.domain.PageRequest.of(0, limit)).stream()
+                .map(wo -> {
+                    String technicianName = wo.getAssignedTechnician() != null
+                            ? wo.getAssignedTechnician().getFullName()
+                            : wo.getAssignedTeam() != null ? wo.getAssignedTeam().getTeamName() : "Unassigned";
+
+                    String activity = switch (wo.getStatus()) {
+                        case COMPLETED -> "Completed Work Order #" + wo.getWorkOrderId();
+                        case IN_PROGRESS -> "Started Work Order #" + wo.getWorkOrderId();
+                        case SCHEDULED -> "Scheduled Work Order #" + wo.getWorkOrderId();
+                        default -> "Updated Work Order #" + wo.getWorkOrderId();
+                    };
+
+                    String timeAgo = formatTimeAgo(wo.getUpdatedAt());
+
+                    return TechnicianActivityDto.builder()
+                            .technicianName(technicianName)
+                            .activity(activity)
+                            .timeAgo(timeAgo)
+                            .build();
+                })
+                .toList();
+    }
+
+    private int resolveLimit(Integer limit) {
+        if (limit == null) return 5;
+        if (limit < 1) return 1;
+        return Math.min(limit, 50);
+    }
+
+    private String formatTimeAgo(LocalDateTime time) {
+        if (time == null) return "just now";
+        long minutes = ChronoUnit.MINUTES.between(time, LocalDateTime.now());
+        if (minutes < 1) return "just now";
+        if (minutes < 60) return minutes + " mins ago";
+        long hours = minutes / 60;
+        if (hours < 24) return hours + (hours == 1 ? " hour ago" : " hours ago");
+        long days = hours / 24;
+        return days + (days == 1 ? " day ago" : " days ago");
     }
 
     private SummaryMetric buildMetric(long value, long currentWindow, long previousWindow) {

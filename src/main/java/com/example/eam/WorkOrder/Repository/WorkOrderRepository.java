@@ -148,4 +148,24 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
             @Param("rangeEnd") LocalDateTime rangeEnd,
             @Param("statuses") Collection<WorkOrderStatus> statuses
     );
+
+    @Query("""
+        select distinct
+            coalesce(wo.assignedTechnician.id, tm.technician.id)
+        from WorkOrder wo
+        left join com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember tm
+            on tm.team = wo.assignedTeam
+        where wo.deleted = false
+          and wo.status in :statuses
+          and wo.plannedEndDateTime > :rangeStart
+          and wo.plannedStartDateTime < :rangeEnd
+          and (wo.assignedTechnician.id is not null or tm.technician.id is not null)
+    """)
+    List<Long> findDistinctTechnicianIdsWithBookings(
+            @Param("rangeStart") LocalDateTime rangeStart,
+            @Param("rangeEnd") LocalDateTime rangeEnd,
+            @Param("statuses") Collection<WorkOrderStatus> statuses
+    );
+
+    List<WorkOrder> findByDeletedFalseOrderByUpdatedAtDesc(org.springframework.data.domain.Pageable pageable);
 }
