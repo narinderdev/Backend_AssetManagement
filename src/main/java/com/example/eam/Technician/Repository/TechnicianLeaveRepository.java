@@ -14,6 +14,11 @@ public interface TechnicianLeaveRepository extends JpaRepository<TechnicianLeave
                                                                                     LocalDate startDate,
                                                                                     LocalDate endDate);
 
+    boolean existsByTechnician_IdAndEndDateGreaterThanEqualAndStartDateLessThanEqualAndIdNot(Long technicianId,
+                                                                                             LocalDate startDate,
+                                                                                             LocalDate endDate,
+                                                                                             Long idToExclude);
+
     @Query("""
         select tl from TechnicianLeave tl
         where tl.technician.id = :technicianId
@@ -34,4 +39,19 @@ public interface TechnicianLeaveRepository extends JpaRepository<TechnicianLeave
           and tl.endDate >= :date
     """)
     long countTechniciansOnLeave(@Param("date") LocalDate date);
+
+    List<TechnicianLeave> findByTechnician_IdOrderByStartDateAsc(Long technicianId);
+
+    List<TechnicianLeave> findAllByOrderByStartDateAsc();
+
+    @Query("""
+        select tl from TechnicianLeave tl
+        where tl.endDate >= :rangeStart
+          and tl.startDate < :rangeEnd
+        order by tl.startDate asc
+    """)
+    List<TechnicianLeave> findOverlappingAny(
+            @Param("rangeStart") LocalDate rangeStart,
+            @Param("rangeEnd") LocalDate rangeEnd
+    );
 }

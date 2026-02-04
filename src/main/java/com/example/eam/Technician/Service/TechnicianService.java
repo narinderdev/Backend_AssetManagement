@@ -187,6 +187,95 @@ public class TechnicianService {
         return toLeaveResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public TechnicianLeaveResponse getLeave(Long technicianId, Long leaveId) {
+        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
+        if (!leave.getTechnician().getId().equals(technicianId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
+        }
+        return toLeaveResponse(leave);
+    }
+
+    @Transactional(readOnly = true)
+    public TechnicianLeaveListResponse listLeaves(Long technicianId, LocalDate startDate, LocalDate endDate) {
+        Technician tech = getTechnicianOrThrow(technicianId);
+        List<TechnicianLeave> leaves;
+        if (startDate != null && endDate != null) {
+            LocalDate endExclusive = endDate.plusDays(1);
+            leaves = technicianLeaveRepository.findOverlapping(tech.getId(), startDate, endExclusive);
+        } else {
+            leaves = technicianLeaveRepository.findByTechnician_IdOrderByStartDateAsc(tech.getId());
+        }
+        List<TechnicianLeaveResponse> responses = leaves.stream()
+                .map(this::toLeaveResponse)
+                .toList();
+        return TechnicianLeaveListResponse.builder()
+                .leaves(responses)
+                .build();
+    }
+
+    @Transactional(readOnly = true)
+    public TechnicianLeaveListResponse listAllLeaves(LocalDate startDate, LocalDate endDate) {
+        List<TechnicianLeave> leaves;
+        if (startDate != null && endDate != null) {
+            LocalDate endExclusive = endDate.plusDays(1);
+            leaves = technicianLeaveRepository.findOverlappingAny(startDate, endExclusive);
+        } else {
+            leaves = technicianLeaveRepository.findAllByOrderByStartDateAsc();
+        }
+        List<TechnicianLeaveResponse> responses = leaves.stream()
+                .map(this::toLeaveResponse)
+                .toList();
+        return TechnicianLeaveListResponse.builder()
+                .leaves(responses)
+                .build();
+    }
+
+    @Transactional
+    public TechnicianLeaveResponse patchLeave(Long technicianId, Long leaveId, TechnicianLeavePatchRequest request) {
+        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
+        if (!leave.getTechnician().getId().equals(technicianId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
+        }
+
+        LocalDate newStart = request.getStartDate() != null ? request.getStartDate() : leave.getStartDate();
+        LocalDate newEnd = request.getEndDate() != null ? request.getEndDate() : leave.getEndDate();
+        if (newStart == null || newEnd == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate and endDate are required");
+        }
+        if (newEnd.isBefore(newStart)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate cannot be before startDate");
+        }
+
+        boolean overlaps = technicianLeaveRepository
+                .existsByTechnician_IdAndEndDateGreaterThanEqualAndStartDateLessThanEqualAndIdNot(
+                        technicianId, newStart, newEnd, leaveId);
+        if (overlaps) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Leave dates overlap with an existing leave");
+        }
+
+        leave.setStartDate(newStart);
+        leave.setEndDate(newEnd);
+        if (request.getReason() != null) {
+            leave.setReason(safeTrim(request.getReason()));
+        }
+
+        TechnicianLeave saved = technicianLeaveRepository.save(leave);
+        return toLeaveResponse(saved);
+    }
+
+    @Transactional
+    public void deleteLeave(Long technicianId, Long leaveId) {
+        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
+        if (!leave.getTechnician().getId().equals(technicianId)) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
+        }
+        technicianLeaveRepository.delete(leave);
+    }
+
     @Transactional
     public TechnicianHolidayResponse addHoliday(TechnicianHolidayRequest request) {
         if (technicianHolidayRepository.existsByHolidayDate(request.getHolidayDate())) {
