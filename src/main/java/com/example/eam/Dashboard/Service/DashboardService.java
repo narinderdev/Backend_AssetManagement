@@ -7,6 +7,7 @@ import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
 import com.example.eam.Technician.Repository.TechnicianLeaveRepository;
+import com.example.eam.Technician.Repository.TechnicianHolidayRepository;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
@@ -53,6 +54,7 @@ public class DashboardService {
     private final MaterialRequisitionRepository materialRequisitionRepository;
     private final TechnicianRepository technicianRepository;
     private final TechnicianLeaveRepository technicianLeaveRepository;
+    private final TechnicianHolidayRepository technicianHolidayRepository;
 
     public DashboardResponse getDashboard() {
         LocalDateTime now = LocalDateTime.now();
@@ -131,6 +133,8 @@ public class DashboardService {
 
         long totalTechnicians = technicianRepository.count();
 
+        boolean isHolidayToday = technicianHolidayRepository.existsByHolidayDate(today);
+
         // technicians busy today (direct or via team)
         List<Long> busyIds = workOrderRepository.findDistinctTechnicianIdsWithBookings(
                 start,
@@ -139,7 +143,7 @@ public class DashboardService {
         );
 
         long onLeave = technicianLeaveRepository.countTechniciansOnLeave(today);
-        long availableToday = totalTechnicians - busyIds.size() - onLeave;
+        long availableToday = isHolidayToday ? 0 : totalTechnicians - busyIds.size() - onLeave;
 
         long totalWorkOrders = workOrderRepository.countByDeletedFalse();
 

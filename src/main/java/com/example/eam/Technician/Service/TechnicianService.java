@@ -8,9 +8,11 @@ import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Entity.TechnicianLeave;
+import com.example.eam.Technician.Entity.TechnicianHoliday;
 import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.Technician.Repository.TechnicianLeaveRepository;
+import com.example.eam.Technician.Repository.TechnicianHolidayRepository;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
@@ -37,6 +39,7 @@ public class TechnicianService {
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamMemberRepository teamMemberRepository;
     private final TechnicianLeaveRepository technicianLeaveRepository;
+    private final TechnicianHolidayRepository technicianHolidayRepository;
     private final WorkOrderRepository workOrderRepository;
 
     @Transactional
@@ -142,6 +145,7 @@ public class TechnicianService {
         }
 
         applyLeavesToCalendar(calendar, technicianId, startDate, endDate);
+        applyHolidaysToCalendar(calendar, startDate, endDate);
 
         List<DailyAvailabilityDto> result = new ArrayList<>();
         for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
@@ -181,6 +185,23 @@ public class TechnicianService {
 
         TechnicianLeave saved = technicianLeaveRepository.save(leave);
         return toLeaveResponse(saved);
+    }
+
+    @Transactional
+    public TechnicianHolidayResponse addHoliday(TechnicianHolidayRequest request) {
+        if (technicianHolidayRepository.existsByHolidayDate(request.getHolidayDate())) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Holiday already exists for the given date");
+        }
+
+        TechnicianHoliday holiday = TechnicianHoliday.builder()
+                .holidayName(request.getHolidayName().trim())
+                .holidayType(request.getHolidayType())
+                .holidayDate(request.getHolidayDate())
+                .notes(safeTrim(request.getNotes()))
+                .build();
+
+        TechnicianHoliday saved = technicianHolidayRepository.save(holiday);
+        return toHolidayResponse(saved);
     }
 
     @Transactional
@@ -311,6 +332,17 @@ public class TechnicianService {
                 .build();
     }
 
+    private TechnicianHolidayResponse toHolidayResponse(TechnicianHoliday holiday) {
+        return TechnicianHolidayResponse.builder()
+                .id(holiday.getId())
+                .holidayName(holiday.getHolidayName())
+                .holidayType(holiday.getHolidayType())
+                .holidayDate(holiday.getHolidayDate())
+                .notes(holiday.getNotes())
+                .createdAt(holiday.getCreatedAt())
+                .build();
+    }
+
     private TechnicianWorkStatus computeWorkStatusToday(Long technicianId) {
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
@@ -340,6 +372,16 @@ public class TechnicianService {
             for (LocalDate d = leaveStart; !d.isAfter(leaveEnd); d = d.plusDays(1)) {
                 calendar.put(d, TechnicianCalendarStatus.LEAVE);
             }
+        }
+    }
+
+    private void applyHolidaysToCalendar(Map<LocalDate, TechnicianCalendarStatus> calendar,
+                                         LocalDate rangeStart,
+                                         LocalDate rangeEndExclusive) {
+        List<TechnicianHoliday> holidays = technicianHolidayRepository.findInRange(rangeStart, rangeEndExclusive);
+        for (TechnicianHoliday holiday : holidays) {
+            LocalDate date = holiday.getHolidayDate();
+            calendar.put(date, TechnicianCalendarStatus.HOLIDAY);
         }
     }
 
