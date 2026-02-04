@@ -47,6 +47,14 @@ public class TechnicianController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician monthly availability fetched", data));
     }
 
+    @PostMapping("/{id}/leaves")
+    public ResponseEntity<ApiResponse<TechnicianLeaveResponse>> applyLeave(@PathVariable Long id,
+                                                                           @Valid @RequestBody TechnicianLeaveRequest request) {
+        TechnicianLeaveResponse data = technicianService.applyLeave(id, request);
+        return ResponseEntity.status(HttpStatus.CREATED)
+                .body(ApiResponse.successResponse(HttpStatus.CREATED.value(), "Technician leave applied successfully", data));
+    }
+
     @PatchMapping("/{id}")
     public ResponseEntity<ApiResponse<TechnicianDetailsResponse>> patch(@PathVariable Long id,
                                                                         @RequestBody TechnicianPatchRequest request) {

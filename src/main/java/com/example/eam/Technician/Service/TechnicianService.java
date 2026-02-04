@@ -7,8 +7,10 @@ import com.example.eam.Enum.TechnicianCalendarStatus;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Technician.Dto.*;
 import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.Technician.Entity.TechnicianLeave;
 import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
 import com.example.eam.Technician.Repository.TechnicianRepository;
+import com.example.eam.Technician.Repository.TechnicianLeaveRepository;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
@@ -34,6 +36,7 @@ public class TechnicianService {
 
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamMemberRepository teamMemberRepository;
+    private final TechnicianLeaveRepository technicianLeaveRepository;
     private final WorkOrderRepository workOrderRepository;
 
     @Transactional
@@ -117,9 +120,6 @@ public class TechnicianService {
             calendar.put(d, base);
         }
 
-        // TODO: integrate technician leave/holiday tables when available
-        // markLeaveAndHolidays(calendar, technicianId, startDate, endDate);
-
         // Mark working days from booked work orders (direct or via team)
         List<com.example.eam.WorkOrder.Entity.WorkOrder> bookings =
                 workOrderRepository.findBookingsForTechnicianCalendar(
@@ -141,6 +141,8 @@ public class TechnicianService {
             }
         }
 
+        applyLeavesToCalendar(calendar, technicianId, startDate, endDate);
+
         List<DailyAvailabilityDto> result = new ArrayList<>();
         for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
             result.add(DailyAvailabilityDto.builder()
@@ -149,6 +151,36 @@ public class TechnicianService {
                     .build());
         }
         return result;
+    }
+
+    @Transactional
+    public TechnicianLeaveResponse applyLeave(Long technicianId, TechnicianLeaveRequest request) {
+        Technician technician = getTechnicianOrThrow(technicianId);
+
+        LocalDate start = request.getStartDate();
+        LocalDate end = request.getEndDate();
+        if (start == null || end == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "startDate and endDate are required");
+        }
+        if (end.isBefore(start)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate cannot be before startDate");
+        }
+
+        boolean overlaps = technicianLeaveRepository
+                .existsByTechnician_IdAndEndDateGreaterThanEqualAndStartDateLessThanEqual(technicianId, start, end);
+        if (overlaps) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Leave dates overlap with an existing leave");
+        }
+
+        TechnicianLeave leave = TechnicianLeave.builder()
+                .technician(technician)
+                .startDate(start)
+                .endDate(end)
+                .reason(safeTrim(request.getReason()))
+                .build();
+
+        TechnicianLeave saved = technicianLeaveRepository.save(leave);
+        return toLeaveResponse(saved);
     }
 
     @Transactional
@@ -259,6 +291,26 @@ public class TechnicianService {
                 .build();
     }
 
+    private TechnicianLeaveResponse toLeaveResponse(TechnicianLeave leave) {
+        Technician tech = leave.getTechnician();
+        String fullName = tech.getFullName();
+        if (fullName == null || fullName.isBlank()) {
+            String first = tech.getFirstName() != null ? tech.getFirstName() : "";
+            String last = tech.getLastName() != null ? tech.getLastName() : "";
+            fullName = (first + " " + last).trim();
+        }
+
+        return TechnicianLeaveResponse.builder()
+                .id(leave.getId())
+                .technicianId(tech.getId())
+                .technicianName(fullName == null || fullName.isBlank() ? null : fullName)
+                .startDate(leave.getStartDate())
+                .endDate(leave.getEndDate())
+                .reason(leave.getReason())
+                .createdAt(leave.getCreatedAt())
+                .build();
+    }
+
     private TechnicianWorkStatus computeWorkStatusToday(Long technicianId) {
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
@@ -272,6 +324,23 @@ public class TechnicianService {
         );
 
         return activeBookings > 0 ? TechnicianWorkStatus.WORKING : TechnicianWorkStatus.AVAILABLE;
+    }
+
+    private void applyLeavesToCalendar(Map<LocalDate, TechnicianCalendarStatus> calendar,
+                                       Long technicianId,
+                                       LocalDate rangeStart,
+                                       LocalDate rangeEndExclusive) {
+        List<TechnicianLeave> leaves = technicianLeaveRepository.findOverlapping(technicianId, rangeStart, rangeEndExclusive);
+        for (TechnicianLeave leave : leaves) {
+            LocalDate leaveStart = leave.getStartDate().isBefore(rangeStart) ? rangeStart : leave.getStartDate();
+            LocalDate leaveEnd = leave.getEndDate().isBefore(rangeEndExclusive.minusDays(1))
+                    ? leave.getEndDate()
+                    : rangeEndExclusive.minusDays(1);
+
+            for (LocalDate d = leaveStart; !d.isAfter(leaveEnd); d = d.plusDays(1)) {
+                calendar.put(d, TechnicianCalendarStatus.LEAVE);
+            }
+        }
     }
 
     private List<TechnicianTeamMembershipResponse> buildTeamMemberships(Technician technician) {

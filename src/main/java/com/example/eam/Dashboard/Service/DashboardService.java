@@ -6,6 +6,7 @@ import com.example.eam.Enum.ServiceRequestStatus;
 import com.example.eam.Enum.WorkOrderStatus;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
+import com.example.eam.Technician.Repository.TechnicianLeaveRepository;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
@@ -51,6 +52,7 @@ public class DashboardService {
     private final ServiceMaintenanceRepository serviceMaintenanceRepository;
     private final MaterialRequisitionRepository materialRequisitionRepository;
     private final TechnicianRepository technicianRepository;
+    private final TechnicianLeaveRepository technicianLeaveRepository;
 
     public DashboardResponse getDashboard() {
         LocalDateTime now = LocalDateTime.now();
@@ -136,8 +138,8 @@ public class DashboardService {
                 EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
         );
 
-        long availableToday = totalTechnicians - busyIds.size();
-        long onLeave = 0; // placeholder until leave module available
+        long onLeave = technicianLeaveRepository.countTechniciansOnLeave(today);
+        long availableToday = totalTechnicians - busyIds.size() - onLeave;
 
         long totalWorkOrders = workOrderRepository.countByDeletedFalse();
 
