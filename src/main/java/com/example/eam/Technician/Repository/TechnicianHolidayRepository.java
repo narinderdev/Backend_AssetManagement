@@ -11,6 +11,7 @@ import java.util.List;
 public interface TechnicianHolidayRepository extends JpaRepository<TechnicianHoliday, Long> {
 
     boolean existsByHolidayDate(LocalDate holidayDate);
+    boolean existsByHolidayDateAndIdNot(LocalDate holidayDate, Long id);
 
     @Query("""
         select th from TechnicianHoliday th
@@ -22,4 +23,6 @@ public interface TechnicianHolidayRepository extends JpaRepository<TechnicianHol
             @Param("rangeStart") LocalDate rangeStart,
             @Param("rangeEnd") LocalDate rangeEnd
     );
+
+    List<TechnicianHoliday> findAllByOrderByHolidayDateAsc();
 }

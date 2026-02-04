@@ -204,6 +204,70 @@ public class TechnicianService {
         return toHolidayResponse(saved);
     }
 
+    @Transactional(readOnly = true)
+    public TechnicianHolidayResponse getHoliday(Long id) {
+        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
+        return toHolidayResponse(holiday);
+    }
+
+    @Transactional(readOnly = true)
+    public TechnicianHolidayListResponse listHolidays(LocalDate startDate, LocalDate endDate) {
+        List<TechnicianHoliday> rows;
+        if (startDate != null && endDate != null) {
+            LocalDate endExclusive = endDate.plusDays(1);
+            rows = technicianHolidayRepository.findInRange(startDate, endExclusive);
+        } else {
+            rows = technicianHolidayRepository.findAllByOrderByHolidayDateAsc();
+        }
+        List<TechnicianHolidayResponse> responses = rows.stream()
+                .map(this::toHolidayResponse)
+                .toList();
+        return TechnicianHolidayListResponse.builder()
+                .holidays(responses)
+                .build();
+    }
+
+    @Transactional
+    public TechnicianHolidayResponse patchHoliday(Long id, TechnicianHolidayPatchRequest request) {
+        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
+
+        if (request.getHolidayName() != null) {
+            String name = request.getHolidayName().trim();
+            if (name.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "holidayName cannot be blank");
+            }
+            holiday.setHolidayName(name);
+        }
+
+        if (request.getHolidayType() != null) {
+            holiday.setHolidayType(request.getHolidayType());
+        }
+
+        if (request.getHolidayDate() != null) {
+            LocalDate newDate = request.getHolidayDate();
+            if (technicianHolidayRepository.existsByHolidayDateAndIdNot(newDate, id)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Holiday already exists for the given date");
+            }
+            holiday.setHolidayDate(newDate);
+        }
+
+        if (request.getNotes() != null) {
+            holiday.setNotes(safeTrim(request.getNotes()));
+        }
+
+        TechnicianHoliday saved = technicianHolidayRepository.save(holiday);
+        return toHolidayResponse(saved);
+    }
+
+    @Transactional
+    public void deleteHoliday(Long id) {
+        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
+        technicianHolidayRepository.delete(holiday);
+    }
+
     @Transactional
     public TechnicianDetailsResponse patchTechnician(Long id, TechnicianPatchRequest request) {
         Technician technician = getTechnicianOrThrow(id);
