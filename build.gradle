@@ -60,6 +60,11 @@ dependencies {
 	// Flyway dependencies with version
     implementation "org.flywaydb:flyway-core:11.20.2"
 	implementation "org.flywaydb:flyway-sqlserver:11.20.2"
+
+// HTML to PDF
+	implementation 'com.openhtmltopdf:openhtmltopdf-core:1.0.10'
+	implementation 'com.openhtmltopdf:openhtmltopdf-pdfbox:1.0.10'
+	implementation 'org.springframework.boot:spring-boot-starter-thymeleaf'
 }
 
 flyway {

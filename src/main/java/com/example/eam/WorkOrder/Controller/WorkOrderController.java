@@ -4,6 +4,7 @@ package com.example.eam.WorkOrder.Controller;
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.WorkOrder.Dto.*;
 import com.example.eam.WorkOrder.Service.WorkOrderService;
+import com.example.eam.WorkOrder.Service.WorkOrderInvoiceService;
 import com.example.eam.WorkRequestType.Dto.WorkRequestTypeResponse;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import jakarta.validation.Valid;
@@ -20,6 +21,7 @@ import org.springframework.web.bind.annotation.*;
 public class WorkOrderController {
 
     private final WorkOrderService workOrderService;
+    private final WorkOrderInvoiceService workOrderInvoiceService;
     private final WorkRequestTypeService workRequestTypeService;
 
     @PostMapping
@@ -174,6 +176,17 @@ public class WorkOrderController {
                                                                        @RequestBody WorkOrderCloseRequest request) {
         WorkOrderDetailsResponse data = workOrderService.closeWorkOrder(id, request);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order closed successfully", data));
+    }
+
+    @PostMapping(value = "/{id}/invoice", produces = MediaType.APPLICATION_PDF_VALUE)
+    public ResponseEntity<byte[]> generateInvoice(@PathVariable Long id,
+                                                  @Valid @RequestBody WorkOrderInvoiceRequest request) {
+        var result = workOrderInvoiceService.generateInvoice(id, request);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(ContentDisposition.attachment().filename(result.fileName()).build());
+        headers.add("X-Invoice-Id", result.invoiceId());
+        return new ResponseEntity<>(result.pdfBytes(), headers, HttpStatus.OK);
     }
 
     @GetMapping("/{id}")
