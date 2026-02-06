@@ -2,130 +2,169 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Invoice</title>
   <style>
-    /* OpenHTMLtoPDF only supports CSS 2.1 + some 3; avoid flex/grid/variables */
+    /* Keep CSS to features OpenHTMLtoPDF supports (no CSS vars) */
     body {
       margin: 0;
-      padding: 0;
       font-family: Arial, sans-serif;
       color: #111827;
       background: #ffffff;
       font-size: 13px;
-      line-height: 1.4;
+      line-height: 1.45;
     }
-    .page {
-      width: 820px;
-      margin: 20px auto;
-      padding: 20px;
+    .invoice {
+      max-width: 900px;
+      margin: 24px auto;
+      padding: 24px;
       border: 1px solid #e5e7eb;
+      border-radius: 12px;
+      background: #fff;
+      box-shadow: 0 6px 18px rgba(0,0,0,0.06);
     }
-    h1 { margin: 0 0 6px 0; font-size: 22px; }
-    h2 { margin: 0 0 10px 0; font-size: 14px; text-transform: uppercase; letter-spacing: .04em; }
+    h1 { font-size: 22px; margin: 0; }
+    h2 { font-size: 14px; margin: 0 0 8px; text-transform: uppercase; letter-spacing: .04em; }
     .muted { color: #6b7280; }
-    .section {
-      border: 1px solid #e5e7eb;
-      padding: 12px;
-      margin-bottom: 12px;
+    .row {
+      width: 100%;
+      display: table;
+      table-layout: fixed;
+      border-spacing: 0 0;
     }
-    .pad-top { margin-top: 8px; }
-    table { width: 100%; border-collapse: collapse; }
-    th {
+    .col { display: table-cell; vertical-align: top; }
+    .col-half { width: 50%; }
+    .between { display: table; width: 100%; table-layout: fixed; }
+    .block {
+      border: 1px solid #e5e7eb;
+      border-radius: 10px;
+      padding: 12px;
+      background: #fff;
+    }
+    .spacer { height: 16px; }
+    .meta-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+    .meta-table td { padding: 4px 0; }
+    .meta-label { color: #6b7280; padding-right: 8px; }
+    table.detail {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    table.detail thead th {
       text-align: left;
-      padding: 8px;
+      padding: 10px;
       background: #f9fafb;
       border-bottom: 1px solid #e5e7eb;
-      font-weight: bold;
+      font-weight: 600;
     }
-    td {
-      padding: 8px;
+    table.detail tbody td {
+      padding: 10px;
       border-bottom: 1px solid #e5e7eb;
       vertical-align: top;
     }
     .num { text-align: right; white-space: nowrap; }
-    .meta-table td { padding: 4px 6px; border: none; }
-    .meta-label { color: #6b7280; }
     .totals {
-      width: 320px;
+      width: 360px;
       margin-left: auto;
       border: 1px solid #e5e7eb;
-    }
-    .totals-row { padding: 8px 10px; border-bottom: 1px solid #e5e7eb; }
-    .totals-row:last-child { border-bottom: none; }
-    .grand { background: #f9fafb; font-weight: bold; }
-    .badge {
-      padding: 2px 6px;
-      border: 1px solid #e5e7eb;
       border-radius: 10px;
+      overflow: hidden;
+      background: #fff;
+    }
+    .totals .line {
+      display: table;
+      width: 100%;
+      table-layout: fixed;
+      padding: 10px 12px;
+      border-bottom: 1px solid #e5e7eb;
+      font-size: 13px;
+    }
+    .totals .line:last-child { border-bottom: 0; }
+    .totals .label { display: table-cell; color: #6b7280; }
+    .totals .value { display: table-cell; text-align: right; }
+    .totals .grand {
+      background: #f9fafb;
+      font-weight: 700;
+      font-size: 14px;
+    }
+    .badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border: 1px solid #e5e7eb;
+      border-radius: 999px;
       font-size: 12px;
       color: #6b7280;
     }
   </style>
 </head>
 <body>
-  <div class="page">
+  <div class="invoice">
     <!-- Header -->
-    <table style="width:100%; margin-bottom:12px;">
-      <tr>
-        <td style="width:55%; padding-right:10px;">
-          <h1>{{brandName}}</h1>
-          <div class="muted">
-            {{brandLine1}}<br/>{{brandLine2}}
-          </div>
-        </td>
-        <td style="width:45%; border:1px solid #e5e7eb; padding:10px;">
+    <div class="row">
+      <div class="col" style="width:55%; padding-right:12px;">
+        <h1>{{brandName}}</h1>
+        <div class="muted" style="font-size:13px; margin-top:6px;">
+          {{brandLine1}}<br/>
+          {{brandLine2}}
+        </div>
+      </div>
+      <div class="col" style="width:45%;">
+        <div class="block">
           <h2>Invoice</h2>
           <table class="meta-table">
             <tr><td class="meta-label">Invoice #</td><td><b>{{invoiceNumber}}</b></td></tr>
             <tr><td class="meta-label">Invoice Date</td><td><b>{{invoiceDate}}</b></td></tr>
             <tr><td class="meta-label">Due Date</td><td><b>{{dueDate}}</b></td></tr>
-            <tr><td class="meta-label">Status</td><td><span class="badge">{{status}}</span></td></tr>
+            <tr><td class="meta-label">Status</td><td><b><span class="badge">{{status}}</span></b></td></tr>
             <tr><td class="meta-label">Work Order</td><td><b>{{workOrderId}}</b></td></tr>
             <tr><td class="meta-label">WO Title</td><td><b>{{workOrderTitle}}</b></td></tr>
           </table>
-        </td>
-      </tr>
-    </table>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
 
     <!-- Bill To + Work Order Summary -->
-    <table style="width:100%; margin-bottom:12px;">
-      <tr>
-        <td style="width:50%; padding-right:8px;">
-          <div class="section">
-            <h2>Bill To</h2>
-            <div>
-              <b>{{billToName}}</b><br/>
-              {{billToAddress}}<br/>
-              {{billToContact}}
-            </div>
+    <div class="row">
+      <div class="col col-half" style="padding-right:8px;">
+        <div class="block">
+          <h2>Bill To</h2>
+          <div style="font-size:13px;">
+            <b>{{billToName}}</b><br/>
+            {{billToAddress}}<br/>
+            {{billToContact}}
           </div>
-        </td>
-        <td style="width:50%; padding-left:8px;">
-          <div class="section">
-            <h2>Work Order Details</h2>
-            <div>
-              <div><span class="muted">Asset:</span> {{assetLine}}</div>
-              <div><span class="muted">Site/Location:</span> {{location}}</div>
-              <div><span class="muted">Issue:</span> {{issue}}</div>
-              <div><span class="muted">Completed By:</span> {{completedBy}}</div>
-              <div><span class="muted">Completed On:</span> {{completedOn}}</div>
-            </div>
-          </div>
-        </td>
-      </tr>
-    </table>
+        </div>
+      </div>
 
-    <!-- Labor -->
-    <div class="section">
+      <div class="col col-half" style="padding-left:8px;">
+        <div class="block">
+          <h2>Work Order Details</h2>
+          <div style="font-size:13px;">
+            <div><span class="muted">Asset:</span> {{assetLine}}</div>
+            <div><span class="muted">Site/Location:</span> {{location}}</div>
+            <div><span class="muted">Issue:</span> {{issue}}</div>
+            <div><span class="muted">Completed By:</span> {{completedBy}}</div>
+            <div><span class="muted">Completed On:</span> {{completedOn}}</div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="spacer"></div>
+
+    <!-- Labor Table -->
+    <div class="block">
       <h2>Labor</h2>
-      <table>
+      <table class="detail">
         <thead>
           <tr>
-            <th style="width:22%;">Technician</th>
-            <th style="width:38%;">Description</th>
-            <th class="num" style="width:10%;">Hours</th>
-            <th class="num" style="width:15%;">Rate</th>
-            <th class="num" style="width:15%;">Amount</th>
+            <th>Technician</th>
+            <th>Description</th>
+            <th class="num">Hours</th>
+            <th class="num">Rate</th>
+            <th class="num">Amount</th>
           </tr>
         </thead>
         <tbody>
@@ -134,46 +173,55 @@
       </table>
     </div>
 
-    <!-- Inventory -->
-    <div class="section">
-      <h2>Inventory Used (Parts)</h2>
-      <table>
+    <div class="spacer"></div>
+
+    <!-- Inventory Used Table -->
+    <div class="block">
+      <h2>Inventory Used (Parts Consumed)</h2>
+      <table class="detail">
         <thead>
           <tr>
-            <th style="width:14%;">Item Code</th>
-            <th style="width:30%;">Description</th>
-            <th style="width:8%;">UOM</th>
-            <th class="num" style="width:8%;">Qty</th>
-            <th class="num" style="width:14%;">Unit Price</th>
-            <th class="num" style="width:10%;">Tax</th>
-            <th class="num" style="width:16%;">Line Total</th>
+            <th>Item Code</th>
+            <th>Description</th>
+            <th>UOM</th>
+            <th class="num">Qty</th>
+            <th class="num">Unit Price</th>
+            <th class="num">Tax</th>
+            <th class="num">Line Total</th>
           </tr>
         </thead>
         <tbody>
           {{partsRows}}
         </tbody>
       </table>
-      <div class="muted pad-top" style="font-size:12px;">{{inventoryNote}}</div>
-    </div>
-
-    <!-- Totals -->
-    <div style="width:100%; margin-top:12px;">
-      <div class="totals">
-        <div class="totals-row"><span class="muted">Labor Subtotal</span><span class="num">{{laborSubtotal}}</span></div>
-        <div class="totals-row"><span class="muted">Parts Subtotal</span><span class="num">{{partsSubtotal}}</span></div>
-        <div class="totals-row"><span class="muted">Discount</span><span class="num">{{discount}}</span></div>
-        <div class="totals-row"><span class="muted">Tax</span><span class="num">{{tax}}</span></div>
-        <div class="totals-row grand"><span>Total</span><span class="num">{{total}}</span></div>
-        <div class="totals-row"><span class="muted">Amount Paid</span><span class="num">{{amountPaid}}</span></div>
-        <div class="totals-row grand"><span>Balance Due</span><span class="num">{{balanceDue}}</span></div>
+      <div class="muted" style="font-size:12px; margin-top:8px;">
+        {{inventoryNote}}
       </div>
     </div>
 
-    <!-- Terms -->
-    <div class="section" style="margin-top:12px;">
-      <h2>Notes &amp; Terms</h2>
-      <div>{{terms}}</div>
+    <div class="spacer"></div>
+
+    <!-- Totals -->
+    <div class="totals">
+      <div class="line"><span class="label muted">Labor Subtotal</span><span class="value">{{laborSubtotal}}</span></div>
+      <div class="line"><span class="label muted">Parts Subtotal</span><span class="value">{{partsSubtotal}}</span></div>
+      <div class="line"><span class="label muted">Discount</span><span class="value">{{discount}}</span></div>
+      <div class="line"><span class="label muted">Tax</span><span class="value">{{tax}}</span></div>
+      <div class="line grand"><span class="label">Total</span><span class="value">{{total}}</span></div>
+      <div class="line"><span class="label muted">Amount Paid</span><span class="value">{{amountPaid}}</span></div>
+      <div class="line grand"><span class="label">Balance Due</span><span class="value">{{balanceDue}}</span></div>
     </div>
+
+    <div class="spacer"></div>
+
+    <!-- Terms -->
+    <div class="block">
+      <h2>Notes &amp; Terms</h2>
+      <div style="font-size:13px;">
+        {{terms}}
+      </div>
+    </div>
+
   </div>
 </body>
 </html>
