@@ -62,11 +62,14 @@ public class ServiceMaintenance {
     @Column(name = "problem_description", nullable = false, length = 2000)
     private String problemDescription;
 
-    @Column(name = "preferred_date")
-    private LocalDate preferredDate;
+    @Column(name = "preferred_date_time")
+    private LocalDateTime preferredDateTime;
 
-    @Column(name = "preferred_time")
-    private LocalTime preferredTime;
+    @Column(name = "preferred_technician_id")
+    private Long preferredTechnicianId;
+
+    @Column(name = "preferred_team_id")
+    private Long preferredTeamId;
 
     @Column(name = "safety_risk")
     private Boolean safetyRisk;

@@ -249,9 +249,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         .woTitle(!isBlank(woTitle) ? woTitle : "Work Order from Service Request")
         .descriptionScope(desc)
         .planner(null)
-        .assignedTechnician(null)
-        .assignedTeam(null)
-        .plannedStartDateTime(null)
+        .assignedTechnician(resolvePreferredTechnician(sr))
+        .assignedTeam(resolvePreferredTeam(sr))
+        .plannedStartDateTime(sr.getPreferredDateTime())
         .plannedEndDateTime(null)
         .targetCompletionDate(null)
         .estimatedLaborHours(null)
@@ -282,6 +282,20 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         throw e;
     }
 }
+
+    private Technician resolvePreferredTechnician(ServiceMaintenance sr) {
+        if (sr.getPreferredTechnicianId() == null) return null;
+        if (sr.getPreferredTeamId() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Service Request has both preferredTechnicianId and preferredTeamId; cannot convert");
+        }
+        return resolveTechnician(sr.getPreferredTechnicianId());
+    }
+
+    private TechnicianTeam resolvePreferredTeam(ServiceMaintenance sr) {
+        if (sr.getPreferredTeamId() == null) return null;
+        return resolveTeam(sr.getPreferredTeamId());
+    }
 
     // ---------------- PATCH UPDATE ----------------
 

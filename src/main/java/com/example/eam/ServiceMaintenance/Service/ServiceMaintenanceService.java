@@ -36,6 +36,7 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public ServiceRequestResponse create(ServiceRequestCreateDto dto) {
+        validatePreferredAssignment(dto.getPreferredTechnicianId(), dto.getPreferredTeamId());
 
         Asset asset = null;
         if (dto.getAssetId() != null) {
@@ -63,8 +64,9 @@ public class ServiceMaintenanceService {
                 .priority(dto.getPriority())
                 .shortTitle(dto.getShortTitle())
                 .problemDescription(dto.getProblemDescription())
-                .preferredDate(dto.getPreferredDate())
-                .preferredTime(dto.getPreferredTime())
+                .preferredDateTime(dto.getPreferredDateTime())
+                .preferredTechnicianId(dto.getPreferredTechnicianId())
+                .preferredTeamId(dto.getPreferredTeamId())
                 .safetyRisk(dto.getSafetyRisk())
                 .attachmentUrl(dto.getAttachmentUrl())
                 .status(ServiceRequestStatus.NEW)
@@ -177,8 +179,18 @@ public class ServiceMaintenanceService {
 
         updateIfNotNull(dto.getMaintenanceType(), entity::setMaintenanceType);
         updateIfNotNull(dto.getPriority(), entity::setPriority);
-        updateIfNotNull(dto.getPreferredDate(), entity::setPreferredDate);
-        updateIfNotNull(dto.getPreferredTime(), entity::setPreferredTime);
+        updateIfNotNull(dto.getPreferredDateTime(), entity::setPreferredDateTime);
+        if (dto.getPreferredTechnicianId() != null || dto.getPreferredTeamId() != null) {
+            validatePreferredAssignment(dto.getPreferredTechnicianId(), dto.getPreferredTeamId());
+            // clear the other side if provided
+            if (dto.getPreferredTechnicianId() != null) {
+                entity.setPreferredTechnicianId(dto.getPreferredTechnicianId());
+                entity.setPreferredTeamId(null);
+            } else if (dto.getPreferredTeamId() != null) {
+                entity.setPreferredTeamId(dto.getPreferredTeamId());
+                entity.setPreferredTechnicianId(null);
+            }
+        }
         updateIfNotNull(dto.getSafetyRisk(), entity::setSafetyRisk);
         if (dto.getStatus() != null) {
             if (dto.getStatus() != ServiceRequestStatus.NEW && dto.getStatus() != ServiceRequestStatus.UNDER_REVIEW) {
@@ -291,8 +303,9 @@ public class ServiceMaintenanceService {
                 .priority(entity.getPriority())
                 .shortTitle(entity.getShortTitle())
                 .problemDescription(entity.getProblemDescription())
-                .preferredDate(entity.getPreferredDate())
-                .preferredTime(entity.getPreferredTime())
+                .preferredDateTime(entity.getPreferredDateTime())
+                .preferredTechnicianId(entity.getPreferredTechnicianId())
+                .preferredTeamId(entity.getPreferredTeamId())
                 .safetyRisk(entity.getSafetyRisk())
                 .attachmentUrl(entity.getAttachmentUrl())
                 .status(entity.getStatus())
@@ -306,5 +319,12 @@ public class ServiceMaintenanceService {
         if (val == null) return null;
         String t = val.trim();
         return t.isEmpty() ? null : t;
+    }
+
+    private void validatePreferredAssignment(Long technicianId, Long teamId) {
+        if (technicianId != null && teamId != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Specify either preferredTechnicianId or preferredTeamId, not both");
+        }
     }
 }

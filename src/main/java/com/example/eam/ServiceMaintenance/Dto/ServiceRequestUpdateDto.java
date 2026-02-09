@@ -5,8 +5,7 @@ import com.example.eam.Enum.RequestPriority;
 import com.example.eam.Enum.ServiceRequestStatus;
 import lombok.Data;
 
-import java.time.LocalDate;
-import java.time.LocalTime;
+import java.time.LocalDateTime;
 
 @Data
 public class ServiceRequestUpdateDto {
@@ -26,8 +25,9 @@ public class ServiceRequestUpdateDto {
     private String shortTitle;
     private String problemDescription;
 
-    private LocalDate preferredDate;
-    private LocalTime preferredTime;
+    private LocalDateTime preferredDateTime;
+    private Long preferredTechnicianId;
+    private Long preferredTeamId;
 
     private Boolean safetyRisk;
     private String attachmentUrl;
