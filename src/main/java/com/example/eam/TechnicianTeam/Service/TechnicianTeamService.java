@@ -154,7 +154,7 @@ public class TechnicianTeamService {
             return;
         }
 
-        List<Technician> requestedTechnicians = technicianRepository.findAllById(desiredIds);
+        List<Technician> requestedTechnicians = technicianRepository.findByIdInAndIsDeletedFalse(desiredIds);
         if (requestedTechnicians.size() != desiredIds.size()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "One or more technicians were not found");
         }

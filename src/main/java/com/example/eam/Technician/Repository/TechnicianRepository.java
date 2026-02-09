@@ -1,16 +1,25 @@
 package com.example.eam.Technician.Repository;
 
 import com.example.eam.Technician.Entity.Technician;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
 import java.util.Optional;
 
 public interface TechnicianRepository extends JpaRepository<Technician, Long> {
 
-    boolean existsByEmailIgnoreCase(String email);
+    Optional<Technician> findByIdAndIsDeletedFalse(Long id);
 
-    Optional<Technician> findByEmailIgnoreCase(String email);
+    Page<Technician> findByIsDeletedFalse(Pageable pageable);
 
-    boolean existsByBadgeNumberIgnoreCase(String badgeNumber);
+    boolean existsByEmailIgnoreCaseAndIsDeletedFalse(String email);
 
-    boolean existsByTechnicianIdIgnoreCase(String technicianId);
+    Optional<Technician> findByEmailIgnoreCaseAndIsDeletedFalse(String email);
+
+    boolean existsByBadgeNumberIgnoreCaseAndIsDeletedFalse(String badgeNumber);
+
+    boolean existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
+
+    List<Technician> findByIdInAndIsDeletedFalse(Iterable<Long> ids);
 }

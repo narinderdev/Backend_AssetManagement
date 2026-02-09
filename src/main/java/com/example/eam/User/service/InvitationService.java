@@ -180,7 +180,7 @@ public class InvitationService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is required to create technician profile");
         }
 
-        return technicianRepository.findByEmailIgnoreCase(normalizedEmail)
+        return technicianRepository.findByEmailIgnoreCaseAndIsDeletedFalse(normalizedEmail)
                 .map(Technician::getId)
                 .orElseGet(() -> {
                     Technician technician = Technician.builder()

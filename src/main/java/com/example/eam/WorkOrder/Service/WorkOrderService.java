@@ -1415,7 +1415,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     private Technician resolveTechnician(Long technicianId) {
         if (technicianId == null) return null;
-        return technicianRepository.findById(technicianId)
+        return technicianRepository.findByIdAndIsDeletedFalse(technicianId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Technician not found: " + technicianId));
     }

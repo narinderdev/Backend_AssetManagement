@@ -45,7 +45,7 @@ public class TechnicianService {
     @Transactional
     public TechnicianDetailsResponse createTechnician(TechnicianCreateRequest request) {
         String email = safeTrim(request.getEmail());
-        if (email != null && technicianRepository.existsByEmailIgnoreCase(email)) {
+        if (email != null && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalse(email)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician with the same email already exists");
         }
 
@@ -91,7 +91,7 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianListResponse listTechnicians(Pageable pageable) {
-        Page<Technician> page = technicianRepository.findAll(pageable);
+        Page<Technician> page = technicianRepository.findByIsDeletedFalse(pageable);
         List<TechnicianDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
@@ -397,7 +397,7 @@ public class TechnicianService {
         if (request.getEmail() != null) {
             String email = safeTrim(request.getEmail());
             if (email != null && !email.equalsIgnoreCase(safeTrim(technician.getEmail()))
-                    && technicianRepository.existsByEmailIgnoreCase(email)) {
+                    && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalse(email)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician with the same email already exists");
             }
             technician.setEmail(email);
@@ -425,6 +425,19 @@ public class TechnicianService {
     @Transactional
     public void deleteTechnician(Long id) {
         Technician technician = getTechnicianOrThrow(id);
+        LocalDateTime now = LocalDateTime.now();
+        long activeOrFutureBookings = workOrderRepository.countActiveBookingsForTechnician(
+                id,
+                now,
+                now.plusYears(50), // generous window for "future"
+                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+        if (activeOrFutureBookings > 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "Cannot delete technician while assigned to active work orders or in future work orders"
+            );
+        }
         // Remove team memberships to avoid dangling references to soft-deleted technicians
         teamMemberRepository.deleteByTechnician_Id(id);
         technician.setDeleted(true);
@@ -432,7 +445,7 @@ public class TechnicianService {
     }
 
     private Technician getTechnicianOrThrow(Long id) {
-        return technicianRepository.findById(id)
+        return technicianRepository.findByIdAndIsDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found"));
     }
 
@@ -572,8 +585,8 @@ public class TechnicianService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "badgeNumber is required");
         }
         String trimmed = badgeNumber.trim();
-        if (technicianRepository.existsByBadgeNumberIgnoreCase(trimmed)) {
-            if (currentId == null || technicianRepository.findById(currentId).stream()
+        if (technicianRepository.existsByBadgeNumberIgnoreCaseAndIsDeletedFalse(trimmed)) {
+            if (currentId == null || technicianRepository.findByIdAndIsDeletedFalse(currentId).stream()
                     .noneMatch(t -> trimmed.equalsIgnoreCase(t.getBadgeNumber()))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "badgeNumber already exists");
             }
@@ -592,7 +605,7 @@ public class TechnicianService {
         for (int i = 0; i < 30; i++) {
             int rand = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 10000);
             String candidate = String.format("TECH-%s-%04d", date, rand);
-            if (!technicianRepository.existsByTechnicianIdIgnoreCase(candidate)) {
+            if (!technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(candidate)) {
                 return candidate;
             }
         }
@@ -600,12 +613,12 @@ public class TechnicianService {
     }
 
     private void ensureTechnicianIdUnique(String technicianId, Long currentId) {
-        boolean exists = technicianRepository.existsByTechnicianIdIgnoreCase(technicianId);
+        boolean exists = technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(technicianId);
         if (exists) {
             if (currentId == null) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
             }
-            technicianRepository.findById(currentId).ifPresent(t -> {
+            technicianRepository.findByIdAndIsDeletedFalse(currentId).ifPresent(t -> {
                 if (!technicianId.equalsIgnoreCase(t.getTechnicianId())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
                 }

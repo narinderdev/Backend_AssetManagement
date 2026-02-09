@@ -103,7 +103,7 @@ public class LoginService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User email is required to resolve technician profile");
         }
 
-        return technicianRepository.findByEmailIgnoreCase(normalizedEmail)
+        return technicianRepository.findByEmailIgnoreCaseAndIsDeletedFalse(normalizedEmail)
                 .map(Technician::getId)
                 .orElseGet(() -> {
                     Technician technician = Technician.builder()
@@ -130,7 +130,7 @@ public class LoginService {
             }
         }
 
-        Technician technician = technicianRepository.findById(technicianId)
+        Technician technician = technicianRepository.findByIdAndIsDeletedFalse(technicianId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found"));
 
         TechnicianDeviceToken entity = null;

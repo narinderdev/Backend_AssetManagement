@@ -6,7 +6,6 @@ import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import jakarta.persistence.*;
 import lombok.*;
 import org.hibernate.annotations.SQLDelete;
-import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -32,7 +31,6 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @SQLDelete(sql = "UPDATE technicians SET is_deleted = true WHERE id = ?")
-@SQLRestriction("is_deleted = false")
 public class Technician {
 
     @Id
