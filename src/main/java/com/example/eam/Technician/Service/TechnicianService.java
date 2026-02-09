@@ -425,6 +425,8 @@ public class TechnicianService {
     @Transactional
     public void deleteTechnician(Long id) {
         Technician technician = getTechnicianOrThrow(id);
+        // Remove team memberships to avoid dangling references to soft-deleted technicians
+        teamMemberRepository.deleteByTechnician_Id(id);
         technician.setDeleted(true);
         technicianRepository.save(technician);
     }

@@ -12,4 +12,6 @@ public interface TechnicianTeamMemberRepository extends JpaRepository<Technician
     List<TechnicianTeamMember> findByTechnician_Id(Long technicianId);
 
     boolean existsByTeam_Id(Long teamId);
+
+    void deleteByTechnician_Id(Long technicianId);
 }
