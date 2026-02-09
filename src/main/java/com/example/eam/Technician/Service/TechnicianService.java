@@ -539,7 +539,7 @@ public class TechnicianService {
                     : rangeEndExclusive.minusDays(1);
 
             for (LocalDate d = leaveStart; !d.isAfter(leaveEnd); d = d.plusDays(1)) {
-                calendar.put(d, TechnicianCalendarStatus.LEAVE);
+                calendar.put(d, TechnicianCalendarStatus.PTO);
             }
         }
     }
