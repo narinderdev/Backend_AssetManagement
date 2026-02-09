@@ -5,6 +5,8 @@ import com.example.eam.Enum.TechnicianType;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.SQLDelete;
+import org.hibernate.annotations.SQLRestriction;
 
 import java.time.LocalDate;
 import java.util.ArrayList;
@@ -29,6 +31,8 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@SQLDelete(sql = "UPDATE technicians SET is_deleted = true WHERE id = ?")
+@SQLRestriction("is_deleted = false")
 public class Technician {
 
     @Id
@@ -100,6 +104,10 @@ public class Technician {
     @Lob
     @Column(name = "notes")
     private String notes;
+
+    @Builder.Default
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted = false;
 
     @Builder.Default
     @OneToMany(mappedBy = "technician", fetch = FetchType.LAZY, cascade = CascadeType.ALL, orphanRemoval = true)

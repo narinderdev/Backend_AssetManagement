@@ -425,7 +425,8 @@ public class TechnicianService {
     @Transactional
     public void deleteTechnician(Long id) {
         Technician technician = getTechnicianOrThrow(id);
-        technicianRepository.delete(technician);
+        technician.setDeleted(true);
+        technicianRepository.save(technician);
     }
 
     private Technician getTechnicianOrThrow(Long id) {
