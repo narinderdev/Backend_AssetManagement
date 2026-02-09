@@ -21,5 +21,6 @@ public class TechnicianTeamDetailsResponse {
     private String notes;
     private Long teamLeaderId;
     private String teamLeaderName;
+    private String availability;
     private List<TechnicianDetailsResponse> technicians;
 }

@@ -10,6 +10,8 @@ import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamRepository;
+import com.example.eam.Enum.WorkOrderStatus;
+import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -20,6 +22,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
+import java.time.LocalDate;
+import java.time.LocalDateTime;
+import java.util.EnumSet;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +33,7 @@ public class TechnicianTeamService {
     private final TechnicianTeamRepository technicianTeamRepository;
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamMemberRepository teamMemberRepository;
+    private final WorkOrderRepository workOrderRepository;
 
     @Transactional
     public TechnicianTeamDetailsResponse createTeam(TechnicianTeamCreateRequest request) {
@@ -247,6 +253,7 @@ public class TechnicianTeamService {
                 .toList();
 
         Technician leader = findTeamLeader(members);
+        String availability = computeTeamAvailabilityToday(team.getId());
 
         return TechnicianTeamDetailsResponse.builder()
                 .id(team.getId())
@@ -258,8 +265,24 @@ public class TechnicianTeamService {
                 .notes(team.getNotes())
                 .teamLeaderId(leader != null ? leader.getId() : null)
                 .teamLeaderName(leader != null ? leader.getFullName() : null)
+                .availability(availability)
                 .technicians(technicians)
                 .build();
+    }
+
+    private String computeTeamAvailabilityToday(Long teamId) {
+        if (teamId == null) return "Unavailable";
+        LocalDate today = LocalDate.now();
+        LocalDateTime start = today.atStartOfDay();
+        LocalDateTime end = today.plusDays(1).atStartOfDay();
+        var bookings = workOrderRepository.findBookingsForAssignments(
+                null,
+                teamId,
+                start,
+                end,
+                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+        return bookings.isEmpty() ? "Available" : "Unavailable";
     }
 
     private TechnicianDetailsResponse mapTechnician(Technician technician) {
