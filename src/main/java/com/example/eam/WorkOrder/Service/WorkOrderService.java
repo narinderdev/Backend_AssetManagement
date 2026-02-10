@@ -238,6 +238,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         String generatedWoId = generateUniqueWorkOrderId();
         log.info("Generated Work Order ID: {}", generatedWoId);
 
+        LocalDateTime preferredStart = null;
+        if (sr.getPreferredStartDate() != null && sr.getPreferredStartTime() != null) {
+            preferredStart = LocalDateTime.of(sr.getPreferredStartDate(), sr.getPreferredStartTime());
+        }
+        LocalDateTime preferredEnd = null;
+        if (sr.getPreferredEndDate() != null && sr.getPreferredEndTime() != null) {
+            preferredEnd = LocalDateTime.of(sr.getPreferredEndDate(), sr.getPreferredEndTime());
+        }
+
         WorkOrder wo = WorkOrder.builder()
         .workOrderId(generatedWoId)
         .linkedRequest(sr)
@@ -251,8 +260,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         .planner(null)
         .assignedTechnician(resolvePreferredTechnician(sr))
         .assignedTeam(resolvePreferredTeam(sr))
-        .plannedStartDateTime(sr.getPreferredDateTime())
-        .plannedEndDateTime(null)
+        .plannedStartDateTime(preferredStart)
+        .plannedEndDateTime(preferredEnd)
         .targetCompletionDate(null)
         .estimatedLaborHours(null)
         .estimatedMaterialCost(null)

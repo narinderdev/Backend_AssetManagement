@@ -64,7 +64,10 @@ public class ServiceMaintenanceService {
                 .priority(dto.getPriority())
                 .shortTitle(dto.getShortTitle())
                 .problemDescription(dto.getProblemDescription())
-                .preferredDateTime(dto.getPreferredDateTime())
+                .preferredStartDate(dto.getPreferredStartDate())
+                .preferredStartTime(dto.getPreferredStartTime())
+                .preferredEndDate(dto.getPreferredEndDate())
+                .preferredEndTime(dto.getPreferredEndTime())
                 .preferredTechnicianId(dto.getPreferredTechnicianId())
                 .preferredTeamId(dto.getPreferredTeamId())
                 .safetyRisk(dto.getSafetyRisk())
@@ -179,7 +182,10 @@ public class ServiceMaintenanceService {
 
         updateIfNotNull(dto.getMaintenanceType(), entity::setMaintenanceType);
         updateIfNotNull(dto.getPriority(), entity::setPriority);
-        updateIfNotNull(dto.getPreferredDateTime(), entity::setPreferredDateTime);
+        updateIfNotNull(dto.getPreferredStartDate(), entity::setPreferredStartDate);
+        updateIfNotNull(dto.getPreferredStartTime(), entity::setPreferredStartTime);
+        updateIfNotNull(dto.getPreferredEndDate(), entity::setPreferredEndDate);
+        updateIfNotNull(dto.getPreferredEndTime(), entity::setPreferredEndTime);
         if (dto.getPreferredTechnicianId() != null || dto.getPreferredTeamId() != null) {
             validatePreferredAssignment(dto.getPreferredTechnicianId(), dto.getPreferredTeamId());
             // clear the other side if provided
@@ -303,7 +309,10 @@ public class ServiceMaintenanceService {
                 .priority(entity.getPriority())
                 .shortTitle(entity.getShortTitle())
                 .problemDescription(entity.getProblemDescription())
-                .preferredDateTime(entity.getPreferredDateTime())
+                .preferredStartDate(entity.getPreferredStartDate())
+                .preferredStartTime(entity.getPreferredStartTime())
+                .preferredEndDate(entity.getPreferredEndDate())
+                .preferredEndTime(entity.getPreferredEndTime())
                 .preferredTechnicianId(entity.getPreferredTechnicianId())
                 .preferredTeamId(entity.getPreferredTeamId())
                 .safetyRisk(entity.getSafetyRisk())

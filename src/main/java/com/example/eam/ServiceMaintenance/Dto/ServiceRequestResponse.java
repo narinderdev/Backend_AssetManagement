@@ -6,7 +6,9 @@ import com.example.eam.Enum.ServiceRequestStatus;
 import lombok.Builder;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 
 @Data
 @Builder
@@ -33,7 +35,10 @@ public class ServiceRequestResponse {
     private String shortTitle;
     private String problemDescription;
 
-    private LocalDateTime preferredDateTime;
+    private LocalDate preferredStartDate;
+    private LocalTime preferredStartTime;
+    private LocalDate preferredEndDate;
+    private LocalTime preferredEndTime;
     private Long preferredTechnicianId;
     private Long preferredTeamId;
 

@@ -6,7 +6,8 @@ import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 
 @Data
 public class ServiceRequestCreateDto {
@@ -36,7 +37,10 @@ public class ServiceRequestCreateDto {
     @NotBlank
     private String problemDescription;
 
-    private LocalDateTime preferredDateTime;
+    private LocalDate preferredStartDate;
+    private LocalTime preferredStartTime;
+    private LocalDate preferredEndDate;
+    private LocalTime preferredEndTime;
 
     // optional assignment preferences
     private Long preferredTechnicianId;
