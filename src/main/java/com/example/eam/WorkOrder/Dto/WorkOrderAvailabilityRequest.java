@@ -16,9 +16,14 @@ public class WorkOrderAvailabilityRequest {
     private LocalDate endDate;
 
     /**
-     * How many hours are required for the work in a day.
+     * How many days are required within the range for availability (days API).
      */
-    @NotNull
+    @Min(1)
+    private Integer daysRequired;
+
+    /**
+     * How many hours are required for the work in a day (time-slots API).
+     */
     @Min(1)
     private Integer hoursRequired;
 
