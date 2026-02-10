@@ -149,9 +149,62 @@ public class TechnicianService {
 
         List<DailyAvailabilityDto> result = new ArrayList<>();
         for (LocalDate d = startDate; d.isBefore(endDate); d = d.plusDays(1)) {
+            LocalDateTime dayStart = d.atTime(9, 0);
+            LocalDateTime dayEnd = d.atTime(21, 0);
+
+            List<TimeWindow> busyWindows = new ArrayList<>();
+            for (var wo : bookings) {
+                LocalDateTime woStart = wo.getPlannedStartDateTime();
+                LocalDateTime woEnd = wo.getPlannedEndDateTime();
+                if (woStart == null || woEnd == null) continue;
+
+                if (woEnd.isAfter(dayStart) && woStart.isBefore(dayEnd)) {
+                    LocalDateTime busyStart = woStart.isAfter(dayStart) ? woStart : dayStart;
+                    LocalDateTime busyEnd = woEnd.isBefore(dayEnd) ? woEnd : dayEnd;
+                    if (busyStart.isBefore(busyEnd)) {
+                        busyWindows.add(new TimeWindow(busyStart, busyEnd));
+                    }
+                }
+            }
+
+            List<TimeWindow> mergedBusy = mergeIntervals(
+                    busyWindows.stream()
+                            .sorted((a, b) -> a.start().compareTo(b.start()))
+                            .toList()
+            );
+
+            TechnicianCalendarStatus status = calendar.get(d);
+
+            List<TimeWindow> freeWindows = switch (status) {
+                case HOLIDAY, PTO -> List.of();
+                default -> computeFreeWindows(dayStart, dayEnd, mergedBusy);
+            };
+
+            List<TimeWindowDto> busyDtos = switch (status) {
+                case HOLIDAY, PTO -> List.of(TimeWindowDto.builder()
+                        .start(dayStart.toLocalTime())
+                        .end(dayEnd.toLocalTime())
+                        .build());
+                default -> mergedBusy.stream()
+                        .map(w -> TimeWindowDto.builder()
+                                .start(w.start().toLocalTime())
+                                .end(w.end().toLocalTime())
+                                .build())
+                        .toList();
+            };
+
+            List<TimeWindowDto> freeDtos = freeWindows.stream()
+                    .map(w -> TimeWindowDto.builder()
+                            .start(w.start().toLocalTime())
+                            .end(w.end().toLocalTime())
+                            .build())
+                    .toList();
+
             result.add(DailyAvailabilityDto.builder()
                     .date(d)
-                    .status(calendar.get(d))
+                    .status(status)
+                    .busyWindows(busyDtos)
+                    .freeWindows(freeDtos)
                     .build());
         }
         return result;
@@ -552,6 +605,44 @@ public class TechnicianService {
             LocalDate date = holiday.getHolidayDate();
             calendar.put(date, TechnicianCalendarStatus.HOLIDAY);
         }
+    }
+
+    private record TimeWindow(LocalDateTime start, LocalDateTime end) { }
+
+    private List<TimeWindow> mergeIntervals(List<TimeWindow> intervals) {
+        if (intervals.isEmpty()) return List.of();
+        List<TimeWindow> merged = new ArrayList<>();
+        TimeWindow current = intervals.get(0);
+
+        for (int i = 1; i < intervals.size(); i++) {
+            TimeWindow next = intervals.get(i);
+            if (!next.start().isAfter(current.end())) {
+                LocalDateTime newEnd = next.end().isAfter(current.end()) ? next.end() : current.end();
+                current = new TimeWindow(current.start(), newEnd);
+            } else {
+                merged.add(current);
+                current = next;
+            }
+        }
+        merged.add(current);
+        return merged;
+    }
+
+    private List<TimeWindow> computeFreeWindows(LocalDateTime rangeStart, LocalDateTime rangeEnd, List<TimeWindow> busy) {
+        List<TimeWindow> free = new ArrayList<>();
+        LocalDateTime cursor = rangeStart;
+        for (TimeWindow block : busy) {
+            if (cursor.isBefore(block.start())) {
+                free.add(new TimeWindow(cursor, block.start()));
+            }
+            if (cursor.isBefore(block.end())) {
+                cursor = block.end();
+            }
+        }
+        if (cursor.isBefore(rangeEnd)) {
+            free.add(new TimeWindow(cursor, rangeEnd));
+        }
+        return free;
     }
 
     private List<TechnicianTeamMembershipResponse> buildTeamMemberships(Technician technician) {
