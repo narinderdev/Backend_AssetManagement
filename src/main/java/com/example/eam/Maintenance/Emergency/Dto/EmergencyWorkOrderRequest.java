@@ -1,12 +1,13 @@
 package com.example.eam.Maintenance.Emergency.Dto;
 
 import com.example.eam.WorkOrder.Dto.WorkOrderMaterialPlanRequest;
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -23,12 +24,16 @@ public class EmergencyWorkOrderRequest {
     private Long assignedTeamId;
 
     @NotNull
-    @FutureOrPresent
-    private LocalDateTime plannedStartDateTime;
+    private LocalDate plannedStartDate;
 
     @NotNull
-    @FutureOrPresent
-    private LocalDateTime plannedEndDateTime;
+    private LocalTime plannedStartTime;
+
+    @NotNull
+    private LocalDate plannedEndDate;
+
+    @NotNull
+    private LocalTime plannedEndTime;
 
     private String planner;
     private String preCheckNotes;

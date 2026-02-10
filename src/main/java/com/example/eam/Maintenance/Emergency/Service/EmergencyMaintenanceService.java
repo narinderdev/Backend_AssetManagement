@@ -95,8 +95,10 @@ public class EmergencyMaintenanceService {
         WorkOrderScheduleRequest scheduleRequest = new WorkOrderScheduleRequest();
         scheduleRequest.setAssignedTechnicianId(req.getAssignedTechnicianId());
         scheduleRequest.setAssignedTeamId(req.getAssignedTeamId());
-        scheduleRequest.setPlannedStartDateTime(req.getPlannedStartDateTime());
-        scheduleRequest.setPlannedEndDateTime(req.getPlannedEndDateTime());
+        scheduleRequest.setPlannedStartDate(req.getPlannedStartDate());
+        scheduleRequest.setPlannedStartTime(req.getPlannedStartTime());
+        scheduleRequest.setPlannedEndDate(req.getPlannedEndDate());
+        scheduleRequest.setPlannedEndTime(req.getPlannedEndTime());
         scheduleRequest.setPlanner(req.getPlanner());
         scheduleRequest.setPreCheckNotes(req.getPreCheckNotes());
         scheduleRequest.setPlannedMaterials(req.getPlannedMaterials());

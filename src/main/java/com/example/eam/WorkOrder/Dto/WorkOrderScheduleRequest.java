@@ -1,10 +1,10 @@
 package com.example.eam.WorkOrder.Dto;
 
-import jakarta.validation.constraints.FutureOrPresent;
 import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
-import java.time.LocalDateTime;
+import java.time.LocalDate;
+import java.time.LocalTime;
 import java.util.List;
 
 @Data
@@ -14,12 +14,16 @@ public class WorkOrderScheduleRequest {
     private Long assignedTeamId;
 
     @NotNull
-    @FutureOrPresent
-    private LocalDateTime plannedStartDateTime;
+    private LocalDate plannedStartDate;
 
     @NotNull
-    @FutureOrPresent
-    private LocalDateTime plannedEndDateTime;
+    private LocalTime plannedStartTime;
+
+    @NotNull
+    private LocalDate plannedEndDate;
+
+    @NotNull
+    private LocalTime plannedEndTime;
 
     private String planner;
     private String preCheckNotes;
