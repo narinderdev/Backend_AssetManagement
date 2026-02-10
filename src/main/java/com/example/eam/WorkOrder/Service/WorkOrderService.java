@@ -1169,6 +1169,34 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public WorkOrderListResponse listWorkOrdersByStatus(Set<WorkOrderStatus> statuses, Pageable pageable) {
+        if (statuses == null || statuses.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "statuses are required");
+        }
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort() == null || pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by("plannedEndDateTime").ascending().and(Sort.by("id").ascending())
+            );
+        }
+        Page<WorkOrder> page = workOrderRepository.findByDeletedFalseAndStatusIn(statuses, effectivePageable);
+        List<WorkOrderDetailsResponse> rows = page.getContent().stream()
+                .map(this::toDetailsResponse)
+                .toList();
+
+        return WorkOrderListResponse.builder()
+                .workOrders(rows)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
     // ---------------- DELETE (soft delete) ----------------
 
     @Transactional

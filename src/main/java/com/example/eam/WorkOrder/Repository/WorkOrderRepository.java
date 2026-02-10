@@ -26,6 +26,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     Page<WorkOrder> findByDeletedFalse(Pageable pageable);
 
+    Page<WorkOrder> findByDeletedFalseAndStatusIn(Collection<WorkOrderStatus> statuses, Pageable pageable);
+
     Optional<WorkOrder> findByLinkedRequest_Id(Long serviceRequestPkId);
 
     long countByStatusInAndDeletedFalse(Collection<WorkOrderStatus> statuses);
