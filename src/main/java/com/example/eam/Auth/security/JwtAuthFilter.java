@@ -2,6 +2,12 @@ package com.example.eam.Auth.security;
 
 import com.example.eam.Auth.service.JwtService;
 import com.example.eam.Auth.service.TokenBlacklistService;
+import com.example.eam.Common.ApiResponse;
+import com.example.eam.User.entity.PasswordPolicy;
+import com.example.eam.User.entity.Users;
+import com.example.eam.User.repository.PasswordPolicyRepository;
+import com.example.eam.User.repository.UsersRepository;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import io.jsonwebtoken.Claims;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -16,6 +22,10 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.Collections;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,6 +36,11 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final TokenBlacklistService tokenBlacklistService;
+    private final UsersRepository usersRepository;
+    private final PasswordPolicyRepository passwordPolicyRepository;
+    private final ObjectMapper objectMapper;
+
+    private static final int DEFAULT_PASSWORD_EXPIRY_DAYS = 90;
 
     @Override
     protected void doFilterInternal(
@@ -58,6 +73,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         String email = claims.getSubject();
 
         // ✅ SAFE extraction of roles
+        Users user = usersRepository.findByEmailAndDeletedFalse(email).orElse(null);
+        if (user != null && isPasswordExpired(user)) {
+            response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+            response.setContentType("application/json");
+            ApiResponse<Void> body = ApiResponse.errorResponse(403, "your password is expired");
+            response.getWriter().write(objectMapper.writeValueAsString(body));
+            return;
+        }
+
         Object rolesObj = claims.get("roles");
 
         List<String> roles = rolesObj instanceof List
@@ -79,5 +103,27 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authToken);
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPasswordExpired(Users user) {
+        int expiryDays = passwordPolicyRepository.findTopByOrderByIdAsc()
+                .map(PasswordPolicy::getPasswordExpiryDays)
+                .filter(days -> days != null && days > 0)
+                .orElse(DEFAULT_PASSWORD_EXPIRY_DAYS);
+        LocalDate baseDate = resolvePasswordChangedAt(user);
+        long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), baseDate.plusDays(expiryDays));
+        return daysRemaining < 0;
+    }
+
+    private LocalDate resolvePasswordChangedAt(Users user) {
+        Instant updatedAt = user.getUpdatedAt();
+        if (updatedAt != null) {
+            return LocalDate.ofInstant(updatedAt, ZoneOffset.UTC);
+        }
+        Instant createdAt = user.getCreatedAt();
+        if (createdAt != null) {
+            return LocalDate.ofInstant(createdAt, ZoneOffset.UTC);
+        }
+        return LocalDate.now();
     }
 }
