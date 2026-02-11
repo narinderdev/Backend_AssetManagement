@@ -19,7 +19,10 @@ public class UserCreateDto{
     private String email;
 
     @NotBlank(message = "Password is required")
-    @Size(min = 6, message = "Password must be at least 6 characters long")
+    @Size(min = 12, message = "Password must be at least 12 characters long")
+    @Pattern(regexp = ".*[A-Z].*", message = "Password must include at least one uppercase letter")
+    @Pattern(regexp = ".*[a-z].*", message = "Password must include at least one lowercase letter")
+    @Pattern(regexp = ".*[^A-Za-z0-9\\s].*", message = "Password must include at least one special character")
     private String password;
 
 }
