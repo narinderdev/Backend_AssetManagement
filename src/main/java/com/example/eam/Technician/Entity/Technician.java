@@ -60,7 +60,7 @@ public class Technician {
     @Column(name = "skills")
     private String skills;
 
-    @Column(name = "phone_number", length = 15)
+    @Column(name = "phone_number", length = 20)
     private String phoneNumber;
 
     @Column(name = "email", length = 100)
