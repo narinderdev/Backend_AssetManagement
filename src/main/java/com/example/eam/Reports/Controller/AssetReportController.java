@@ -46,19 +46,13 @@ public class AssetReportController {
             return EnumSet.allOf(AssetStatus.class);
         }
         String normalized = status.trim().toUpperCase();
-        return switch (normalized) {
-            case "ACTIVE" -> EnumSet.of(AssetStatus.IN_SERVICE, AssetStatus.UNDER_MAINTENANCE);
-            case "INACTIVE" -> EnumSet.of(AssetStatus.OUT_OF_SERVICE, AssetStatus.DISPOSED);
-            default -> {
-                try {
-                    yield EnumSet.of(AssetStatus.valueOf(normalized));
-                } catch (IllegalArgumentException ex) {
-                    throw new ResponseStatusException(
-                            HttpStatus.BAD_REQUEST,
-                            "status must be ACTIVE, INACTIVE, or a valid AssetStatus"
-                    );
-                }
-            }
-        };
+        try {
+            return EnumSet.of(AssetStatus.valueOf(normalized));
+        } catch (IllegalArgumentException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.BAD_REQUEST,
+                    "status must be a valid AssetStatus"
+            );
+        }
     }
 }
