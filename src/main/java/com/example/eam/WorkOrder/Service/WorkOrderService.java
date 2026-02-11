@@ -238,6 +238,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         String generatedWoId = generateUniqueWorkOrderId();
         log.info("Generated Work Order ID: {}", generatedWoId);
 
+        LocalDateTime preferredStart = null;
+        if (sr.getPreferredStartDate() != null && sr.getPreferredStartTime() != null) {
+            preferredStart = LocalDateTime.of(sr.getPreferredStartDate(), sr.getPreferredStartTime());
+        }
+        LocalDateTime preferredEnd = null;
+        if (sr.getPreferredEndDate() != null && sr.getPreferredEndTime() != null) {
+            preferredEnd = LocalDateTime.of(sr.getPreferredEndDate(), sr.getPreferredEndTime());
+        }
+
         WorkOrder wo = WorkOrder.builder()
         .workOrderId(generatedWoId)
         .linkedRequest(sr)
@@ -251,8 +260,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         .planner(null)
         .assignedTechnician(resolvePreferredTechnician(sr))
         .assignedTeam(resolvePreferredTeam(sr))
-        .plannedStartDateTime(sr.getPreferredDateTime())
-        .plannedEndDateTime(null)
+        .plannedStartDateTime(preferredStart)
+        .plannedEndDateTime(preferredEnd)
         .targetCompletionDate(null)
         .estimatedLaborHours(null)
         .estimatedMaterialCost(null)
@@ -459,8 +468,21 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         if (request.getAssignedTechnicianId() == null && request.getAssignedTeamId() == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Assign technician or team to schedule work order");
         }
-        if (request.getPlannedEndDateTime().isBefore(request.getPlannedStartDateTime())) {
+        if (request.getPlannedStartDate() == null || request.getPlannedStartTime() == null
+                || request.getPlannedEndDate() == null || request.getPlannedEndTime() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedStartDate/Time and plannedEndDate/Time are required");
+        }
+        LocalDateTime plannedStart = LocalDateTime.of(request.getPlannedStartDate(), request.getPlannedStartTime());
+        LocalDateTime plannedEnd = LocalDateTime.of(request.getPlannedEndDate(), request.getPlannedEndTime());
+        if (plannedEnd.isBefore(plannedStart)) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedEndDateTime must be after plannedStartDateTime");
+        }
+        LocalDateTime now = LocalDateTime.now();
+        if (plannedStart.isBefore(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedStartDateTime must be in the future or present");
+        }
+        if (plannedEnd.isBefore(now)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "plannedEndDateTime must be in the future or present");
         }
 
         if (request.getAssignedTechnicianId() != null) {
@@ -470,8 +492,8 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             wo.setAssignedTeam(resolveTeam(request.getAssignedTeamId()));
         }
         wo.setPlanner(trim(request.getPlanner()));
-        wo.setPlannedStartDateTime(request.getPlannedStartDateTime());
-        wo.setPlannedEndDateTime(request.getPlannedEndDateTime());
+        wo.setPlannedStartDateTime(plannedStart);
+        wo.setPlannedEndDateTime(plannedEnd);
         wo.setPrecheckNotes(trim(request.getPreCheckNotes()));
 
         // replace planned materials if provided
@@ -493,15 +515,43 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     @Transactional(readOnly = true)
-    public List<AvailabilitySlotResponse> getTechnicianAvailability(Long technicianId, WorkOrderAvailabilityRequest request) {
+    public List<AvailabilityDayRangeResponse> getTechnicianAvailability(Long technicianId, WorkOrderAvailabilityRequest request) {
+        if (request.getTeamId() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "teamId is not allowed for technician availability");
+        }
+        if (request.getTechnicianId() != null && !request.getTechnicianId().equals(technicianId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId does not match path parameter");
+        }
         Technician technician = resolveTechnician(technicianId);
-        return computeAvailabilitySlots(technicianId, null, technician, null, request);
+        return computeAvailabilityDayRanges(technicianId, null, technician, null, request);
     }
 
     @Transactional(readOnly = true)
-    public List<AvailabilitySlotResponse> getTeamAvailability(Long teamId, WorkOrderAvailabilityRequest request) {
+    public List<AvailabilityDayRangeResponse> getTeamAvailability(Long teamId, WorkOrderAvailabilityRequest request) {
+        if (request.getTechnicianId() != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is not allowed for team availability");
+        }
+        if (request.getTeamId() != null && !request.getTeamId().equals(teamId)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "teamId does not match path parameter");
+        }
         TechnicianTeam team = resolveTeam(teamId);
-        return computeAvailabilitySlots(null, teamId, null, team, request);
+        return computeAvailabilityDayRanges(null, teamId, null, team, request);
+    }
+
+    @Transactional(readOnly = true)
+    public List<AvailabilitySlotResponse> getAvailabilityTimeSlots(WorkOrderAvailabilityRequest request) {
+        Long technicianId = request.getTechnicianId();
+        Long teamId = request.getTeamId();
+        if (technicianId == null && teamId == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId or teamId is required");
+        }
+        if (technicianId != null && teamId != null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "provide only one of technicianId or teamId");
+        }
+
+        Technician technician = technicianId != null ? resolveTechnician(technicianId) : null;
+        TechnicianTeam team = teamId != null ? resolveTeam(teamId) : null;
+        return computeAvailabilitySlots(technicianId, teamId, technician, team, request);
     }
 
     @Transactional
@@ -1119,6 +1169,34 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .build();
     }
 
+    @Transactional(readOnly = true)
+    public WorkOrderListResponse listWorkOrdersByStatus(Set<WorkOrderStatus> statuses, Pageable pageable) {
+        if (statuses == null || statuses.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "statuses are required");
+        }
+        Pageable effectivePageable = pageable;
+        if (pageable.getSort() == null || pageable.getSort().isUnsorted()) {
+            effectivePageable = PageRequest.of(
+                    pageable.getPageNumber(),
+                    pageable.getPageSize(),
+                    Sort.by("plannedEndDateTime").ascending().and(Sort.by("id").ascending())
+            );
+        }
+        Page<WorkOrder> page = workOrderRepository.findByDeletedFalseAndStatusIn(statuses, effectivePageable);
+        List<WorkOrderDetailsResponse> rows = page.getContent().stream()
+                .map(this::toDetailsResponse)
+                .toList();
+
+        return WorkOrderListResponse.builder()
+                .workOrders(rows)
+                .page(page.getNumber())
+                .size(page.getSize())
+                .totalElements(page.getTotalElements())
+                .totalPages(page.getTotalPages())
+                .last(page.isLast())
+                .build();
+    }
+
     // ---------------- DELETE (soft delete) ----------------
 
     @Transactional
@@ -1589,19 +1667,29 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                                                                     Technician technician,
                                                                     TechnicianTeam team,
                                                                     WorkOrderAvailabilityRequest request) {
-        LocalDate fromDate = request.getFromDate() != null ? request.getFromDate() : LocalDate.now();
-        LocalDate toDate = request.getToDate() != null ? request.getToDate() : fromDate.plusDays(14);
-        if (toDate.isBefore(fromDate)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "toDate must be on or after fromDate");
+        LocalDate startDate = request.getStartDate();
+        LocalDate endDate = request.getEndDate();
+        if (endDate.isBefore(startDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate must be on or after startDate");
         }
 
-        int slotMinutes = request.getSlotMinutes() != null ? request.getSlotMinutes() : 60;
-        if (slotMinutes <= 0) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "slotMinutes must be greater than 0");
+        Integer daysRequiredObj = request.getDaysRequired();
+        if (daysRequiredObj == null || daysRequiredObj <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "daysRequired must be greater than 0");
+        }
+        int daysRequired = daysRequiredObj;
+
+        int hoursRequired = 1; // default: at least 1 hour free makes the day available
+        Integer hoursRequiredObj = request.getHoursRequired();
+        if (hoursRequiredObj != null) {
+            if (hoursRequiredObj <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "hoursRequired must be greater than 0");
+            }
+            hoursRequired = hoursRequiredObj;
         }
 
-        LocalDateTime rangeStart = fromDate.atStartOfDay();
-        LocalDateTime rangeEnd = toDate.plusDays(1).atStartOfDay(); // inclusive end-of-day
+        LocalDateTime rangeStart = startDate.atStartOfDay();
+        LocalDateTime rangeEnd = endDate.plusDays(1).atStartOfDay(); // inclusive end-of-day
 
         List<WorkOrder> bookings = workOrderRepository.findBookingsForAssignments(
                 technicianId,
@@ -1611,32 +1699,140 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
         );
 
-        List<TimeWindow> mergedBusy = mergeIntervals(
-                bookings.stream()
-                        .map(wo -> new TimeWindow(wo.getPlannedStartDateTime(), wo.getPlannedEndDateTime()))
-                        .sorted(Comparator.comparing(TimeWindow::start))
-                        .toList()
-        );
-
-        List<TimeWindow> freeWindows = computeFreeWindows(rangeStart, rangeEnd, mergedBusy);
+        List<TimeWindow> bookingWindows = bookings.stream()
+                .map(wo -> new TimeWindow(wo.getPlannedStartDateTime(), wo.getPlannedEndDateTime()))
+                .toList();
 
         List<AvailabilitySlotResponse> slots = new ArrayList<>();
-        for (TimeWindow window : freeWindows) {
-            LocalDateTime cursor = window.start();
-            while (cursor.plusMinutes(slotMinutes).isBefore(window.end()) || cursor.plusMinutes(slotMinutes).equals(window.end())) {
-                LocalDateTime slotEnd = cursor.plusMinutes(slotMinutes);
-                slots.add(AvailabilitySlotResponse.builder()
-                        .start(cursor)
-                        .end(slotEnd)
-                        .technicianId(technician != null ? technician.getId() : null)
-                        .technicianName(technician != null ? technician.getFullName() : null)
-                        .teamId(team != null ? team.getId() : null)
-                        .teamName(team != null ? team.getTeamName() : null)
-                        .build());
-                cursor = slotEnd;
+        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+            LocalDateTime dayStart = day.atTime(9, 0);
+            LocalDateTime dayEnd = day.atTime(21, 0);
+
+            List<TimeWindow> dayBusy = new ArrayList<>();
+            for (TimeWindow booking : bookingWindows) {
+                LocalDateTime busyStart = booking.start().isAfter(dayStart) ? booking.start() : dayStart;
+                LocalDateTime busyEnd = booking.end().isBefore(dayEnd) ? booking.end() : dayEnd;
+                if (busyStart.isBefore(busyEnd)) {
+                    dayBusy.add(new TimeWindow(busyStart, busyEnd));
+                }
+            }
+
+            List<TimeWindow> mergedBusy = mergeIntervals(
+                    dayBusy.stream()
+                            .sorted(Comparator.comparing(TimeWindow::start))
+                            .toList()
+            );
+
+            List<TimeWindow> freeWindows = computeFreeWindows(dayStart, dayEnd, mergedBusy);
+            int slotMinutes = hoursRequired * 60;
+
+            for (TimeWindow window : freeWindows) {
+                LocalDateTime cursor = ceilToHour(window.start());
+                while (!cursor.plusMinutes(slotMinutes).isAfter(window.end())) {
+                    LocalDateTime slotEnd = cursor.plusMinutes(slotMinutes);
+                    slots.add(AvailabilitySlotResponse.builder()
+                            .start(cursor)
+                            .end(slotEnd)
+                            .technicianId(technician != null ? technician.getId() : null)
+                            .technicianName(technician != null ? technician.getFullName() : null)
+                            .teamId(team != null ? team.getId() : null)
+                            .teamName(team != null ? team.getTeamName() : null)
+                            .build());
+                    cursor = cursor.plusHours(1);
+                }
             }
         }
         return slots;
+    }
+
+    private List<AvailabilityDayRangeResponse> computeAvailabilityDayRanges(Long technicianId,
+                                                                            Long teamId,
+                                                                            Technician technician,
+                                                                            TechnicianTeam team,
+                                                                            WorkOrderAvailabilityRequest request) {
+        LocalDate startDate = request.getStartDate();
+        LocalDate endDate = request.getEndDate();
+        if (endDate.isBefore(startDate)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "endDate must be on or after startDate");
+        }
+
+        Integer daysRequiredObj = request.getDaysRequired();
+        if (daysRequiredObj == null || daysRequiredObj <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "daysRequired must be greater than 0");
+        }
+        int daysRequired = daysRequiredObj;
+
+        LocalDateTime rangeStart = startDate.atStartOfDay();
+        LocalDateTime rangeEnd = endDate.plusDays(1).atStartOfDay(); // inclusive end-of-day
+
+        List<WorkOrder> bookings = workOrderRepository.findBookingsForAssignments(
+                technicianId,
+                teamId,
+                rangeStart,
+                rangeEnd,
+                Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+        );
+
+        List<TimeWindow> bookingWindows = bookings.stream()
+                .map(wo -> new TimeWindow(wo.getPlannedStartDateTime(), wo.getPlannedEndDateTime()))
+                .toList();
+
+        List<LocalDate> availableDays = new ArrayList<>();
+        for (LocalDate day = startDate; !day.isAfter(endDate); day = day.plusDays(1)) {
+            LocalDateTime dayStart = day.atTime(9, 0);
+            LocalDateTime dayEnd = day.atTime(21, 0);
+
+            List<TimeWindow> dayBusy = new ArrayList<>();
+            for (TimeWindow booking : bookingWindows) {
+                LocalDateTime busyStart = booking.start().isAfter(dayStart) ? booking.start() : dayStart;
+                LocalDateTime busyEnd = booking.end().isBefore(dayEnd) ? booking.end() : dayEnd;
+                if (busyStart.isBefore(busyEnd)) {
+                    dayBusy.add(new TimeWindow(busyStart, busyEnd));
+                }
+            }
+
+            List<TimeWindow> mergedBusy = mergeIntervals(
+                    dayBusy.stream()
+                            .sorted(Comparator.comparing(TimeWindow::start))
+                            .toList()
+            );
+            List<TimeWindow> freeWindows = computeFreeWindows(dayStart, dayEnd, mergedBusy);
+
+            boolean available = !freeWindows.isEmpty();
+
+            if (available) {
+                availableDays.add(day);
+            }
+        }
+
+        List<AvailabilityDayRangeResponse> ranges = new ArrayList<>();
+        int i = 0;
+        while (i < availableDays.size()) {
+            int j = i;
+            while (j + 1 < availableDays.size()
+                    && availableDays.get(j + 1).equals(availableDays.get(j).plusDays(1))) {
+                j++;
+            }
+
+            int segmentLength = j - i + 1;
+            if (segmentLength >= daysRequired) {
+                for (int startIdx = i; startIdx <= j - daysRequired + 1; startIdx++) {
+                    LocalDate windowStart = availableDays.get(startIdx);
+                    LocalDate windowEnd = availableDays.get(startIdx + daysRequired - 1);
+                    ranges.add(AvailabilityDayRangeResponse.builder()
+                            .startDate(windowStart)
+                            .endDate(windowEnd)
+                            .technicianId(technician != null ? technician.getId() : null)
+                            .technicianName(technician != null ? technician.getFullName() : null)
+                            .teamId(team != null ? team.getId() : null)
+                            .teamName(team != null ? team.getTeamName() : null)
+                            .build());
+                }
+            }
+
+            i = j + 1;
+        }
+        return ranges;
     }
 
     private List<TimeWindow> mergeIntervals(List<TimeWindow> intervals) {
@@ -1676,6 +1872,13 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     }
 
     private record TimeWindow(LocalDateTime start, LocalDateTime end) { }
+
+    private LocalDateTime ceilToHour(LocalDateTime time) {
+        if (time.getMinute() == 0 && time.getSecond() == 0 && time.getNano() == 0) {
+            return time;
+        }
+        return time.plusHours(1).withMinute(0).withSecond(0).withNano(0);
+    }
 
     private String trim(String val) {
         if (val == null) return null;

@@ -66,21 +66,29 @@ public class WorkOrderController {
     }
 
     @PostMapping("/availability/technician/{technicianId}")
-    public ResponseEntity<ApiResponse<java.util.List<AvailabilitySlotResponse>>> technicianAvailability(
+    public ResponseEntity<ApiResponse<java.util.List<AvailabilityDayRangeResponse>>> technicianAvailability(
             @PathVariable Long technicianId,
             @Valid @RequestBody WorkOrderAvailabilityRequest request
     ) {
-        java.util.List<AvailabilitySlotResponse> data = workOrderService.getTechnicianAvailability(technicianId, request);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician availability slots fetched", data));
+        java.util.List<AvailabilityDayRangeResponse> data = workOrderService.getTechnicianAvailability(technicianId, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Technician availability days fetched", data));
     }
 
     @PostMapping("/availability/team/{teamId}")
-    public ResponseEntity<ApiResponse<java.util.List<AvailabilitySlotResponse>>> teamAvailability(
+    public ResponseEntity<ApiResponse<java.util.List<AvailabilityDayRangeResponse>>> teamAvailability(
             @PathVariable Long teamId,
             @Valid @RequestBody WorkOrderAvailabilityRequest request
     ) {
-        java.util.List<AvailabilitySlotResponse> data = workOrderService.getTeamAvailability(teamId, request);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team availability slots fetched", data));
+        java.util.List<AvailabilityDayRangeResponse> data = workOrderService.getTeamAvailability(teamId, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Team availability days fetched", data));
+    }
+
+    @PostMapping("/availability/time-slots")
+    public ResponseEntity<ApiResponse<java.util.List<AvailabilitySlotResponse>>> availabilityTimeSlots(
+            @Valid @RequestBody WorkOrderAvailabilityRequest request
+    ) {
+        java.util.List<AvailabilitySlotResponse> data = workOrderService.getAvailabilityTimeSlots(request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Availability time slots fetched", data));
     }
 
     @PostMapping("/{id}/in-progress")

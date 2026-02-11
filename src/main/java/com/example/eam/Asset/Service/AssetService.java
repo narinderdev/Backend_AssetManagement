@@ -24,6 +24,7 @@ import java.util.Map;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 import java.util.stream.Collectors;
+import java.util.Collection;
 
 @Service
 @RequiredArgsConstructor
@@ -477,6 +478,35 @@ public class AssetService {
     @Transactional(readOnly = true)
     public Page<AssetDetailsResponse> listAssets(Pageable pageable) {
         return assetRepository.findAll(pageable)
+                .map(asset -> {
+                    Long id = asset.getId();
+                    AssetLocation loc = locationRepository.findByAsset_Id(id).orElse(null);
+                    AssetTechnicalDetails tech = technicalRepository.findByAsset_Id(id).orElse(null);
+                    AssetFinancialDetails fin = financialRepository.findByAsset_Id(id).orElse(null);
+                    AssetWarrantyLifecycle wl = warrantyRepository.findByAsset_Id(id).orElse(null);
+                    AssetInsurance insurance = insuranceRepository.findByAsset_Id(id).orElse(null);
+                    AssetSafetyOperations safety = safetyRepository.findByAsset_Id(id).orElse(null);
+                    return mapToDetails(asset, loc, tech, fin, wl, insurance, safety);
+                });
+    }
+
+    @Transactional(readOnly = true)
+    public Page<AssetDetailsResponse> reportAssets(Collection<com.example.eam.Enum.AssetStatus> statuses,
+                                                   com.example.eam.Enum.AssetCriticality criticality,
+                                                   Long assetTypeId,
+                                                   Integer warrantyExpiryDays,
+                                                   Pageable pageable) {
+        LocalDate warrantyStart = null;
+        LocalDate warrantyEnd = null;
+        if (warrantyExpiryDays != null) {
+            if (warrantyExpiryDays != 30 && warrantyExpiryDays != 60 && warrantyExpiryDays != 90) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "warrantyExpiryDays must be 30, 60, or 90");
+            }
+            warrantyStart = LocalDate.now();
+            warrantyEnd = warrantyStart.plusDays(warrantyExpiryDays);
+        }
+
+        return assetRepository.findForReport(statuses, criticality, assetTypeId, warrantyStart, warrantyEnd, pageable)
                 .map(asset -> {
                     Long id = asset.getId();
                     AssetLocation loc = locationRepository.findByAsset_Id(id).orElse(null);
