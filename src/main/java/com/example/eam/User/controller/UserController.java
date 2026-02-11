@@ -5,6 +5,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.User.dto.ChangePasswordDto;
 import com.example.eam.User.dto.UserCreateDto;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.service.UserService;
@@ -33,6 +34,19 @@ public class UserController {
         var users = userService.listUsers();
         ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>> response =
                 ApiResponse.successResponse(200, "Users fetched successfully", users);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/change-password")
+    public ResponseEntity<ApiResponse<Void>> changePassword(
+            @Valid @RequestBody ChangePasswordDto dto
+    ) {
+        String email = org.springframework.security.core.context.SecurityContextHolder.getContext()
+                .getAuthentication() != null
+                ? String.valueOf(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal())
+                : null;
+        userService.changePassword(email, dto);
+        ApiResponse<Void> response = ApiResponse.successResponse(200, "Password updated successfully", null);
         return ResponseEntity.ok(response);
     }
 }

@@ -6,6 +6,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
+import com.example.eam.User.dto.ChangePasswordDto;
 import com.example.eam.User.dto.UserCreateDto;
 import com.example.eam.User.dto.UserSummaryDto;
 import com.example.eam.User.entity.UserRole;
@@ -78,6 +79,29 @@ public class UserService {
             userRoleRepository.save(userRole);
 
             return savedUser;
+        }
+
+        @Transactional
+        public void changePassword(String authenticatedEmail, ChangePasswordDto dto) {
+            String normalizedEmail = authenticatedEmail != null ? authenticatedEmail.trim().toLowerCase() : null;
+            if (normalizedEmail == null || normalizedEmail.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+            }
+
+            Users user = usersRepository.findByEmailAndDeletedFalse(normalizedEmail)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+            if (user.getPassword() == null || user.getPassword().isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password is not set for this user");
+            }
+
+            if (!passwordEncoder.matches(dto.getCurrentPassword(), user.getPassword())) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Current password is incorrect");
+            }
+
+            user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+            user.setUpdatedAt(Instant.now());
+            usersRepository.save(user);
         }
 
         @Transactional(readOnly = true)
