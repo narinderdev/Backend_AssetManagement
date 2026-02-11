@@ -7,5 +7,6 @@ import java.util.Optional;
 
 public interface WorkOrderTypeTemplateRepository extends JpaRepository<WorkOrderTypeTemplate, Long> {
     boolean existsByWorkOrderTypeIgnoreCase(String workOrderType);
+    boolean existsByWorkOrderTypeIgnoreCaseAndIdNot(String workOrderType, Long id);
     Optional<WorkOrderTypeTemplate> findByWorkOrderTypeIgnoreCase(String workOrderType);
 }

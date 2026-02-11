@@ -3,6 +3,7 @@ package com.example.eam.WorkOrder.Controller;
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateCreateRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateResponse;
+import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateUpdateRequest;
 import com.example.eam.WorkOrder.Service.WorkOrderTypeTemplateService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -37,5 +38,19 @@ public class WorkOrderTypeTemplateController {
     public ResponseEntity<ApiResponse<Page<WorkOrderTypeTemplateResponse>>> list(Pageable pageable) {
         Page<WorkOrderTypeTemplateResponse> data = service.list(pageable);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order types fetched", data));
+    }
+
+    @PatchMapping("/{id}")
+    public ResponseEntity<ApiResponse<WorkOrderTypeTemplateResponse>> update(
+            @PathVariable Long id,
+            @RequestBody WorkOrderTypeTemplateUpdateRequest req) {
+        WorkOrderTypeTemplateResponse data = service.update(id, req);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order type updated", data));
+    }
+
+    @DeleteMapping("/{id}")
+    public ResponseEntity<ApiResponse<Void>> delete(@PathVariable Long id) {
+        service.delete(id);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order type deleted", null));
     }
 }

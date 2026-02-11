@@ -2,7 +2,9 @@ package com.example.eam.WorkOrder.Service;
 
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateCreateRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateResponse;
+import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateUpdateRequest;
 import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
+import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderTypeTemplateRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -17,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 public class WorkOrderTypeTemplateService {
 
     private final WorkOrderTypeTemplateRepository repository;
+    private final WorkOrderRepository workOrderRepository;
 
     @Transactional
     public WorkOrderTypeTemplateResponse create(WorkOrderTypeTemplateCreateRequest req) {
@@ -46,6 +49,44 @@ public class WorkOrderTypeTemplateService {
     @Transactional(readOnly = true)
     public Page<WorkOrderTypeTemplateResponse> list(Pageable pageable) {
         return repository.findAll(pageable).map(this::toResponse);
+    }
+
+    @Transactional
+    public WorkOrderTypeTemplateResponse update(Long id, WorkOrderTypeTemplateUpdateRequest req) {
+        WorkOrderTypeTemplate t = getOrThrow(id);
+
+        if (req.getWorkOrderType() != null) {
+            String type = req.getWorkOrderType().trim();
+            if (type.isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderType cannot be blank");
+            }
+            if (repository.existsByWorkOrderTypeIgnoreCaseAndIdNot(type, id)) {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type already exists: " + type);
+            }
+            t.setWorkOrderType(type);
+        }
+
+        if (req.getDefaultGlAccount() != null) t.setDefaultGlAccount(trim(req.getDefaultGlAccount()));
+        if (req.getDefaultUtilityAccount() != null) t.setDefaultUtilityAccount(trim(req.getDefaultUtilityAccount()));
+        if (req.getCostTreatment() != null) t.setCostTreatment(req.getCostTreatment());
+        if (req.getLaborGlAccount() != null) t.setLaborGlAccount(trim(req.getLaborGlAccount()));
+        if (req.getLaborUtilityAccount() != null) t.setLaborUtilityAccount(trim(req.getLaborUtilityAccount()));
+        if (req.getInventoryGlAccount() != null) t.setInventoryGlAccount(trim(req.getInventoryGlAccount()));
+        if (req.getInventoryUtilityAccount() != null) t.setInventoryUtilityAccount(trim(req.getInventoryUtilityAccount()));
+        if (req.getActive() != null) t.setActive(req.getActive());
+
+        WorkOrderTypeTemplate saved = repository.save(t);
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        WorkOrderTypeTemplate t = getOrThrow(id);
+        long inUse = workOrderRepository.countByWorkOrderTypeTemplate_Id(id);
+        if (inUse > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type is in use and cannot be deleted");
+        }
+        repository.delete(t);
     }
 
     private WorkOrderTypeTemplate getOrThrow(Long id) {

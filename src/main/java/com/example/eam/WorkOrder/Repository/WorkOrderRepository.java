@@ -51,6 +51,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     long countByDeletedFalse();
 
+    long countByWorkOrderTypeTemplate_Id(Long workOrderTypeId);
+
 
     @Query("""
         select distinct wo from WorkOrder wo
