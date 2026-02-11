@@ -27,18 +27,25 @@ public class WorkOrderReportController {
     @GetMapping
     public ResponseEntity<ApiResponse<WorkOrderListResponse>> list(
             @RequestParam(value = "statuses", required = false) List<WorkOrderStatus> statuses,
+            @RequestParam(value = "status", required = false) WorkOrderStatus status,
             Pageable pageable
     ) {
-        Set<WorkOrderStatus> filterStatuses = (statuses == null || statuses.isEmpty())
-                ? EnumSet.of(
-                        WorkOrderStatus.NEW,
-                        WorkOrderStatus.APPROVED,
-                        WorkOrderStatus.SCHEDULED,
-                        WorkOrderStatus.IN_PROGRESS,
-                        WorkOrderStatus.COMPLETED,
-                        WorkOrderStatus.CLOSED
-                )
-                : EnumSet.copyOf(statuses);
+        Set<WorkOrderStatus> filterStatuses;
+        if (statuses != null && !statuses.isEmpty()) {
+            filterStatuses = EnumSet.copyOf(statuses);
+        } else if (status != null) {
+            filterStatuses = EnumSet.of(status);
+        } else {
+            filterStatuses = EnumSet.of(
+                    WorkOrderStatus.NEW,
+                    WorkOrderStatus.APPROVED,
+                    WorkOrderStatus.REJECTED,
+                    WorkOrderStatus.SCHEDULED,
+                    WorkOrderStatus.IN_PROGRESS,
+                    WorkOrderStatus.COMPLETED,
+                    WorkOrderStatus.CLOSED
+            );
+        }
 
         WorkOrderListResponse data = workOrderService.listWorkOrdersByStatus(filterStatuses, pageable);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order report fetched", data));
