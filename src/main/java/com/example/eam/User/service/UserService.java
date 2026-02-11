@@ -16,6 +16,7 @@ import com.example.eam.User.repository.UsersRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
 import lombok.RequiredArgsConstructor;
+import java.time.Instant;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -60,6 +61,7 @@ public class UserService {
             newUser.setStatus(UserStatus.ACTIVE);
             newUser.setDeleted(false);
             newUser.setPassword(passwordEncoder.encode(password));
+            newUser.setUpdatedAt(Instant.now());
             
 
             // Save the user

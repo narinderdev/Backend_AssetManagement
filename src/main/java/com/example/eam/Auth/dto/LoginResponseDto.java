@@ -16,14 +16,23 @@ public class LoginResponseDto {
     private Boolean technician;
     private Boolean teamLeader;
     private List<TeamSummary> leaderTeams;
+    private Integer daysUntilPasswordExpiry;
+    private Boolean passwordExpired;
 
     public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader, List<TeamSummary> leaderTeams) {
+        this(token, user, technicianId, technician, teamLeader, leaderTeams, null, null);
+    }
+
+    public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
+                            List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired) {
         this.token = token;
         this.user = user;
         this.technicianId = technicianId;
         this.technician = technician;
         this.teamLeader = teamLeader;
         this.leaderTeams = leaderTeams;
+        this.daysUntilPasswordExpiry = daysUntilPasswordExpiry;
+        this.passwordExpired = passwordExpired;
     }
 
     @Getter

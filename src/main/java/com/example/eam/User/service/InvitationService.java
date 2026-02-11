@@ -26,6 +26,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
@@ -159,6 +160,7 @@ public class InvitationService {
         }
 
         user.setPassword(passwordEncoder.encode(dto.getPassword()));
+        user.setUpdatedAt(Instant.now());
         user.setStatus(UserStatus.ACTIVE);
         usersRepository.save(user);
     }

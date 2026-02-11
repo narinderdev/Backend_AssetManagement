@@ -1,5 +1,9 @@
 package com.example.eam.Auth.service;
 
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.temporal.ChronoUnit;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -14,8 +18,10 @@ import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
+import com.example.eam.User.entity.PasswordPolicy;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
+import com.example.eam.User.repository.PasswordPolicyRepository;
 import com.example.eam.User.repository.UsersRepository;
 import com.example.eam.Enum.DevicePlatform;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
@@ -38,6 +44,10 @@ public class LoginService {
     private final TechnicianRepository technicianRepository;
     private final TechnicianDeviceTokenRepository technicianDeviceTokenRepository;
     private final TechnicianTeamMemberRepository technicianTeamMemberRepository;
+    private final PasswordPolicyRepository passwordPolicyRepository;
+
+    private static final int DEFAULT_PASSWORD_EXPIRY_DAYS = 90;
+    private static final int PASSWORD_EXPIRY_WARNING_DAYS = 7;
 
     @Transactional
     public LoginResponseDto login(LoginDto dto) {
@@ -60,6 +70,17 @@ public class LoginService {
                     HttpStatus.UNAUTHORIZED, "Invalid password"
             );
         }
+
+        int expiryDays = resolvePasswordExpiryDays();
+        LocalDate passwordChangedAt = resolvePasswordChangedAt(user);
+        LocalDate expiryDate = passwordChangedAt.plusDays(expiryDays);
+        long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate);
+        if (daysRemaining < 0) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Password expired");
+        }
+        Integer daysUntilPasswordExpiry = daysRemaining <= PASSWORD_EXPIRY_WARNING_DAYS
+                ? (int) daysRemaining
+                : null;
 
         List<String> roles = user.getUserRoles()
                 .stream()
@@ -94,7 +115,35 @@ public class LoginService {
                 )
         );
 
-        return new LoginResponseDto(token, user, technicianId, isTechnician, isTeamLeader, leaderTeams);
+        return new LoginResponseDto(
+                token,
+                user,
+                technicianId,
+                isTechnician,
+                isTeamLeader,
+                leaderTeams,
+                daysUntilPasswordExpiry,
+                false
+        );
+    }
+
+    private int resolvePasswordExpiryDays() {
+        return passwordPolicyRepository.findTopByOrderByIdAsc()
+                .map(PasswordPolicy::getPasswordExpiryDays)
+                .filter(days -> days != null && days > 0)
+                .orElse(DEFAULT_PASSWORD_EXPIRY_DAYS);
+    }
+
+    private LocalDate resolvePasswordChangedAt(Users user) {
+        Instant updatedAt = user.getUpdatedAt();
+        if (updatedAt != null) {
+            return LocalDate.ofInstant(updatedAt, ZoneOffset.UTC);
+        }
+        Instant createdAt = user.getCreatedAt();
+        if (createdAt != null) {
+            return LocalDate.ofInstant(createdAt, ZoneOffset.UTC);
+        }
+        return LocalDate.now();
     }
 
     private Long ensureTechnicianProfile(Users user) {
