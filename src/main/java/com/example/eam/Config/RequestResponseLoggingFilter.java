@@ -139,7 +139,10 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         if (body == null || body.isBlank()) return body;
         return body
                 .replaceAll("\"password\"\\s*:\\s*\"[^\"]*\"", "\"password\":\"***\"")
-                .replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"***\"");
+                .replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"***\"")
+                .replaceAll("\"mfaToken\"\\s*:\\s*\"[^\"]*\"", "\"mfaToken\":\"***\"")
+                .replaceAll("\"mfa_token\"\\s*:\\s*\"[^\"]*\"", "\"mfa_token\":\"***\"")
+                .replaceAll("\"secret\"\\s*:\\s*\"[^\"]*\"", "\"secret\":\"***\"");
     }
 }
 

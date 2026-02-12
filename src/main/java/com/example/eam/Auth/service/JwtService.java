@@ -28,8 +28,12 @@ public class JwtService {
     }
 
     public String generateToken(String subject, Map<String, Object> claims) {
+        return generateToken(subject, claims, expirationMs);
+    }
+
+    public String generateToken(String subject, Map<String, Object> claims, long customExpirationMs) {
         Date now = new Date();
-        Date expiry = new Date(now.getTime() + expirationMs);
+        Date expiry = new Date(now.getTime() + customExpirationMs);
 
         return Jwts.builder()
                 .setSubject(subject)             // usually email or userId

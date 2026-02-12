@@ -54,6 +54,18 @@ public class Users {
     @Column(name = "updated_at")
     private Instant updatedAt;
 
+    @Default
+    @Column(name = "mfa_enabled", nullable = false)
+    private boolean mfaEnabled = false;
+
+    @Column(name = "mfa_secret", length = 512)
+    @JsonIgnore
+    private String mfaSecret;
+
+    @Column(name = "mfa_secret_temp", length = 512)
+    @JsonIgnore
+    private String mfaSecretTemp;
+
 }
 
 

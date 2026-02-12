@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.eam.Auth.dto.LoginDto;
 import com.example.eam.Auth.dto.LoginResponseDto;
+import com.example.eam.Auth.dto.MfaLoginDto;
 import com.example.eam.Auth.service.LogoutService;
 import com.example.eam.Auth.service.LoginService;
 import com.example.eam.Common.ApiResponse;
@@ -29,12 +30,26 @@ public class LoginController {
     public ResponseEntity<ApiResponse<LoginResponseDto>> login(@Valid @RequestBody LoginDto dto) {
         LoginResponseDto user = loginService.login(dto);
 
+        String message = Boolean.TRUE.equals(user.getMfaRequired())
+                ? "MFA required"
+                : "Login Successfully";
         ApiResponse<LoginResponseDto> body = ApiResponse.successResponse(
             201, 
-            "Login Successfully", 
+            message, 
             user
         );
         return ResponseEntity.status(200).body(body);
+    }
+
+    @PostMapping("/login/mfa")
+    public ResponseEntity<ApiResponse<LoginResponseDto>> loginWithMfa(@Valid @RequestBody MfaLoginDto dto) {
+        LoginResponseDto user = loginService.loginWithMfa(dto);
+        ApiResponse<LoginResponseDto> body = ApiResponse.successResponse(
+            200,
+            "Login Successfully",
+            user
+        );
+        return ResponseEntity.ok(body);
     }
 
     @PostMapping("/logout")

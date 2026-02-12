@@ -2,6 +2,7 @@ package com.example.eam.Auth.dto;
 
 import com.example.eam.User.entity.Users;
 import com.fasterxml.jackson.annotation.JsonInclude;
+import com.fasterxml.jackson.annotation.JsonProperty;
 import java.util.List;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
@@ -18,6 +19,12 @@ public class LoginResponseDto {
     private List<TeamSummary> leaderTeams;
     private Integer daysUntilPasswordExpiry;
     private Boolean passwordExpired;
+    @JsonProperty("mfa_required")
+    private Boolean mfaRequired;
+
+    @JsonProperty("mfa_token")
+    private String mfaToken;
+
 
     public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader, List<TeamSummary> leaderTeams) {
         this(token, user, technicianId, technician, teamLeader, leaderTeams, null, null);
@@ -33,6 +40,11 @@ public class LoginResponseDto {
         this.leaderTeams = leaderTeams;
         this.daysUntilPasswordExpiry = daysUntilPasswordExpiry;
         this.passwordExpired = passwordExpired;
+    }
+
+    public LoginResponseDto(Boolean mfaRequired, String mfaToken) {
+        this.mfaRequired = mfaRequired;
+        this.mfaToken = mfaToken;
     }
 
     @Getter

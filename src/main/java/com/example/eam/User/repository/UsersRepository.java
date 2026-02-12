@@ -14,6 +14,7 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
     Optional<Users> findByEmail(String email);
     boolean existsByEmail(String email);
     Optional<Users> findByEmailAndDeletedFalse(String email);
+    Optional<Users> findByIdAndDeletedFalse(Long id);
 
     @Query("""
         select distinct u from Users u
