@@ -142,6 +142,8 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
                 .replaceAll("\"token\"\\s*:\\s*\"[^\"]*\"", "\"token\":\"***\"")
                 .replaceAll("\"mfaToken\"\\s*:\\s*\"[^\"]*\"", "\"mfaToken\":\"***\"")
                 .replaceAll("\"mfa_token\"\\s*:\\s*\"[^\"]*\"", "\"mfa_token\":\"***\"")
+                .replaceAll("\"code\"\\s*:\\s*\"\\d{6}\"", "\"code\":\"***\"")
+                .replaceAll("\"otp\"\\s*:\\s*\"\\d{4,8}\"", "\"otp\":\"***\"")
                 .replaceAll("\"secret\"\\s*:\\s*\"[^\"]*\"", "\"secret\":\"***\"");
     }
 }

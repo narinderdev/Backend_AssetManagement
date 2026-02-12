@@ -10,9 +10,11 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.eam.Auth.dto.LoginDto;
 import com.example.eam.Auth.dto.LoginResponseDto;
+import com.example.eam.Auth.dto.MfaCodeDto;
 import com.example.eam.Auth.dto.MfaLoginDto;
 import com.example.eam.Auth.service.LogoutService;
 import com.example.eam.Auth.service.LoginService;
+import com.example.eam.Auth.service.MfaService;
 import com.example.eam.Common.ApiResponse;
 
 import jakarta.validation.Valid;
@@ -24,6 +26,7 @@ import lombok.RequiredArgsConstructor;
 public class LoginController {
     private final LoginService loginService;
     private final LogoutService logoutService;
+    private final MfaService mfaService;
     
 
     @PostMapping()
@@ -50,6 +53,35 @@ public class LoginController {
             user
         );
         return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/mfa/email/send")
+    public ResponseEntity<ApiResponse<Void>> sendMfaEmailOtp() {
+        String email = currentUserEmail();
+        mfaService.sendEmailOtp(email);
+        ApiResponse<Void> body = ApiResponse.successResponse(
+                200,
+                "Email OTP sent successfully",
+                null
+        );
+        return ResponseEntity.ok(body);
+    }
+
+    @PostMapping("/mfa/email/verify")
+    public ResponseEntity<ApiResponse<Void>> verifyMfaEmailOtp(@Valid @RequestBody MfaCodeDto dto) {
+        String email = currentUserEmail();
+        mfaService.verifyEmailOtp(email, dto.getCode());
+        ApiResponse<Void> body = ApiResponse.successResponse(
+                200,
+                "Email OTP verified successfully",
+                null
+        );
+        return ResponseEntity.ok(body);
+    }
+
+    private String currentUserEmail() {
+        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
+        return auth != null ? String.valueOf(auth.getPrincipal()) : null;
     }
 
     @PostMapping("/logout")

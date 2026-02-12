@@ -66,6 +66,18 @@ public class Users {
     @JsonIgnore
     private String mfaSecretTemp;
 
+    @Column(name = "mfa_email_otp", length = 10)
+    @JsonIgnore
+    private String mfaEmailOtp;
+
+    @Column(name = "mfa_email_otp_expires_at")
+    @JsonIgnore
+    private Instant mfaEmailOtpExpiresAt;
+
+    @Default
+    @Column(name = "mfa_email_verified", nullable = false)
+    private boolean mfaEmailVerified = false;
+
 }
 
 
