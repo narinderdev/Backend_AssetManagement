@@ -4,6 +4,7 @@ import jakarta.annotation.PostConstruct;
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.env.Environment;
 import org.springframework.core.io.ByteArrayResource;
@@ -51,6 +52,7 @@ public class EmailService {
         log.info("Mail will be sent FROM: {}", this.fromEmail);
     }
 
+    @Async("emailTaskExecutor")
     public void sendWithAttachment(String to, String subject, String html, byte[] pdf) {
         if (fromEmail == null || fromEmail.isBlank()) {
             throw new IllegalStateException("Mail is not configured; set spring.mail.username/password or set app.mail.enforce-credentials=true with valid credentials.");
@@ -83,4 +85,3 @@ public class EmailService {
         }
     }
 }
-
