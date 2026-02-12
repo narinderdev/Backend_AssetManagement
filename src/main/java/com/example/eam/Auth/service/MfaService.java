@@ -108,13 +108,13 @@ public class MfaService {
         usersRepository.save(user);
 
         String html = """
-                <p>Your MFA email verification code is:</p>
+                <p>Your email verification code is:</p>
                 <h2>%s</h2>
                 <p>This code expires in %d minutes.</p>
                 """.formatted(otp, emailOtpExpiryMinutes);
         emailService.sendWithAttachment(
                 user.getEmail(),
-                "Your MFA email verification code",
+                "Your email verification code",
                 html,
                 null
         );
