@@ -109,7 +109,7 @@ public class MfaService {
     }
 
     private String buildOtpAuthUrl(String appName, String email, String secret) {
-        String label = URLEncoder.encode(appName + ":" + email, StandardCharsets.UTF_8);
+        String label = URLEncoder.encode(appName, StandardCharsets.UTF_8);
         String issuer = URLEncoder.encode(appName, StandardCharsets.UTF_8);
         return "otpauth://totp/" + label
                 + "?secret=" + secret
