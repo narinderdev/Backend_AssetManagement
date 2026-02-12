@@ -34,7 +34,8 @@ public class LoginController {
         LoginResponseDto user = loginService.login(dto);
 
         String message = Boolean.TRUE.equals(user.getMfaRequired())
-                ? "MFA required"
+                // ? "MFA required" 
+                ?"OTP Sent on Email"
                 : "Login Successfully";
         ApiResponse<LoginResponseDto> body = ApiResponse.successResponse(
             201, 

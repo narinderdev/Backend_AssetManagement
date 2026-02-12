@@ -93,10 +93,10 @@ public class LoginService {
                 claims.put("devicePlatform", dto.getDevicePlatform().trim());
             }
             String mfaToken = jwtService.generateToken(user.getEmail(), claims, mfaTokenExpirationMs);
-            return new LoginResponseDto(true, mfaToken);
+            return buildLoginResponse(user, daysUntilPasswordExpiry, dto.getDeviceToken(), dto.getDevicePlatform(), true, mfaToken);
         }
 
-        return buildLoginResponse(user, daysUntilPasswordExpiry, dto.getDeviceToken(), dto.getDevicePlatform());
+        return buildLoginResponse(user, daysUntilPasswordExpiry, dto.getDeviceToken(), dto.getDevicePlatform(), null, null);
     }
 
     @Transactional
@@ -128,10 +128,11 @@ public class LoginService {
         Integer daysUntilPasswordExpiry = resolveDaysUntilPasswordExpiry(user);
         String deviceToken = claims.get("deviceToken", String.class);
         String devicePlatform = claims.get("devicePlatform", String.class);
-        return buildLoginResponse(user, daysUntilPasswordExpiry, deviceToken, devicePlatform);
+        return buildLoginResponse(user, daysUntilPasswordExpiry, deviceToken, devicePlatform, null, null);
     }
 
-    private LoginResponseDto buildLoginResponse(Users user, Integer daysUntilPasswordExpiry, String deviceToken, String devicePlatform) {
+    private LoginResponseDto buildLoginResponse(Users user, Integer daysUntilPasswordExpiry, String deviceToken, String devicePlatform,
+                                                Boolean mfaRequired, String mfaToken) {
         List<String> roles = user.getUserRoles()
                 .stream()
                 .map(ur -> ur.getRole().getName())
@@ -172,7 +173,9 @@ public class LoginService {
                 isTeamLeader,
                 leaderTeams,
                 daysUntilPasswordExpiry,
-                false
+                false,
+                mfaRequired,
+                mfaToken
         );
     }
 

@@ -42,6 +42,14 @@ public class LoginResponseDto {
         this.passwordExpired = passwordExpired;
     }
 
+    public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
+                            List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired,
+                            Boolean mfaRequired, String mfaToken) {
+        this(token, user, technicianId, technician, teamLeader, leaderTeams, daysUntilPasswordExpiry, passwordExpired);
+        this.mfaRequired = mfaRequired;
+        this.mfaToken = mfaToken;
+    }
+
     public LoginResponseDto(Boolean mfaRequired, String mfaToken) {
         this.mfaRequired = mfaRequired;
         this.mfaToken = mfaToken;
