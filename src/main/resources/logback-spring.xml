@@ -2,7 +2,7 @@
 <configuration>
 
     <!-- Log directory -->
-    <property name="LOG_PATH" value="./logs"/>
+    <springProperty scope="context" name="LOG_PATH" source="app.logging.path" defaultValue="./logs"/>
 
     <!-- Patterns -->
     <property name="CONSOLE_PATTERN"
@@ -50,14 +50,14 @@
     </appender>
 
     <!-- ================= YOUR REQUEST FILTER ONLY ================= -->
-    <logger name="com.example.account.receivable.Config.RequestResponseLoggingFilter"
+    <logger name="com.example.eam.Config.RequestResponseLoggingFilter"
             level="INFO"
             additivity="false">
         <appender-ref ref="HTTP_FILE"/>
     </logger>
 
     <!-- ================= APPLICATION LOGGING ================= -->
-    <logger name="com.example.account.receivable" level="DEBUG"/>
+    <logger name="com.example.eam" level="DEBUG"/>
 
     <!-- ================= ROOT LOGGER (IMPORTANT) ================= -->
     <root level="INFO">
