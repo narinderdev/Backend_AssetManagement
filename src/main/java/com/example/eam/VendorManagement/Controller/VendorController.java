@@ -2,6 +2,7 @@ package com.example.eam.VendorManagement.Controller;
 
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.VendorManagement.Dto.*;
 import com.example.eam.VendorManagement.Service.VendorService;
 import jakarta.validation.Valid;
@@ -41,10 +42,18 @@ public class VendorController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<VendorResponse>>> list(Pageable pageable,
-                                                                  @RequestParam(defaultValue = "false") boolean includeInactive) {
+    public ResponseEntity<ApiResponse<PageResponse<VendorResponse>>> list(
+            Pageable pageable,
+            @RequestParam(defaultValue = "false") boolean includeInactive
+    ) {
         Page<VendorResponse> data = vendorService.list(pageable, includeInactive);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Vendors fetched successfully", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(
+                        HttpStatus.OK.value(),
+                        "Vendors fetched successfully",
+                        PageResponse.from(data)
+                )
+        );
     }
 
     @DeleteMapping("/{id}")

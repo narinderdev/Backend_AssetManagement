@@ -1,6 +1,7 @@
 package com.example.eam.Procurement.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.Procurement.Dto.*;
 import com.example.eam.Procurement.Service.MaterialRequisitionService;
 import com.example.eam.Procurement.Service.PurchaseOrderService;
@@ -31,9 +32,15 @@ public class MaterialRequisitionController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<MaterialRequisitionResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<MaterialRequisitionResponse>>> list(Pageable pageable) {
         Page<MaterialRequisitionResponse> data = materialRequisitionService.list(pageable);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Material Requisitions fetched", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(
+                        HttpStatus.OK.value(),
+                        "Material Requisitions fetched",
+                        PageResponse.from(data)
+                )
+        );
     }
 
     @GetMapping("/{id}")

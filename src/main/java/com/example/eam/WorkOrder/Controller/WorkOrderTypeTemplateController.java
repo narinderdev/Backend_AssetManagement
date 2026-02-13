@@ -1,6 +1,7 @@
 package com.example.eam.WorkOrder.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateCreateRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateUpdateRequest;
@@ -35,9 +36,11 @@ public class WorkOrderTypeTemplateController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<WorkOrderTypeTemplateResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<WorkOrderTypeTemplateResponse>>> list(Pageable pageable) {
         Page<WorkOrderTypeTemplateResponse> data = service.list(pageable);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order types fetched", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(HttpStatus.OK.value(), "Work order types fetched", PageResponse.from(data))
+        );
     }
 
     @PatchMapping("/{id}")

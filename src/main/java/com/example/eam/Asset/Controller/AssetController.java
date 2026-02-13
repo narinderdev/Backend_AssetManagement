@@ -3,6 +3,7 @@ package com.example.eam.Asset.Controller;
 import com.example.eam.Asset.Dto.*;
 import com.example.eam.Asset.Service.AssetService;
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -131,10 +132,13 @@ public class AssetController {
 
     // 6. LIST ALL ASSETS (paginated)
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<AssetDetailsResponse>>> listAssets(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<AssetDetailsResponse>>> listAssets(Pageable pageable) {
         Page<AssetDetailsResponse> page = assetService.listAssets(pageable);
-        ApiResponse<Page<AssetDetailsResponse>> apiResponse = ApiResponse.successResponse(HttpStatus.OK.value(),
-                "Assets list fetched successfully", page);
+        ApiResponse<PageResponse<AssetDetailsResponse>> apiResponse = ApiResponse.successResponse(
+                HttpStatus.OK.value(),
+                "Assets list fetched successfully",
+                PageResponse.from(page)
+        );
         return ResponseEntity.ok(apiResponse);
     }
 }

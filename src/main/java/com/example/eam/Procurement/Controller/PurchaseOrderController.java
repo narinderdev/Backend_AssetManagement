@@ -1,6 +1,7 @@
 package com.example.eam.Procurement.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.Procurement.Dto.CreatePurchaseOrderRequest;
 import com.example.eam.Procurement.Dto.PurchaseOrderResponse;
 import com.example.eam.Procurement.Dto.UpdatePurchaseOrderStatusRequest;
@@ -31,10 +32,14 @@ public class PurchaseOrderController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<PurchaseOrderResponse>>> list(Pageable pageable,
-                                                                         @RequestParam(required = false) Long mrId) {
+    public ResponseEntity<ApiResponse<PageResponse<PurchaseOrderResponse>>> list(
+            Pageable pageable,
+            @RequestParam(required = false) Long mrId
+    ) {
         Page<PurchaseOrderResponse> data = purchaseOrderService.list(pageable, mrId);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Purchase Orders fetched", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(HttpStatus.OK.value(), "Purchase Orders fetched", PageResponse.from(data))
+        );
     }
 
     @GetMapping("/{id}")

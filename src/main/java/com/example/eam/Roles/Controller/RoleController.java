@@ -1,6 +1,7 @@
 package com.example.eam.Roles.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.Roles.Dto.*;
 import com.example.eam.Roles.Service.RoleService;
 import jakarta.validation.Valid;
@@ -37,9 +38,11 @@ public class RoleController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<RoleResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<RoleResponse>>> list(Pageable pageable) {
         Page<RoleResponse> data = roleService.list(pageable);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Roles fetched successfully", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(HttpStatus.OK.value(), "Roles fetched successfully", PageResponse.from(data))
+        );
     }
 
     @DeleteMapping("/{id}")

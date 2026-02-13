@@ -1,6 +1,7 @@
 package com.example.eam.InventoryManagement.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.InventoryManagement.Dto.*;
 import com.example.eam.InventoryManagement.Service.InventoryItemService;
 import jakarta.validation.Valid;
@@ -38,9 +39,15 @@ public class InventoryItemController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<InventoryItemResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<InventoryItemResponse>>> list(Pageable pageable) {
         Page<InventoryItemResponse> data = service.list(pageable);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Inventory items fetched successfully", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(
+                        HttpStatus.OK.value(),
+                        "Inventory items fetched successfully",
+                        PageResponse.from(data)
+                )
+        );
     }
 
     @DeleteMapping("/{id}")

@@ -1060,6 +1060,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     "Only in-progress work orders can be completed by technicians");
         }
 
+        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
+        if (!openLogs.isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Check out all technicians before completing the work order");
+        }
+
         if (request.getActualStartDateTime() != null) {
             wo.setActualStartDateTime(request.getActualStartDateTime());
         } else if (wo.getActualStartDateTime() == null) {
@@ -1078,11 +1084,23 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         updateIfNotNull(request.getBeforePhotoUrl(), wo::setBeforePhotoUrl);
         updateIfNotNull(request.getAfterPhotoUrl(), wo::setAfterPhotoUrl);
 
+        List<WorkOrderCheckLog> checkLogs = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        Map<Long, BigDecimal> workingHoursByTechnician = computeWorkingHoursByTechnician(checkLogs);
+
         BigDecimal totalLaborHours = BigDecimal.ZERO;
         BigDecimal totalLaborCost = BigDecimal.ZERO;
+        Set<Long> seenTechnicianIds = new java.util.HashSet<>();
         if (request.getLaborEntries() != null) {
             for (WorkOrderLaborEntryRequest laborRequest : request.getLaborEntries()) {
-                WorkOrderLaborEntry entry = buildLaborEntry(wo, laborRequest);
+                if (laborRequest == null || laborRequest.getTechnicianId() == null) {
+                    throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required for each labor entry");
+                }
+                if (!seenTechnicianIds.add(laborRequest.getTechnicianId())) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT,
+                            "Duplicate technicianId in labor entries: " + laborRequest.getTechnicianId());
+                }
+
+                WorkOrderLaborEntry entry = buildLaborEntry(wo, laborRequest, workingHoursByTechnician);
                 workOrderLaborEntryRepository.save(entry);
                 totalLaborHours = totalLaborHours.add(entry.getLaborHours());
                 if (entry.getLaborCost() != null) {
@@ -1091,13 +1109,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             }
         }
 
-        if (totalLaborHours.compareTo(BigDecimal.ZERO) > 0) {
-            if (wo.getActualLaborHours() == null) {
-                wo.setActualLaborHours(totalLaborHours);
-            } else {
-                wo.setActualLaborHours(wo.getActualLaborHours().add(totalLaborHours));
-            }
-        }
+        wo.setActualLaborHours(totalLaborHours.compareTo(BigDecimal.ZERO) > 0 ? totalLaborHours : null);
         wo.setActualLaborCost(totalLaborCost.compareTo(BigDecimal.ZERO) > 0 ? totalLaborCost : null);
 
         BigDecimal totalMaterialCost = BigDecimal.ZERO;
@@ -1408,11 +1420,11 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     private List<Technician> resolveTechniciansForLog(WorkOrderCheckLog log) {
         if (log == null) return List.of();
-        if (log.getTeam() != null) {
-            return dedupeById(getTeamMembers(log.getTeam()));
-        }
         if (log.getTechnician() != null) {
             return List.of(log.getTechnician());
+        }
+        if (log.getTeam() != null) {
+            return dedupeById(getTeamMembers(log.getTeam()));
         }
         return List.of();
     }
@@ -1505,6 +1517,35 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .sum();
     }
 
+    private Map<Long, BigDecimal> computeWorkingHoursByTechnician(List<WorkOrderCheckLog> logs) {
+        if (logs == null || logs.isEmpty()) {
+            return Map.of();
+        }
+
+        Map<Long, Long> workingSecondsByTechnician = new HashMap<>();
+        for (WorkOrderCheckLog log : logs) {
+            long workingSeconds = computeWorkingSeconds(log);
+            if (workingSeconds <= 0) {
+                continue;
+            }
+
+            for (Technician technician : resolveTechniciansForLog(log)) {
+                if (technician == null || technician.getId() == null) {
+                    continue;
+                }
+                workingSecondsByTechnician.merge(technician.getId(), workingSeconds, Long::sum);
+            }
+        }
+
+        Map<Long, BigDecimal> workingHoursByTechnician = new HashMap<>();
+        for (Map.Entry<Long, Long> entry : workingSecondsByTechnician.entrySet()) {
+            BigDecimal hours = BigDecimal.valueOf(entry.getValue())
+                    .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+            workingHoursByTechnician.put(entry.getKey(), hours);
+        }
+        return workingHoursByTechnician;
+    }
+
     private Technician resolveTechnician(Long technicianId) {
         if (technicianId == null) return null;
         return technicianRepository.findByIdAndIsDeletedFalse(technicianId)
@@ -1540,13 +1581,31 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         );
     }
 
-    private WorkOrderLaborEntry buildLaborEntry(WorkOrder workOrder, WorkOrderLaborEntryRequest request) {
+    private WorkOrderLaborEntry buildLaborEntry(WorkOrder workOrder,
+                                                WorkOrderLaborEntryRequest request,
+                                                Map<Long, BigDecimal> workingHoursByTechnician) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Labor entry payload is required");
         }
-        BigDecimal hours = normalizeHours(request.getLaborHours(), "laborHours");
+        if (request.getTechnicianId() == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required");
+        }
+
         Technician technician = resolveTechnician(request.getTechnicianId());
+        BigDecimal hours = workingHoursByTechnician.getOrDefault(request.getTechnicianId(), BigDecimal.ZERO);
+        if (hours.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "No check-in/check-out working hours found for technicianId: " + request.getTechnicianId());
+        }
+
         BigDecimal hourlyRate = normalizeCurrency(request.getHourlyRate(), "hourlyRate");
+        if (hourlyRate == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "hourlyRate is required");
+        }
+        if (hourlyRate.compareTo(BigDecimal.ZERO) <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "hourlyRate must be greater than zero");
+        }
+
         BigDecimal laborCost = hourlyRate != null
                 ? hourlyRate.multiply(hours).setScale(2, RoundingMode.HALF_UP)
                 : null;
@@ -1558,8 +1617,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .laborHours(hours)
                 .hourlyRate(hourlyRate)
                 .laborCost(laborCost)
-                .laborDate(request.getLaborDate())
-                .notes(request.getNotes())
+                .laborDate(workOrder.getActualEndDateTime() != null
+                        ? workOrder.getActualEndDateTime().toLocalDate()
+                        : LocalDate.now())
+                .notes(null)
                 .build();
     }
 
@@ -1886,23 +1947,106 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return t.isEmpty() ? null : t;
     }
 
-    private WorkOrderLaborEntryResponse toLaborEntryResponse(WorkOrderLaborEntry entry) {
+    private WorkOrderLaborEntryResponse toLaborEntryResponse(WorkOrderLaborEntry entry,
+                                                             Map<Long, BigDecimal> workingHoursByTechnician) {
         Technician technician = entry.getTechnician();
         String techName = entry.getTechnicianNameSnapshot();
         if (techName == null && technician != null) {
             techName = technician.getFullName();
         }
 
+        Long technicianId = technician != null ? technician.getId() : null;
+        BigDecimal laborHours = technicianId != null
+                ? workingHoursByTechnician.getOrDefault(technicianId, entry.getLaborHours())
+                : entry.getLaborHours();
+        BigDecimal laborCost = entry.getHourlyRate() != null && laborHours != null
+                ? entry.getHourlyRate().multiply(laborHours).setScale(2, RoundingMode.HALF_UP)
+                : entry.getLaborCost();
+
         return WorkOrderLaborEntryResponse.builder()
                 .id(entry.getId())
-                .technicianId(technician != null ? technician.getId() : null)
+                .technicianId(technicianId)
                 .technicianName(techName)
-                .laborHours(entry.getLaborHours())
+                .laborHours(laborHours)
                 .hourlyRate(entry.getHourlyRate())
-                .laborCost(entry.getLaborCost())
+                .laborCost(laborCost)
                 .laborDate(entry.getLaborDate())
                 .notes(entry.getNotes())
                 .build();
+    }
+
+    private List<WorkOrderLaborEntryResponse> buildLaborEntriesForResponse(
+            WorkOrder workOrder,
+            List<WorkOrderCheckLog> checkLogEntities,
+            Map<Long, BigDecimal> workingHoursByTechnician
+    ) {
+        List<WorkOrderLaborEntry> persistedEntries = workOrderLaborEntryRepository.findByWorkOrder_Id(workOrder.getId());
+        Map<Long, WorkOrderLaborEntry> persistedByTechnician = new LinkedHashMap<>();
+        List<WorkOrderLaborEntryResponse> entriesWithoutTechnician = new ArrayList<>();
+
+        for (WorkOrderLaborEntry entry : persistedEntries) {
+            Technician technician = entry.getTechnician();
+            if (technician == null || technician.getId() == null) {
+                entriesWithoutTechnician.add(toLaborEntryResponse(entry, workingHoursByTechnician));
+                continue;
+            }
+            persistedByTechnician.putIfAbsent(technician.getId(), entry);
+        }
+
+        Map<Long, String> technicianNames = new LinkedHashMap<>();
+        for (WorkOrderCheckLog log : checkLogEntities) {
+            Technician technician = log.getTechnician();
+            if (technician == null || technician.getId() == null) {
+                continue;
+            }
+            technicianNames.putIfAbsent(technician.getId(), resolveTechnicianName(technician));
+        }
+
+        for (Map.Entry<Long, WorkOrderLaborEntry> persisted : persistedByTechnician.entrySet()) {
+            WorkOrderLaborEntry entry = persisted.getValue();
+            String snapshotName = entry.getTechnicianNameSnapshot();
+            if (snapshotName != null && !snapshotName.isBlank()) {
+                technicianNames.putIfAbsent(persisted.getKey(), snapshotName);
+            } else if (entry.getTechnician() != null) {
+                technicianNames.putIfAbsent(persisted.getKey(), resolveTechnicianName(entry.getTechnician()));
+            }
+        }
+
+        List<WorkOrderLaborEntryResponse> responses = new ArrayList<>();
+        Set<Long> includedTechnicians = new java.util.HashSet<>();
+
+        for (Map.Entry<Long, WorkOrderLaborEntry> persisted : persistedByTechnician.entrySet()) {
+            Long technicianId = persisted.getKey();
+            responses.add(toLaborEntryResponse(persisted.getValue(), workingHoursByTechnician));
+            includedTechnicians.add(technicianId);
+        }
+
+        for (Map.Entry<Long, BigDecimal> computed : workingHoursByTechnician.entrySet()) {
+            Long technicianId = computed.getKey();
+            if (includedTechnicians.contains(technicianId)) {
+                continue;
+            }
+
+            responses.add(WorkOrderLaborEntryResponse.builder()
+                    .id(null)
+                    .technicianId(technicianId)
+                    .technicianName(technicianNames.get(technicianId))
+                    .laborHours(computed.getValue())
+                    .hourlyRate(null)
+                    .laborCost(null)
+                    .laborDate(workOrder.getActualEndDateTime() != null
+                            ? workOrder.getActualEndDateTime().toLocalDate()
+                            : null)
+                    .notes(null)
+                    .build());
+        }
+
+        responses.addAll(entriesWithoutTechnician);
+        responses.sort(Comparator
+                .comparing(WorkOrderLaborEntryResponse::getTechnicianName, Comparator.nullsLast(String.CASE_INSENSITIVE_ORDER))
+                .thenComparing(WorkOrderLaborEntryResponse::getTechnicianId, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        return responses;
     }
 
     private WorkOrderMaterialUsageResponse toMaterialUsageResponse(WorkOrderMaterialUsage usage) {
@@ -1995,9 +2139,16 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                         .build())
                 .toList();
 
-        List<WorkOrderLaborEntryResponse> laborEntries = workOrderLaborEntryRepository.findByWorkOrder_Id(wo.getId()).stream()
-                .map(this::toLaborEntryResponse)
-                .toList();
+        List<WorkOrderCheckLog> checkLogEntities = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        checkLogEntities.sort(Comparator.comparing(WorkOrderCheckLog::getCheckInAt, Comparator.nullsLast(Comparator.naturalOrder()))
+                .thenComparing(WorkOrderCheckLog::getId, Comparator.nullsLast(Comparator.naturalOrder())));
+
+        Map<Long, BigDecimal> workingHoursByTechnician = computeWorkingHoursByTechnician(checkLogEntities);
+        List<WorkOrderLaborEntryResponse> laborEntries = buildLaborEntriesForResponse(
+                wo,
+                checkLogEntities,
+                workingHoursByTechnician
+        );
 
         List<WorkOrderMaterialUsageResponse> materialUsages = workOrderMaterialUsageRepository.findByWorkOrder_Id(wo.getId()).stream()
                 .map(this::toMaterialUsageResponse)
@@ -2007,9 +2158,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .map(this::toMaterialPlanResponse)
                 .toList();
 
-        List<WorkOrderCheckLog> checkLogEntities = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
-        checkLogEntities.sort(Comparator.comparing(WorkOrderCheckLog::getCheckInAt, Comparator.nullsLast(Comparator.naturalOrder()))
-                .thenComparing(WorkOrderCheckLog::getId, Comparator.nullsLast(Comparator.naturalOrder())));
         long actualWorkingSeconds = computeTotalWorkingSeconds(checkLogEntities);
         BigDecimal actualWorkingHours = BigDecimal.valueOf(actualWorkingSeconds)
                 .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);

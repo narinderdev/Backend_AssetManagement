@@ -1,6 +1,7 @@
 package com.example.eam.Maintenance.Preventive.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanCreateRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanPatchRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanResponse;
@@ -34,9 +35,11 @@ public class PreventiveMaintenanceDirectController {
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<PreventivePlanResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<PreventivePlanResponse>>> list(Pageable pageable) {
         Page<PreventivePlanResponse> data = planService.list(pageable);
-        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Preventive plans fetched", data));
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(HttpStatus.OK.value(), "Preventive plans fetched", PageResponse.from(data))
+        );
     }
 
     @PatchMapping("/{id}")

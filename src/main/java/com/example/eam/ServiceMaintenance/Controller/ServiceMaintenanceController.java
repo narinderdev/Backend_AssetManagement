@@ -1,6 +1,7 @@
 package com.example.eam.ServiceMaintenance.Controller;
 
 import com.example.eam.Common.ApiResponse;
+import com.example.eam.Common.PageResponse;
 import com.example.eam.ServiceMaintenance.Dto.ServiceRequestCreateDto;
 import com.example.eam.ServiceMaintenance.Dto.ServiceRequestApproveDto;
 import com.example.eam.ServiceMaintenance.Dto.ServiceRequestRejectDto;
@@ -99,15 +100,15 @@ public class ServiceMaintenanceController {
 
     // LIST (paginated)
     @GetMapping
-    public ResponseEntity<ApiResponse<Page<ServiceRequestResponse>>> list(Pageable pageable) {
+    public ResponseEntity<ApiResponse<PageResponse<ServiceRequestResponse>>> list(Pageable pageable) {
 
         Page<ServiceRequestResponse> page = service.list(pageable);
 
-        ApiResponse<Page<ServiceRequestResponse>> body =
+        ApiResponse<PageResponse<ServiceRequestResponse>> body =
                 ApiResponse.successResponse(
                         HttpStatus.OK.value(),
                         "Service requests fetched successfully",
-                        page
+                        PageResponse.from(page)
                 );
 
         return ResponseEntity.ok(body);
