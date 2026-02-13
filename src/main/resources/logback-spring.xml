@@ -53,6 +53,7 @@
     <logger name="com.example.eam.Config.RequestResponseLoggingFilter"
             level="INFO"
             additivity="false">
+        <appender-ref ref="CONSOLE"/>
         <appender-ref ref="HTTP_FILE"/>
     </logger>
 
