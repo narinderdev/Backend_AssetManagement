@@ -4,11 +4,11 @@ import com.example.eam.Dashboard.Dto.*;
 import com.example.eam.Enum.AssetCriticality;
 import com.example.eam.Enum.ServiceRequestStatus;
 import com.example.eam.Enum.WorkOrderStatus;
+import com.example.eam.Enum.WorkType;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
 import com.example.eam.Technician.Repository.TechnicianLeaveRepository;
 import com.example.eam.Technician.Repository.TechnicianHolidayRepository;
-import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
@@ -24,7 +24,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
-import java.util.Comparator;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
@@ -109,6 +108,9 @@ public class DashboardService {
         List<RecentWorkOrderDto> recentWorkOrders = mapRecentWorkOrders();
         List<NewServiceRequestDto> newServiceRequests = mapNewServiceRequests();
         long requestsNotAcceptedCount = workOrderRepository.countByStatusAndDeletedFalse(WorkOrderStatus.NEW);
+        LocalDate today = LocalDate.now();
+        MaintenanceListSection upcomingMaintenance = buildUpcomingMaintenance(today);
+        MaintenanceListSection pastDueMaintenance = buildPastDueMaintenance(today);
 
         DashboardMetadata metadata = DashboardMetadata.builder()
                 .generatedAt(Instant.now().toString())
@@ -122,6 +124,8 @@ public class DashboardService {
                 .recentWorkOrders(recentWorkOrders)
                 .newServiceRequests(newServiceRequests)
                 .requestsNotAcceptedCount(requestsNotAcceptedCount)
+                .upcomingMaintenance(upcomingMaintenance)
+                .pastDueMaintenance(pastDueMaintenance)
                 .metadata(metadata)
                 .build();
     }
@@ -222,6 +226,34 @@ public class DashboardService {
         return (diff / previous) * 100d;
     }
 
+    private MaintenanceListSection buildUpcomingMaintenance(LocalDate today) {
+        List<WorkOrder> upcoming = workOrderRepository
+                .findTop5ByTargetCompletionDateAfterAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
+                        today, ACTIVE_WORK_ORDER_STATUSES);
+
+        long count = workOrderRepository.countByTargetCompletionDateAfterAndStatusInAndDeletedFalse(
+                today, ACTIVE_WORK_ORDER_STATUSES);
+
+        return MaintenanceListSection.builder()
+                .count(count)
+                .items(mapMaintenanceItems(upcoming))
+                .build();
+    }
+
+    private MaintenanceListSection buildPastDueMaintenance(LocalDate today) {
+        List<WorkOrder> pastDue = workOrderRepository
+                .findTop5ByTargetCompletionDateBeforeAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
+                        today, ACTIVE_WORK_ORDER_STATUSES);
+
+        long count = workOrderRepository.countByTargetCompletionDateBeforeAndStatusInAndDeletedFalse(
+                today, ACTIVE_WORK_ORDER_STATUSES);
+
+        return MaintenanceListSection.builder()
+                .count(count)
+                .items(mapMaintenanceItems(pastDue))
+                .build();
+    }
+
     private MaintenanceCostSummary buildMaintenanceCostSummary() {
         LocalDate firstMonth = LocalDate.now().withDayOfMonth(1).minusMonths(5);
         List<MaintenanceCostPoint> points = new ArrayList<>();
@@ -249,6 +281,26 @@ public class DashboardService {
                 .period("last_6_months")
                 .data(points)
                 .build();
+    }
+
+    private List<MaintenanceItemDto> mapMaintenanceItems(List<WorkOrder> workOrders) {
+        return workOrders.stream()
+                .map(wo -> MaintenanceItemDto.builder()
+                        .workOrderDbId(wo.getId())
+                        .workOrderId(wo.getWorkOrderId())
+                        .title(wo.getWoTitle())
+                        .asset(wo.getAsset() != null ? wo.getAsset().getAssetName() : null)
+                        .dueDate(wo.getTargetCompletionDate())
+                        .priority(wo.getPriority())
+                        .status(wo.getStatus())
+                        .workType(wo.getWorkType())
+                        .preventive(isPreventive(wo))
+                        .build())
+                .toList();
+    }
+
+    private boolean isPreventive(WorkOrder workOrder) {
+        return workOrder.getPmPlan() != null || workOrder.getWorkType() == WorkType.PREVENTIVE;
     }
 
     private BigDecimal resolveWorkOrderCost(WorkOrder wo) {

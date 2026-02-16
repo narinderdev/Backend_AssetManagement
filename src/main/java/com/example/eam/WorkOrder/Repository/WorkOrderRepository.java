@@ -45,7 +45,20 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
                                                                       LocalDate end,
                                                                       Collection<WorkOrderStatus> statuses);
 
+    long countByTargetCompletionDateAfterAndStatusInAndDeletedFalse(LocalDate date,
+                                                                    Collection<WorkOrderStatus> statuses);
+
     List<WorkOrder> findTop5ByDeletedFalseOrderByCreatedAtDesc();
+
+    List<WorkOrder> findTop5ByTargetCompletionDateAfterAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
+            LocalDate date,
+            Collection<WorkOrderStatus> statuses
+    );
+
+    List<WorkOrder> findTop5ByTargetCompletionDateBeforeAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
+            LocalDate date,
+            Collection<WorkOrderStatus> statuses
+    );
 
     List<WorkOrder> findByDeletedFalseAndCreatedAtBetween(LocalDateTime start, LocalDateTime end);
 

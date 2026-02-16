@@ -22,4 +22,16 @@ public interface TechnicianRepository extends JpaRepository<Technician, Long> {
     boolean existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
 
     List<Technician> findByIdInAndIsDeletedFalse(Iterable<Long> ids);
+
+    /**
+     * Backward-compatible helpers used in older code/tests. They delegate to the
+     * soft-delete aware queries to avoid returning deleted technicians.
+     */
+    default boolean existsByEmailIgnoreCase(String email) {
+        return existsByEmailIgnoreCaseAndIsDeletedFalse(email);
+    }
+
+    default Optional<Technician> findByEmailIgnoreCase(String email) {
+        return findByEmailIgnoreCaseAndIsDeletedFalse(email);
+    }
 }

@@ -28,5 +28,11 @@ public class DashboardResponse {
     @JsonProperty("requests_not_accepted_count")
     private Long requestsNotAcceptedCount;
 
+    @JsonProperty("upcoming_maintenance")
+    private MaintenanceListSection upcomingMaintenance;
+
+    @JsonProperty("past_due_maintenance")
+    private MaintenanceListSection pastDueMaintenance;
+
     private DashboardMetadata metadata;
 }
