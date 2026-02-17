@@ -1,0 +1,172 @@
+package com.example.eam.InventoryManagement.Service;
+
+import com.example.eam.Enum.InventoryReconciliationStatus;
+import com.example.eam.InventoryManagement.Dto.InventoryReconciliationCreateRequest;
+import com.example.eam.InventoryManagement.Dto.InventoryReconciliationDecisionRequest;
+import com.example.eam.InventoryManagement.Dto.InventoryReconciliationResponse;
+import com.example.eam.InventoryManagement.Entity.InventoryItem;
+import com.example.eam.InventoryManagement.Entity.InventoryReconciliation;
+import com.example.eam.InventoryManagement.Entity.Warehouse;
+import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
+import com.example.eam.InventoryManagement.Repository.InventoryReconciliationRepository;
+import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
+import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.http.HttpStatus;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
+
+import java.math.BigDecimal;
+import java.time.LocalDateTime;
+
+@Service
+@RequiredArgsConstructor
+public class InventoryReconciliationService {
+
+    private final InventoryReconciliationRepository reconciliationRepository;
+    private final InventoryItemRepository inventoryItemRepository;
+    private final WarehouseRepository warehouseRepository;
+
+    @Transactional
+    public InventoryReconciliationResponse create(InventoryReconciliationCreateRequest req) {
+        Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found"));
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(req.getInventoryItemId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+
+        int systemQty = item.getStockLevel() != null ? item.getStockLevel() : 0;
+        int physicalQty = req.getPhysicalQuantity();
+        int varianceQty = physicalQty - systemQty;
+        BigDecimal costSnap = item.getCostPerUnit();
+        BigDecimal varianceCost = costSnap != null ? costSnap.multiply(BigDecimal.valueOf(varianceQty)) : null;
+
+        InventoryReconciliationStatus status = varianceQty == 0
+                ? InventoryReconciliationStatus.POSTED
+                : InventoryReconciliationStatus.SUBMITTED;
+
+        InventoryReconciliation entity = InventoryReconciliation.builder()
+                .warehouse(warehouse)
+                .inventoryItem(item)
+                .reconcileDate(req.getReconcileDate())
+                .enteredBy(trim(req.getEnteredBy()))
+                .systemQuantity(systemQty)
+                .physicalQuantity(physicalQty)
+                .varianceQuantity(varianceQty)
+                .costPerUnitSnapshot(costSnap)
+                .varianceCost(varianceCost)
+                .status(status)
+                .reason(trim(req.getReason()))
+                .build();
+
+        InventoryReconciliation saved = reconciliationRepository.save(entity);
+
+        // If variance is zero and status is POSTED, no stock change needed (already matching)
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public InventoryReconciliationResponse approve(Long id, InventoryReconciliationDecisionRequest req) {
+        InventoryReconciliation rec = getOrThrow(id);
+        if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be approved");
+        }
+        rec.setStatus(InventoryReconciliationStatus.APPROVED);
+        rec.setApprovedBy(trim(req.getActor()));
+        rec.setApprovedAt(LocalDateTime.now());
+        rec.setApprovalComment(trim(req.getComment()));
+        rec.setUpdatedAt(LocalDateTime.now());
+        return toResponse(reconciliationRepository.save(rec));
+    }
+
+    @Transactional
+    public InventoryReconciliationResponse reject(Long id, InventoryReconciliationDecisionRequest req) {
+        InventoryReconciliation rec = getOrThrow(id);
+        if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be rejected");
+        }
+        rec.setStatus(InventoryReconciliationStatus.REJECTED);
+        rec.setRejectedBy(trim(req.getActor()));
+        rec.setRejectedAt(LocalDateTime.now());
+        rec.setRejectionComment(trim(req.getComment()));
+        rec.setUpdatedAt(LocalDateTime.now());
+        return toResponse(reconciliationRepository.save(rec));
+    }
+
+    @Transactional
+    public InventoryReconciliationResponse post(Long id) {
+        InventoryReconciliation rec = getOrThrow(id);
+        if (rec.getStatus() == InventoryReconciliationStatus.POSTED) {
+            return toResponse(rec);
+        }
+        if (rec.getStatus() == InventoryReconciliationStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Approve before posting");
+        }
+
+        // status APPROVED -> POSTED
+        InventoryItem item = rec.getInventoryItem();
+        item.setStockLevel(rec.getPhysicalQuantity());
+        inventoryItemRepository.save(item);
+
+        rec.setStatus(InventoryReconciliationStatus.POSTED);
+        rec.setUpdatedAt(LocalDateTime.now());
+        return toResponse(reconciliationRepository.save(rec));
+    }
+
+    @Transactional(readOnly = true)
+    public InventoryReconciliationResponse get(Long id) {
+        return toResponse(getOrThrow(id));
+    }
+
+    @Transactional(readOnly = true)
+    public Page<InventoryReconciliationResponse> list(Pageable pageable) {
+        return reconciliationRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
+    }
+
+    @Transactional
+    public void delete(Long id) {
+        InventoryReconciliation rec = getOrThrow(id);
+        reconciliationRepository.delete(rec);
+    }
+
+    private InventoryReconciliation getOrThrow(Long id) {
+        return reconciliationRepository.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory reconciliation not found"));
+    }
+
+    private InventoryReconciliationResponse toResponse(InventoryReconciliation rec) {
+        return InventoryReconciliationResponse.builder()
+                .id(rec.getId())
+                .warehouseId(rec.getWarehouse() != null ? rec.getWarehouse().getId() : null)
+                .warehouseName(rec.getWarehouse() != null ? rec.getWarehouse().getName() : null)
+                .inventoryItemId(rec.getInventoryItem() != null ? rec.getInventoryItem().getId() : null)
+                .itemId(rec.getInventoryItem() != null ? rec.getInventoryItem().getItemId() : null)
+                .skuNumber(rec.getInventoryItem() != null ? rec.getInventoryItem().getSkuNumber() : null)
+                .itemName(rec.getInventoryItem() != null ? rec.getInventoryItem().getItemName() : null)
+                .reconcileDate(rec.getReconcileDate())
+                .enteredBy(rec.getEnteredBy())
+                .systemQuantity(rec.getSystemQuantity())
+                .physicalQuantity(rec.getPhysicalQuantity())
+                .varianceQuantity(rec.getVarianceQuantity())
+                .costPerUnitSnapshot(rec.getCostPerUnitSnapshot())
+                .varianceCost(rec.getVarianceCost())
+                .reason(rec.getReason())
+                .status(rec.getStatus())
+                .approvedBy(rec.getApprovedBy())
+                .approvedAt(rec.getApprovedAt())
+                .approvalComment(rec.getApprovalComment())
+                .rejectedBy(rec.getRejectedBy())
+                .rejectedAt(rec.getRejectedAt())
+                .rejectionComment(rec.getRejectionComment())
+                .createdAt(rec.getCreatedAt())
+                .updatedAt(rec.getUpdatedAt())
+                .build();
+    }
+
+    private String trim(String v) {
+        if (v == null) return null;
+        String t = v.trim();
+        return t.isEmpty() ? null : t;
+    }
+}
