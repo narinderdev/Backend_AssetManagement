@@ -16,6 +16,15 @@ import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
+import com.example.eam.Enum.SecurityEventCategory;
+import com.example.eam.Enum.SecurityEventResult;
+import com.example.eam.Enum.SecurityEventType;
+import com.example.eam.Enum.SecurityTargetType;
+import com.example.eam.Security.Entity.SecurityEvent;
+import com.example.eam.Security.Repository.SecurityEventRepository;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+
 import lombok.RequiredArgsConstructor;
 import java.time.Instant;
 import java.util.Optional;
@@ -28,6 +37,7 @@ public class UserService {
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
+    private final SecurityEventRepository securityEventRepository;
 
 
     //create user
@@ -78,6 +88,7 @@ public class UserService {
             // Save the UserRole to establish the relationship between the user and the role
             userRoleRepository.save(userRole);
 
+            logEvent(SecurityEventType.USER_CREATED, savedUser, "Admin user created");
             return savedUser;
         }
 
@@ -102,6 +113,7 @@ public class UserService {
             user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
             user.setUpdatedAt(Instant.now());
             usersRepository.save(user);
+            logEvent(SecurityEventType.PASSWORD_CHANGED, user, "Password changed via change-password");
         }
 
         @Transactional(readOnly = true)
@@ -132,6 +144,30 @@ public class UserService {
                     user.getStatus(),
                     roles
             );
+        }
+
+        private void logEvent(SecurityEventType type, Users user, String details) {
+            SecurityEvent event = SecurityEvent.builder()
+                    .eventType(type)
+                    .category(SecurityEventCategory.USER)
+                    .targetType(SecurityTargetType.USER)
+                    .targetId(user.getId())
+                    .targetName(user.getEmail())
+                    .performedBy(resolveCurrentUser())
+                    .result(SecurityEventResult.SUCCESS)
+                    .details(details)
+                    .build();
+            securityEventRepository.save(event);
+        }
+
+        private String resolveCurrentUser() {
+            try {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth != null && auth.getPrincipal() != null) {
+                    return String.valueOf(auth.getPrincipal());
+                }
+            } catch (Exception ignored) { }
+            return "system";
         }
 
 }

@@ -8,6 +8,8 @@ import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.AppPermissionRepository;
 import com.example.eam.Roles.Repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -18,6 +20,14 @@ import org.springframework.web.server.ResponseStatusException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
+
+import com.example.eam.Enum.SecurityEventCategory;
+import com.example.eam.Enum.SecurityEventResult;
+import com.example.eam.Enum.SecurityEventType;
+import com.example.eam.Enum.SecurityTargetType;
+import com.example.eam.Security.Entity.SecurityEvent;
+import com.example.eam.Security.Repository.SecurityEventRepository;
 
 @Service
 @RequiredArgsConstructor
@@ -25,6 +35,7 @@ public class RoleService {
 
     private final RoleRepository roleRepository;
     private final AppPermissionRepository permissionRepository;
+    private final SecurityEventRepository securityEventRepository;
 
     @Transactional
     public RoleResponse create(RoleCreateRequest req) {
@@ -45,6 +56,7 @@ public class RoleService {
                 .build();
 
         Role saved = roleRepository.save(role);
+        logEvent(SecurityEventType.ROLE_CREATED, saved, permissions, Set.of());
         return toResponse(saved);
     }
 
@@ -74,12 +86,16 @@ public class RoleService {
         }
 
         if (req.getPermissionCodes() != null) {
+            Set<String> before = role.getPermissions().stream().map(AppPermission::getCode).collect(Collectors.toSet());
             Set<AppPermission> permissions = resolvePermissions(req.getPermissionCodes());
             role.getPermissions().clear();
             role.getPermissions().addAll(permissions);
+            Set<String> after = permissions.stream().map(AppPermission::getCode).collect(Collectors.toSet());
+            logPermissionDelta(role, before, after);
         }
 
         Role saved = roleRepository.save(role);
+        logEvent(SecurityEventType.ROLE_UPDATED, saved, role.getPermissions(), Set.of());
         return toResponse(saved);
     }
 
@@ -101,6 +117,7 @@ public class RoleService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found"));
         role.setActive(false);
         roleRepository.save(role);
+        logEvent(SecurityEventType.ROLE_UPDATED, role, role.getPermissions(), Set.of(), "Role deactivated");
     }
 
     private Set<AppPermission> resolvePermissions(Set<String> codes) {
@@ -132,6 +149,50 @@ public class RoleService {
                 .createdAt(r.getCreatedAt())
                 .updatedAt(r.getUpdatedAt())
                 .build();
+    }
+
+    private void logPermissionDelta(Role role, Set<String> before, Set<String> after) {
+        Set<String> added = new HashSet<>(after);
+        added.removeAll(before);
+        Set<String> removed = new HashSet<>(before);
+        removed.removeAll(after);
+        if (added.isEmpty() && removed.isEmpty()) return;
+        String details = "added=" + String.join(",", added) + "; removed=" + String.join(",", removed);
+        logEvent(SecurityEventType.ROLE_PERMISSION_UPDATED, role, Set.of(), Set.of(), details);
+    }
+
+    private void logEvent(SecurityEventType type, Role role, Set<AppPermission> currentPerms, Set<AppPermission> removedPerms) {
+        logEvent(type, role, currentPerms, removedPerms, null);
+    }
+
+    private void logEvent(SecurityEventType type, Role role, Set<AppPermission> currentPerms, Set<AppPermission> removedPerms, String extraDetails) {
+        String performedBy = resolveCurrentUser();
+        String details = extraDetails;
+        if (details == null) {
+            Set<String> codes = currentPerms != null ? currentPerms.stream().map(AppPermission::getCode).collect(Collectors.toSet()) : Set.of();
+            details = "permissions=" + String.join(",", codes);
+        }
+        SecurityEvent event = SecurityEvent.builder()
+                .eventType(type)
+                .category(SecurityEventCategory.ROLE)
+                .targetType(SecurityTargetType.ROLE)
+                .targetId(role.getId())
+                .targetName(role.getName())
+                .performedBy(performedBy)
+                .result(SecurityEventResult.SUCCESS)
+                .details(details)
+                .build();
+        securityEventRepository.save(event);
+    }
+
+    private String resolveCurrentUser() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() != null) {
+                return String.valueOf(auth.getPrincipal());
+            }
+        } catch (Exception ignored) { }
+        return "system";
     }
 }
 
