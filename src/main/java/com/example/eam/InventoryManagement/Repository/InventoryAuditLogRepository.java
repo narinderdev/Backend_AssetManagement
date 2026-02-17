@@ -12,4 +12,5 @@ public interface InventoryAuditLogRepository extends JpaRepository<InventoryAudi
     Page<InventoryAuditLog> findByInventoryItem_IdOrderByCreatedAtDesc(Long itemId, Pageable pageable);
     Page<InventoryAuditLog> findByTransactionTypeOrderByCreatedAtDesc(InventoryTransactionType type, Pageable pageable);
     Page<InventoryAuditLog> findByReferenceTypeOrderByCreatedAtDesc(InventoryReferenceType refType, Pageable pageable);
+    Page<InventoryAuditLog> findByCreatedAtBetweenOrderByCreatedAtDesc(java.time.LocalDateTime from, java.time.LocalDateTime to, Pageable pageable);
 }
