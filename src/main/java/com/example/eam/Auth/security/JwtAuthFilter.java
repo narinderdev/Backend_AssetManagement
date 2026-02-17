@@ -79,7 +79,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
 
         // ✅ SAFE extraction of roles
         Users user = usersRepository.findByEmailAndDeletedFalse(email).orElse(null);
-        if (user != null && isPasswordExpired(user)) {
+        if (user != null && !isPasswordExpiryBypassed(request) && isPasswordExpired(user)) {
             response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
             response.setContentType("application/json");
             ApiResponse<Void> body = ApiResponse.errorResponse(401, "your password is expired");
@@ -108,6 +108,15 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         SecurityContextHolder.getContext().setAuthentication(authToken);
 
         filterChain.doFilter(request, response);
+    }
+
+    private boolean isPasswordExpiryBypassed(HttpServletRequest request) {
+        String path = request.getRequestURI();
+        if (path == null) return false;
+        // Allow password change / reset endpoints even when password is expired
+        return path.contains("/users/change-password")
+                || path.contains("/users/set-password")
+                || path.contains("/users/accept");
     }
 
     private boolean isPasswordExpired(Users user) {

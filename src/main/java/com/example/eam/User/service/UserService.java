@@ -82,10 +82,10 @@ public class UserService {
         }
 
         @Transactional
-        public void changePassword(String authenticatedEmail, ChangePasswordDto dto) {
-            String normalizedEmail = authenticatedEmail != null ? authenticatedEmail.trim().toLowerCase() : null;
+        public void changePassword(String emailFromRequest, ChangePasswordDto dto) {
+            String normalizedEmail = emailFromRequest != null ? emailFromRequest.trim().toLowerCase() : null;
             if (normalizedEmail == null || normalizedEmail.isBlank()) {
-                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
             }
 
             Users user = usersRepository.findByEmailAndDeletedFalse(normalizedEmail)

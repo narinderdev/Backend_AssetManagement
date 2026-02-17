@@ -17,4 +17,7 @@ public class ChangePasswordDto {
     @Pattern(regexp = ".*[a-z].*", message = "Password must include at least one lowercase letter")
     @Pattern(regexp = ".*[^A-Za-z0-9\\s].*", message = "Password must include at least one special character")
     private String newPassword;
+
+    @NotBlank(message = "Email is required")
+    private String email;
 }

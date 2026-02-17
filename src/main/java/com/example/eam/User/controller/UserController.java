@@ -41,11 +41,7 @@ public class UserController {
     public ResponseEntity<ApiResponse<Void>> changePassword(
             @Valid @RequestBody ChangePasswordDto dto
     ) {
-        String email = org.springframework.security.core.context.SecurityContextHolder.getContext()
-                .getAuthentication() != null
-                ? String.valueOf(org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication().getPrincipal())
-                : null;
-        userService.changePassword(email, dto);
+        userService.changePassword(dto.getEmail(), dto);
         ApiResponse<Void> response = ApiResponse.successResponse(200, "Password updated successfully", null);
         return ResponseEntity.ok(response);
     }
