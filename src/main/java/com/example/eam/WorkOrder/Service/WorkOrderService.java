@@ -13,6 +13,7 @@ import com.example.eam.Asset.Dto.CreateAssetDto;
 import com.example.eam.Enum.*;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
+import com.example.eam.InventoryManagement.Service.InventoryAuditLogService;
 import com.example.eam.Maintenance.Emergency.Repository.EmergencyIncidentRepository;
 import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
@@ -48,6 +49,8 @@ import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -97,6 +100,7 @@ public class WorkOrderService {
     private final WorkOrderLaborEntryRepository workOrderLaborEntryRepository;
     private final WorkOrderMaterialUsageRepository workOrderMaterialUsageRepository;
     private final WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
+    private final InventoryAuditLogService inventoryAuditLogService;
     private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
     private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
@@ -1327,6 +1331,16 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         return s == null || s.trim().isEmpty();
     }
 
+    private String resolveCurrentUser() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth != null && auth.getPrincipal() != null) {
+                return String.valueOf(auth.getPrincipal());
+            }
+        } catch (Exception ignored) { }
+        return "system";
+    }
+
     private void validateStatusTransition(WorkOrderStatus current, WorkOrderStatus requested) {
         if (requested == null || current == requested) return;
         Set<WorkOrderStatus> allowed = STATUS_TRANSITIONS.getOrDefault(current, Set.of());
@@ -1749,8 +1763,18 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     "Insufficient stock for item " + item.getItemId());
         }
 
-        item.setStockLevel(currentStock - request.getQuantityUsed());
+        int afterStock = currentStock - request.getQuantityUsed();
+        item.setStockLevel(afterStock);
         inventoryItemRepository.save(item);
+
+        inventoryAuditLogService.recordIssueForWorkOrder(
+                item,
+                currentStock,
+                afterStock,
+                workOrder.getWoNumber() != null ? workOrder.getWoNumber() : workOrder.getWorkOrderId(),
+                resolveCurrentUser(),
+                request.getNotes()
+        );
 
         BigDecimal unitCost = normalizeCurrency(item.getCostPerUnit(), "costPerUnit");
         BigDecimal totalCost = unitCost != null

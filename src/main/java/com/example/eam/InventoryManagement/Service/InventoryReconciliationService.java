@@ -7,6 +7,8 @@ import com.example.eam.InventoryManagement.Dto.InventoryReconciliationResponse;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Entity.InventoryReconciliation;
 import com.example.eam.InventoryManagement.Entity.Warehouse;
+import com.example.eam.InventoryManagement.Service.InventoryAuditLogService;
+import com.example.eam.Enum.InventoryReferenceType;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.InventoryManagement.Repository.InventoryReconciliationRepository;
 import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
@@ -28,6 +30,7 @@ public class InventoryReconciliationService {
     private final InventoryReconciliationRepository reconciliationRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final WarehouseRepository warehouseRepository;
+    private final InventoryAuditLogService auditLogService;
 
     @Transactional
     public InventoryReconciliationResponse create(InventoryReconciliationCreateRequest req) {
@@ -62,7 +65,18 @@ public class InventoryReconciliationService {
 
         InventoryReconciliation saved = reconciliationRepository.save(entity);
 
-        // If variance is zero and status is POSTED, no stock change needed (already matching)
+        // If variance is zero and status is POSTED, log audit entry reflecting no change
+        if (status == InventoryReconciliationStatus.POSTED) {
+            auditLogService.recordAdjustment(
+                    item,
+                    systemQty,
+                    physicalQty,
+                    InventoryReferenceType.RECONCILIATION,
+                    "REC-" + (saved.getId() != null ? saved.getId() : "pending"),
+                    saved.getEnteredBy(),
+                    saved.getReason()
+            );
+        }
         return toResponse(saved);
     }
 
@@ -106,12 +120,26 @@ public class InventoryReconciliationService {
 
         // status APPROVED -> POSTED
         InventoryItem item = rec.getInventoryItem();
-        item.setStockLevel(rec.getPhysicalQuantity());
+        int before = item.getStockLevel() != null ? item.getStockLevel() : 0;
+        int after = rec.getPhysicalQuantity();
+        item.setStockLevel(after);
         inventoryItemRepository.save(item);
 
         rec.setStatus(InventoryReconciliationStatus.POSTED);
         rec.setUpdatedAt(LocalDateTime.now());
-        return toResponse(reconciliationRepository.save(rec));
+        InventoryReconciliation saved = reconciliationRepository.save(rec);
+
+        auditLogService.recordAdjustment(
+                item,
+                before,
+                after,
+                InventoryReferenceType.RECONCILIATION,
+                "REC-" + saved.getId(),
+                saved.getApprovedBy() != null ? saved.getApprovedBy() : saved.getEnteredBy(),
+                saved.getReason()
+        );
+
+        return toResponse(saved);
     }
 
     @Transactional(readOnly = true)

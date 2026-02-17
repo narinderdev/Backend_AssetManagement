@@ -2,6 +2,8 @@ package com.example.eam.Procurement.Service;
 
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
+import com.example.eam.InventoryManagement.Service.InventoryAuditLogService;
+import com.example.eam.Enum.InventoryReferenceType;
 import com.example.eam.Procurement.Dto.CreateGrnRequest;
 import com.example.eam.Procurement.Dto.GrnLineResponse;
 import com.example.eam.Procurement.Dto.GrnResponse;
@@ -41,6 +43,7 @@ public class GRNService {
     private final InventoryItemRepository inventoryItemRepository;
     private final StockLedgerEntryRepository stockLedgerEntryRepository;
     private final NumberGeneratorService numberGeneratorService;
+    private final InventoryAuditLogService inventoryAuditLogService;
 
     @Transactional
     public GrnResponse create(CreateGrnRequest request) {
@@ -148,7 +151,7 @@ public class GRNService {
         }
 
         GoodsReceiptNote saved = grnRepository.save(grn);
-        incrementStock(qtyByItem, saved.getId());
+        incrementStock(qtyByItem, saved);
 
         if (po != null) {
             if (po.getLines().stream().allMatch(line -> line.getOrderedQty().compareTo(line.getReceivedQty()) == 0)) {
@@ -202,7 +205,7 @@ public class GRNService {
 
     // Helpers
 
-    private void incrementStock(Map<Long, BigDecimal> qtyByItem, Long grnId) {
+    private void incrementStock(Map<Long, BigDecimal> qtyByItem, GoodsReceiptNote grn) {
         if (qtyByItem.isEmpty()) return;
 
         List<StockLedgerEntry> ledgerEntries = new ArrayList<>();
@@ -213,16 +216,31 @@ public class GRNService {
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item not found: " + itemId));
 
             int delta = toWholeUnits(qty);
-            item.setStockLevel(item.getStockLevel() + delta);
+            int before = item.getStockLevel() != null ? item.getStockLevel() : 0;
+            int after = before + delta;
+            item.setStockLevel(after);
             inventoryItemRepository.save(item);
 
             ledgerEntries.add(StockLedgerEntry.builder()
                     .itemId(itemId)
                     .refType(StockReferenceType.GRN)
-                    .refId(grnId)
+                    .refId(grn.getId())
                     .movementType(StockMovementType.IN)
                     .qty(qty.setScale(4, RoundingMode.HALF_UP))
                     .build());
+
+            String referenceNumber = grn.getGrnNumber() != null ? grn.getGrnNumber()
+                    : (grn.getPoId() != null ? "PO-" + grn.getPoId() : "GRN-" + grn.getId());
+            InventoryReferenceType refType = grn.getPoId() != null ? InventoryReferenceType.PURCHASE_ORDER : InventoryReferenceType.OTHER;
+            inventoryAuditLogService.recordReceiveForPoOrGrn(
+                    item,
+                    before,
+                    after,
+                    refType,
+                    referenceNumber,
+                    null,
+                    grn.getNotes()
+            );
         }
 
         if (!ledgerEntries.isEmpty()) {
