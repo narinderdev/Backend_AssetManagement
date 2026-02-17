@@ -2,6 +2,7 @@ package com.example.eam.InventoryManagement.Controller;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationCreateRequest;
+import com.example.eam.InventoryManagement.Dto.InventoryReconciliationUpdateRequest;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationResponse;
 import com.example.eam.InventoryManagement.Service.InventoryReconciliationService;
 import jakarta.validation.Valid;
@@ -25,6 +26,14 @@ public class InventoryReconciliationController {
         InventoryReconciliationResponse data = service.create(req);
         return ResponseEntity.status(HttpStatus.CREATED)
                 .body(ApiResponse.successResponse(HttpStatus.CREATED.value(), "Reconciliation created", data));
+    }
+
+    @PutMapping("/{id}")
+    public ResponseEntity<ApiResponse<InventoryReconciliationResponse>> update(
+            @PathVariable Long id,
+            @Valid @RequestBody InventoryReconciliationUpdateRequest req) {
+        InventoryReconciliationResponse data = service.update(id, req);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Reconciliation updated", data));
     }
 
     @GetMapping("/{id}")

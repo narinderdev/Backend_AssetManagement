@@ -4,6 +4,7 @@ import com.example.eam.Enum.InventoryReconciliationStatus;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationCreateRequest;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationDecisionRequest;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationResponse;
+import com.example.eam.InventoryManagement.Dto.InventoryReconciliationUpdateRequest;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Entity.InventoryReconciliation;
 import com.example.eam.InventoryManagement.Entity.Warehouse;
@@ -77,6 +78,60 @@ public class InventoryReconciliationService {
                     saved.getReason()
             );
         }
+        return toResponse(saved);
+    }
+
+    @Transactional
+    public InventoryReconciliationResponse update(Long id, InventoryReconciliationUpdateRequest req) {
+        InventoryReconciliation rec = getOrThrow(id);
+        if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be edited");
+        }
+
+        Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found"));
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(req.getInventoryItemId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
+
+        int systemQty = item.getStockLevel() != null ? item.getStockLevel() : 0;
+        int physicalQty = req.getPhysicalQuantity();
+        int varianceQty = physicalQty - systemQty;
+        BigDecimal costSnap = item.getCostPerUnit();
+        BigDecimal varianceCost = costSnap != null ? costSnap.multiply(BigDecimal.valueOf(varianceQty)) : null;
+
+        rec.setWarehouse(warehouse);
+        rec.setInventoryItem(item);
+        rec.setReconcileDate(req.getReconcileDate());
+        rec.setEnteredBy(trim(req.getEnteredBy()));
+        rec.setSystemQuantity(systemQty);
+        rec.setPhysicalQuantity(physicalQty);
+        rec.setVarianceQuantity(varianceQty);
+        rec.setCostPerUnitSnapshot(costSnap);
+        rec.setVarianceCost(varianceCost);
+        rec.setReason(trim(req.getReason()));
+
+        rec.setStatus(varianceQty == 0 ? InventoryReconciliationStatus.POSTED : InventoryReconciliationStatus.SUBMITTED);
+        rec.setApprovedBy(null);
+        rec.setApprovedAt(null);
+        rec.setApprovalComment(null);
+        rec.setRejectedBy(null);
+        rec.setRejectedAt(null);
+        rec.setRejectionComment(null);
+
+        InventoryReconciliation saved = reconciliationRepository.save(rec);
+
+        if (saved.getStatus() == InventoryReconciliationStatus.POSTED) {
+            auditLogService.recordAdjustment(
+                    item,
+                    systemQty,
+                    physicalQty,
+                    InventoryReferenceType.RECONCILIATION,
+                    "REC-" + saved.getId(),
+                    saved.getEnteredBy(),
+                    saved.getReason()
+            );
+        }
+
         return toResponse(saved);
     }
 
