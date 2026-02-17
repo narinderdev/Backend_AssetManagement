@@ -5,6 +5,7 @@ import com.example.eam.Enum.AssetStatus;
 
 import jakarta.persistence.*;
 import lombok.*;
+import java.time.LocalDate;
 
 @Entity
 @Table(name = "assets")
@@ -74,11 +75,20 @@ public class Asset {
     @Column(name = "utility_account", length = 128)
     private String utilityAccount;
 
+    @Column(name = "property_unit", length = 128)
+    private String propertyUnit;
+
     @Column(name = "property_group", length = 128)
     private String propertyGroup;
 
     @Column(name = "serial_number", length = 128)
     private String serialNumber;
+
+    @Column(name = "model_number", length = 128)
+    private String modelNumber;
+
+    @Column(name = "manufacture_date")
+    private LocalDate manufactureDate;
 
     // 1:1 sections
     @OneToOne(mappedBy = "asset", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)

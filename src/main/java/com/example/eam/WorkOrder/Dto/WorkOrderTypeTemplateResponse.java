@@ -18,6 +18,11 @@ public class WorkOrderTypeTemplateResponse {
     private String laborUtilityAccount;
     private String inventoryGlAccount;
     private String inventoryUtilityAccount;
+    private boolean createAsset;
+    private String propertyUnit;
+    private String propertyGroup;
+    private String retirementUnit;
+    private String functionalClass;
     private boolean active;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;

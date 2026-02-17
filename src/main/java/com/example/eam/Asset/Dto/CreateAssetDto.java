@@ -3,6 +3,7 @@ package com.example.eam.Asset.Dto;
 
 import com.example.eam.Enum.AssetCriticality;
 import com.example.eam.Enum.AssetStatus;
+import java.time.LocalDate;
 
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
@@ -43,9 +44,17 @@ public class CreateAssetDto {
     private String utilityAccount;
 
     @Size(max = 128)
+    private String propertyUnit;
+
+    @Size(max = 128)
     private String propertyGroup;
 
     @Size(max = 128)
     private String serialNumber;
+
+    @Size(max = 128)
+    private String modelNumber;
+
+    private LocalDate manufactureDate;
 }
 

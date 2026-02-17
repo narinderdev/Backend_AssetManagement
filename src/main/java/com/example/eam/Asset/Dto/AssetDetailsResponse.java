@@ -4,7 +4,7 @@ package com.example.eam.Asset.Dto;
 import com.example.eam.Enum.AssetCriticality;
 import com.example.eam.Enum.AssetStatus;
 import com.fasterxml.jackson.annotation.JsonPropertyOrder;
-
+import java.time.LocalDate;
 import lombok.Builder;
 import lombok.Data;
 
@@ -27,8 +27,11 @@ import lombok.Data;
     "functionalClass",
     "retirementUnit",
     "utilityAccount",
+    "propertyUnit",
     "propertyGroup",
     "serialNumber",
+    "modelNumber",
+    "manufactureDate",
     "location",
     "predictiveThresholds",
     "technicalDetails",
@@ -55,8 +58,11 @@ public class AssetDetailsResponse {
     private String functionalClass;
     private String retirementUnit;
     private String utilityAccount;
+    private String propertyUnit;
     private String propertyGroup;
     private String serialNumber;
+    private String modelNumber;
+    private LocalDate manufactureDate;
 
     private AssetLocationDto location;
     private java.util.List<com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse> predictiveThresholds;

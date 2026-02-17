@@ -85,8 +85,11 @@ public class AssetService {
                 .functionalClass(request.getFunctionalClass())
                 .retirementUnit(request.getRetirementUnit())
                 .utilityAccount(request.getUtilityAccount())
+                .propertyUnit(request.getPropertyUnit())
                 .propertyGroup(request.getPropertyGroup())
                 .serialNumber(request.getSerialNumber())
+                .modelNumber(request.getModelNumber())
+                .manufactureDate(request.getManufactureDate())
                 .build();
 
         Asset saved = assetRepository.save(asset);
@@ -277,8 +280,11 @@ public class AssetService {
             updateIfNotNull(basic.getFunctionalClass(), asset::setFunctionalClass);
             updateIfNotNull(basic.getRetirementUnit(), asset::setRetirementUnit);
             updateIfNotNull(basic.getUtilityAccount(), asset::setUtilityAccount);
+            updateIfNotNull(basic.getPropertyUnit(), asset::setPropertyUnit);
             updateIfNotNull(basic.getPropertyGroup(), asset::setPropertyGroup);
             updateIfNotNull(basic.getSerialNumber(), asset::setSerialNumber);
+            updateIfNotNull(basic.getModelNumber(), asset::setModelNumber);
+            updateIfNotNull(basic.getManufactureDate(), asset::setManufactureDate);
             if (basic.getStatus() != null) {
                 asset.setStatus(basic.getStatus());
             }
@@ -728,8 +734,11 @@ public class AssetService {
                 .functionalClass(asset.getFunctionalClass())
                 .retirementUnit(asset.getRetirementUnit())
                 .utilityAccount(asset.getUtilityAccount())
+                .propertyUnit(asset.getPropertyUnit())
                 .propertyGroup(asset.getPropertyGroup())
                 .serialNumber(asset.getSerialNumber())
+                .modelNumber(asset.getModelNumber())
+                .manufactureDate(asset.getManufactureDate())
                 .location(locDto)
                 .predictiveThresholds(predictiveThresholds)
                 .technicalDetails(techDto)

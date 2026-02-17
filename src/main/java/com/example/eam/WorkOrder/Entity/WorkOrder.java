@@ -81,6 +81,19 @@ public class WorkOrder {
     @JoinColumn(name = "work_order_type_id")
     private WorkOrderTypeTemplate workOrderTypeTemplate;
 
+    // Optional free-text asset name provided at WO creation when asset does not yet exist
+    @Column(name = "asset_name_input", length = 255)
+    private String assetNameInput;
+
+    @Column(name = "asset_serial_input", length = 128)
+    private String assetSerialInput;
+
+    @Column(name = "asset_model_input", length = 128)
+    private String assetModelInput;
+
+    @Column(name = "asset_manufacture_date_input")
+    private LocalDate assetManufactureDateInput;
+
     // Snapshot of location (auto from asset if present, but editable)
     @Column(name = "location", length = 255)
     private String location;

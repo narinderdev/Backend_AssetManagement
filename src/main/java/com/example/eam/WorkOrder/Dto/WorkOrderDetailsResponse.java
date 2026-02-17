@@ -29,6 +29,9 @@ import java.util.List;
          "assetDbId",
          "assetId",
          "assetName",
+         "assetSerialNumber",
+         "assetModelNumber",
+         "assetManufactureDate",
          "warrantyLifecycle",
          "location",
         "workType",
@@ -111,6 +114,9 @@ public class WorkOrderDetailsResponse {
     private Long assetDbId;                  // Asset.id
     private String assetId;                  // Asset.assetId (business id)
     private String assetName;
+    private String assetSerialNumber;
+    private String assetModelNumber;
+    private LocalDate assetManufactureDate;
     private AssetWarrantyLifecycleDto warrantyLifecycle;
 
     private String location;

@@ -7,6 +7,9 @@ import com.example.eam.Asset.Dto.AssetWarrantyLifecycleDto;
 import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
+import com.example.eam.Asset.Service.AssetService;
+import com.example.eam.Asset.Dto.AssetDetailsResponse;
+import com.example.eam.Asset.Dto.CreateAssetDto;
 import com.example.eam.Enum.*;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
@@ -83,6 +86,7 @@ public class WorkOrderService {
     private final WorkOrderChecklistItemRepository workOrderChecklistItemRepository;
     private final AssetRepository assetRepository;
     private final AssetLocationRepository assetLocationRepository;
+    private final AssetService assetService;
     private final ServiceMaintenanceRepository serviceMaintenanceRepository;
     private final TechnicianRepository technicianRepository;
     private final TechnicianTeamRepository technicianTeamRepository;
@@ -160,6 +164,10 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
                 .asset(asset)
                 .workRequestType(workRequestType)
                 .workOrderTypeTemplate(woType)
+                .assetNameInput(trim(request.getAssetName()))
+                .assetSerialInput(trim(request.getAssetSerialNumber()))
+                .assetModelInput(trim(request.getAssetModelNumber()))
+                .assetManufactureDateInput(request.getAssetManufactureDate())
                 .location(location)
                 .workType(request.getWorkType())
                 .priority(request.getPriority())
@@ -430,6 +438,11 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             wo.setInventoryUtilityAccount(trim(request.getInventoryUtilityAccount()));
         } else if (woType != null && wo.getInventoryUtilityAccount() == null) {
             wo.setInventoryUtilityAccount(woType.getInventoryUtilityAccount());
+        }
+
+        if (shouldAutoCreateAsset(wo, woType)) {
+            Asset newAsset = createAssetForWorkOrder(wo, woType);
+            wo.setAsset(newAsset);
         }
 
         WorkOrder saved = workOrderRepository.save(wo);
@@ -1230,6 +1243,58 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     private <T> void updateIfNotNull(T value, Consumer<T> setter) {
         if (value != null) setter.accept(value);
+    }
+
+    private boolean shouldAutoCreateAsset(WorkOrder wo, WorkOrderTypeTemplate woType) {
+        return woType != null && woType.isCreateAsset() && wo.getAsset() == null;
+    }
+
+    private Asset createAssetForWorkOrder(WorkOrder wo, WorkOrderTypeTemplate woType) {
+        String assetName = trim(wo.getAssetNameInput());
+        if (assetName == null) {
+            assetName = trim(wo.getWoTitle());
+        }
+        if (assetName == null) {
+            assetName = wo.getWorkOrderId();
+        }
+
+        String assetCategory = trim(woType.getWorkOrderType());
+        if (assetCategory == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "Work order type is required to auto-create asset");
+        }
+
+        CreateAssetDto dto = new CreateAssetDto();
+        dto.setAssetName(assetName);
+        dto.setShortDescription(trim(wo.getDescriptionScope()));
+        dto.setAssetCategory(assetCategory);
+        dto.setStatus(AssetStatus.IN_SERVICE);
+        dto.setFunctionalClass(trim(woType.getFunctionalClass()));
+        dto.setRetirementUnit(trim(woType.getRetirementUnit()));
+        dto.setPropertyGroup(trim(woType.getPropertyGroup()));
+        dto.setPropertyUnit(trim(woType.getPropertyUnit()));
+        dto.setSerialNumber(trim(wo.getAssetSerialInput()));
+        dto.setModelNumber(trim(wo.getAssetModelInput()));
+        dto.setManufactureDate(wo.getAssetManufactureDateInput());
+        String utility = wo.getUtilityAccount() != null
+                ? wo.getUtilityAccount()
+                : woType.getDefaultUtilityAccount();
+        dto.setUtilityAccount(trim(utility));
+
+        AssetDetailsResponse created = assetService.createAsset(dto);
+        Asset asset = assetRepository.findById(created.getId())
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load auto-created asset"));
+
+        if (!isBlank(wo.getLocation())) {
+            AssetLocation loc = AssetLocation.builder()
+                    .asset(asset)
+                    .location(wo.getLocation().trim())
+                    .build();
+            assetLocationRepository.save(loc);
+        }
+
+        return asset;
     }
 
     private String resolveLocation(Asset asset, String providedLocation) {
@@ -2182,7 +2247,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .emergencyIncidentId(emergencyIncidentId)
                 .assetDbId(asset != null ? asset.getId() : null)
                 .assetId(asset != null ? asset.getAssetId() : null)
-                .assetName(asset != null ? asset.getAssetName() : null)
+                .assetName(asset != null ? asset.getAssetName() : wo.getAssetNameInput())
+                .assetSerialNumber(asset != null ? asset.getSerialNumber() : wo.getAssetSerialInput())
+                .assetModelNumber(asset != null ? asset.getModelNumber() : wo.getAssetModelInput())
+                .assetManufactureDate(asset != null ? asset.getManufactureDate() : wo.getAssetManufactureDateInput())
                 .warrantyLifecycle(warrantyDto)
                 .location(wo.getLocation())
                 .workType(wo.getWorkType())

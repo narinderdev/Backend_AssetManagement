@@ -27,6 +27,7 @@ public class WorkOrderTypeTemplateService {
         if (repository.existsByWorkOrderTypeIgnoreCase(type)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type already exists: " + type);
         }
+        boolean createAsset = Boolean.TRUE.equals(req.getCreateAsset());
         WorkOrderTypeTemplate saved = repository.save(WorkOrderTypeTemplate.builder()
                 .workOrderType(type)
                 .defaultGlAccount(trim(req.getDefaultGlAccount()))
@@ -36,6 +37,11 @@ public class WorkOrderTypeTemplateService {
                 .laborUtilityAccount(trim(req.getLaborUtilityAccount()))
                 .inventoryGlAccount(trim(req.getInventoryGlAccount()))
                 .inventoryUtilityAccount(trim(req.getInventoryUtilityAccount()))
+                .createAsset(createAsset)
+                .propertyUnit(createAsset ? trim(req.getPropertyUnit()) : null)
+                .propertyGroup(createAsset ? trim(req.getPropertyGroup()) : null)
+                .retirementUnit(createAsset ? trim(req.getRetirementUnit()) : null)
+                .functionalClass(createAsset ? trim(req.getFunctionalClass()) : null)
                 .active(req.getActive() == null || req.getActive())
                 .build());
         return toResponse(saved);
@@ -73,6 +79,19 @@ public class WorkOrderTypeTemplateService {
         if (req.getLaborUtilityAccount() != null) t.setLaborUtilityAccount(trim(req.getLaborUtilityAccount()));
         if (req.getInventoryGlAccount() != null) t.setInventoryGlAccount(trim(req.getInventoryGlAccount()));
         if (req.getInventoryUtilityAccount() != null) t.setInventoryUtilityAccount(trim(req.getInventoryUtilityAccount()));
+        if (req.getCreateAsset() != null) {
+            t.setCreateAsset(req.getCreateAsset());
+            if (!req.getCreateAsset()) {
+                t.setPropertyUnit(null);
+                t.setPropertyGroup(null);
+                t.setRetirementUnit(null);
+                t.setFunctionalClass(null);
+            }
+        }
+        if (req.getPropertyUnit() != null) t.setPropertyUnit(trim(req.getPropertyUnit()));
+        if (req.getPropertyGroup() != null) t.setPropertyGroup(trim(req.getPropertyGroup()));
+        if (req.getRetirementUnit() != null) t.setRetirementUnit(trim(req.getRetirementUnit()));
+        if (req.getFunctionalClass() != null) t.setFunctionalClass(trim(req.getFunctionalClass()));
         if (req.getActive() != null) t.setActive(req.getActive());
 
         WorkOrderTypeTemplate saved = repository.save(t);
@@ -105,6 +124,11 @@ public class WorkOrderTypeTemplateService {
                 .laborUtilityAccount(t.getLaborUtilityAccount())
                 .inventoryGlAccount(t.getInventoryGlAccount())
                 .inventoryUtilityAccount(t.getInventoryUtilityAccount())
+                .createAsset(t.isCreateAsset())
+                .propertyUnit(t.getPropertyUnit())
+                .propertyGroup(t.getPropertyGroup())
+                .retirementUnit(t.getRetirementUnit())
+                .functionalClass(t.getFunctionalClass())
                 .active(t.isActive())
                 .createdAt(t.getCreatedAt())
                 .updatedAt(t.getUpdatedAt())

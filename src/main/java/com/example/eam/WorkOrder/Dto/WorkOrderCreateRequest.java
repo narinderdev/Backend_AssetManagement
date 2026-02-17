@@ -14,6 +14,12 @@ public class WorkOrderCreateRequest {
     // Asset optional (location-only WO allowed)
     private Long assetId;
 
+    // Used when createAsset is enabled on work order type
+    private String assetName;
+    private String assetSerialNumber;
+    private String assetModelNumber;
+    private LocalDate assetManufactureDate;
+
     // If assetId is null, location is required
     private String location;
 

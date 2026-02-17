@@ -20,7 +20,9 @@ public class AssetUpdateRequest {
     private String functionalClass;
     private String retirementUnit;
     private String utilityAccount;
+    private String propertyUnit;
     private String propertyGroup;
     private String serialNumber;
+    private String modelNumber;
+    private java.time.LocalDate manufactureDate;
 }
-

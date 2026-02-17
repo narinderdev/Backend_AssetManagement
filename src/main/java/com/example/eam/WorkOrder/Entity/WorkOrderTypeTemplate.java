@@ -54,6 +54,22 @@ public class WorkOrderTypeTemplate {
     private String inventoryUtilityAccount;
 
     @Builder.Default
+    @Column(name = "create_asset", nullable = false)
+    private boolean createAsset = false;
+
+    @Column(name = "property_unit", length = 128)
+    private String propertyUnit;
+
+    @Column(name = "property_group", length = 128)
+    private String propertyGroup;
+
+    @Column(name = "retirement_unit", length = 128)
+    private String retirementUnit;
+
+    @Column(name = "functional_class", length = 128)
+    private String functionalClass;
+
+    @Builder.Default
     @Column(name = "active", nullable = false)
     private boolean active = true;
 
