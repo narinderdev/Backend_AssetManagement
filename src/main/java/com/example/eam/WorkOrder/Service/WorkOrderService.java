@@ -444,11 +444,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             wo.setInventoryUtilityAccount(woType.getInventoryUtilityAccount());
         }
 
-        if (shouldAutoCreateAsset(wo, woType)) {
-            Asset newAsset = createAssetForWorkOrder(wo, woType);
-            wo.setAsset(newAsset);
-        }
-
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
     }
@@ -1142,6 +1137,13 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         wo.setActualMaterialCost(totalMaterialCost.compareTo(BigDecimal.ZERO) > 0 ? totalMaterialCost : null);
         wo.setActualTotalCost(addCosts(wo.getActualLaborCost(), wo.getActualMaterialCost()));
+
+        // Auto-create asset at completion (if configured and not yet created)
+        WorkOrderTypeTemplate woType = wo.getWorkOrderTypeTemplate();
+        if (shouldAutoCreateAsset(wo, woType)) {
+            Asset newAsset = createAssetForWorkOrder(wo, woType);
+            wo.setAsset(newAsset);
+        }
 
         validateStatusTransition(wo.getStatus(), WorkOrderStatus.COMPLETED);
         wo.setStatus(WorkOrderStatus.COMPLETED);
