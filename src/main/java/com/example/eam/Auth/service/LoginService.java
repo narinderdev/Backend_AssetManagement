@@ -232,7 +232,7 @@ public class LoginService {
         LocalDate expiryDate = passwordChangedAt.plusDays(expiryDays);
         long daysRemaining = ChronoUnit.DAYS.between(LocalDate.now(), expiryDate);
         if (daysRemaining < 0) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Password expired");
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Password expired");
         }
         return daysRemaining <= PASSWORD_EXPIRY_WARNING_DAYS ? (int) daysRemaining : null;
     }
