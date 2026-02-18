@@ -31,6 +31,7 @@ public class PurchaseOrderResponse {
     private Long shipToWarehouseId;
     private Long shipToWorkOrderId;
     private PurchaseOrderStatus status;
+    private Instant deliveredAt;
     private LocalDate requiredDeliveryDate;
     private String remarks;
     private String createdByUserId;

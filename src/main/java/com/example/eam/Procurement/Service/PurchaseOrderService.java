@@ -222,6 +222,9 @@ public class PurchaseOrderService {
                 if (po.getStatus() == PurchaseOrderStatus.CANCELLED || po.getStatus() == PurchaseOrderStatus.CLOSED) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot mark Delivered from status " + po.getStatus());
                 }
+                if (po.getDeliveredAt() == null) {
+                    po.setDeliveredAt(Instant.now());
+                }
             }
             case CLOSED -> {
                 if (po.getStatus() != PurchaseOrderStatus.DELIVERED) {
@@ -342,6 +345,7 @@ public class PurchaseOrderService {
                 .shipToWarehouseId(po.getShipToWarehouseId())
                 .shipToWorkOrderId(po.getShipToWorkOrderId())
                 .status(po.getStatus())
+                .deliveredAt(po.getDeliveredAt())
                 .glAccountString(po.getGlAccountString())
                 .requiredDeliveryDate(po.getRequiredDeliveryDate())
                 .remarks(po.getRemarks())

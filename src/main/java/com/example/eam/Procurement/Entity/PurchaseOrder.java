@@ -84,6 +84,9 @@ public class PurchaseOrder {
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
 
+    @Column(name = "delivered_at", columnDefinition = "datetimeoffset")
+    private Instant deliveredAt;
+
     @OneToMany(mappedBy = "po", cascade = CascadeType.ALL, orphanRemoval = true)
     @Builder.Default
     private List<PurchaseOrderLine> lines = new ArrayList<>();
