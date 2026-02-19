@@ -41,4 +41,7 @@ public class GoodsReceiptNoteLine {
 
     @Column(name = "return_qty", precision = 19, scale = 4)
     private BigDecimal returnQty;
+
+    @Column(name = "return_reason", length = 500)
+    private String returnReason;
 }

@@ -85,7 +85,7 @@ public class VendorReturnService {
                 .returnCost(returnCost)
                 .stockBefore(stockBefore)
                 .stockAfter(stockAfter)
-                .reason(grn.getNotes())
+                .reason(line.getReturnReason() != null ? line.getReturnReason() : grn.getNotes())
                 .performedBy(grn.getReceivedByUserId())
                 .build());
 
