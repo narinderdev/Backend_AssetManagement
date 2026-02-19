@@ -35,10 +35,14 @@ public class WorkOrderBudgetService {
             String workOrderId,
             String period
     ) {
+        Long assetDbId = parseLongOrNull(assetId);
+        Long workOrderDbId = parseLongOrNull(workOrderId);
         DateRange range = resolveDateRange(period);
         List<WorkOrder> workOrders = workOrderRepository.findForBudgetReport(
                 assetId,
+                assetDbId,
                 workOrderId,
+                workOrderDbId,
                 range.startDateTime(),
                 range.endDateTimeExclusive()
         );
@@ -239,6 +243,15 @@ public class WorkOrderBudgetService {
             return BigDecimal.valueOf(num.doubleValue());
         }
         return BigDecimal.ZERO;
+    }
+
+    private Long parseLongOrNull(String value) {
+        if (value == null) return null;
+        try {
+            return Long.parseLong(value.trim());
+        } catch (NumberFormatException ex) {
+            return null;
+        }
     }
 
     private DateRange resolveDateRange(String period) {

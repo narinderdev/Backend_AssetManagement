@@ -190,14 +190,31 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
         select wo from WorkOrder wo
         left join fetch wo.asset a
         where wo.deleted = false
-          and (:assetId is null or (a is not null and a.assetId = :assetId))
-          and (:workOrderId is null or wo.workOrderId = :workOrderId or wo.woNumber = :workOrderId)
+          and (
+                (:assetId is null and :assetDbId is null)
+             or (
+                    a is not null
+                and (
+                        (:assetId is not null and a.assetId = :assetId)
+                     or (:assetDbId is not null and a.id = :assetDbId)
+                )
+             )
+          )
+          and (
+                (:workOrderId is null and :workOrderDbId is null)
+             or (
+                        (:workOrderId is not null and (wo.workOrderId = :workOrderId or wo.woNumber = :workOrderId))
+                     or (:workOrderDbId is not null and wo.id = :workOrderDbId)
+             )
+          )
           and (:startDate is null or wo.createdAt >= :startDate)
           and (:endDate is null or wo.createdAt < :endDate)
     """)
     List<WorkOrder> findForBudgetReport(
             @Param("assetId") String assetId,
+            @Param("assetDbId") Long assetDbId,
             @Param("workOrderId") String workOrderId,
+            @Param("workOrderDbId") Long workOrderDbId,
             @Param("startDate") LocalDateTime startDate,
             @Param("endDate") LocalDateTime endDate
     );
