@@ -44,6 +44,7 @@ public class GRNService {
     private final StockLedgerEntryRepository stockLedgerEntryRepository;
     private final NumberGeneratorService numberGeneratorService;
     private final InventoryAuditLogService inventoryAuditLogService;
+    private final VendorReturnService vendorReturnService;
 
     @Transactional
     public GrnResponse create(CreateGrnRequest request) {
@@ -152,6 +153,7 @@ public class GRNService {
 
         GoodsReceiptNote saved = grnRepository.save(grn);
         incrementStock(qtyByItem, saved);
+        vendorReturnService.recordInitialReturns(saved);
 
         if (po != null) {
             if (po.getLines().stream().allMatch(line -> line.getOrderedQty().compareTo(line.getReceivedQty()) == 0)) {

@@ -87,6 +87,16 @@ public class InventoryAuditLogService {
         return recordTransaction(item, InventoryTransactionType.RECEIVE, refType, referenceNumber, beforeQty, afterQty, performedBy, reason);
     }
 
+    public InventoryAuditLog recordReturn(InventoryItem item,
+                                          int beforeQty,
+                                          int afterQty,
+                                          InventoryReferenceType refType,
+                                          String referenceNumber,
+                                          String performedBy,
+                                          String reason) {
+        return recordTransaction(item, InventoryTransactionType.RETURN, refType, referenceNumber, beforeQty, afterQty, performedBy, reason);
+    }
+
     private InventoryAuditLog recordTransaction(InventoryItem item,
                                                 InventoryTransactionType type,
                                                 InventoryReferenceType refType,
