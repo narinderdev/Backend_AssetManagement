@@ -23,7 +23,7 @@ public class CreateGrnLineRequest {
     private BigDecimal orderedQty; // optional when poLineId is present; required when no PO
 
     @NotNull
-    @DecimalMin(value = "0", inclusive = false)
+    @DecimalMin(value = "0", inclusive = false, message = "Received quantity must be at least 1")
     private BigDecimal receivedQty;
 
     // Quantity being returned to vendor (informational); stock is updated only by receivedQty

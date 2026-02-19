@@ -104,7 +104,7 @@ public class GRNService {
 
             BigDecimal receivedQty = lineRequest.getReceivedQty();
             if (receivedQty == null || receivedQty.compareTo(BigDecimal.ZERO) <= 0) {
-                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "receivedQty must be greater than zero");
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Received quantity must be at least 1");
             }
             receivedQty = receivedQty.setScale(4, RoundingMode.HALF_UP);
 
