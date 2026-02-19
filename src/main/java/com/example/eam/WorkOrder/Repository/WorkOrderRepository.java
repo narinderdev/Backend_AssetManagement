@@ -185,4 +185,20 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
     );
 
     List<WorkOrder> findByDeletedFalseOrderByUpdatedAtDesc(org.springframework.data.domain.Pageable pageable);
+
+    @Query("""
+        select wo from WorkOrder wo
+        left join fetch wo.asset a
+        where wo.deleted = false
+          and (:assetId is null or (a is not null and a.assetId = :assetId))
+          and (:workOrderId is null or wo.workOrderId = :workOrderId or wo.woNumber = :workOrderId)
+          and (:startDate is null or wo.createdAt >= :startDate)
+          and (:endDate is null or wo.createdAt < :endDate)
+    """)
+    List<WorkOrder> findForBudgetReport(
+            @Param("assetId") String assetId,
+            @Param("workOrderId") String workOrderId,
+            @Param("startDate") LocalDateTime startDate,
+            @Param("endDate") LocalDateTime endDate
+    );
 }

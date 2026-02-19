@@ -2,7 +2,9 @@ package com.example.eam.Reports.Controller;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.Enum.WorkOrderStatus;
+import com.example.eam.WorkOrder.Dto.WorkOrderBudgetSummaryResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderListResponse;
+import com.example.eam.WorkOrder.Service.WorkOrderBudgetService;
 import com.example.eam.WorkOrder.Service.WorkOrderService;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Pageable;
@@ -23,6 +25,7 @@ import java.util.Set;
 public class WorkOrderReportController {
 
     private final WorkOrderService workOrderService;
+    private final WorkOrderBudgetService workOrderBudgetService;
 
     @GetMapping
     public ResponseEntity<ApiResponse<WorkOrderListResponse>> list(
@@ -49,5 +52,23 @@ public class WorkOrderReportController {
 
         WorkOrderListResponse data = workOrderService.listWorkOrdersByStatus(filterStatuses, pageable);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order report fetched", data));
+    }
+
+    @GetMapping("/budget")
+    public ResponseEntity<ApiResponse<WorkOrderBudgetSummaryResponse>> budgetSummary(
+            @RequestParam(value = "assetId", required = false) String assetId,
+            @RequestParam(value = "workOrderId", required = false) String workOrderId,
+            @RequestParam(value = "period", required = false, defaultValue = "THIS_MONTH") String period
+    ) {
+        WorkOrderBudgetSummaryResponse data = workOrderBudgetService.getBudgetSummary(
+                assetId,
+                workOrderId,
+                period
+        );
+        return ResponseEntity.ok(ApiResponse.successResponse(
+                HttpStatus.OK.value(),
+                "Work order budget summary fetched",
+                data
+        ));
     }
 }
