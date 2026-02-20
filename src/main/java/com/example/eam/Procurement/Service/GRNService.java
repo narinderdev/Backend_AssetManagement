@@ -18,6 +18,8 @@ import com.example.eam.Procurement.Enum.StockReferenceType;
 import com.example.eam.Procurement.Repository.GoodsReceiptNoteRepository;
 import com.example.eam.Procurement.Repository.PurchaseOrderRepository;
 import com.example.eam.Procurement.Repository.StockLedgerEntryRepository;
+import com.example.eam.VendorManagement.Entity.Vendor;
+import com.example.eam.VendorManagement.Repository.VendorRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -42,6 +44,7 @@ public class GRNService {
     private final PurchaseOrderRepository poRepository;
     private final InventoryItemRepository inventoryItemRepository;
     private final StockLedgerEntryRepository stockLedgerEntryRepository;
+    private final VendorRepository vendorRepository;
     private final NumberGeneratorService numberGeneratorService;
     private final InventoryAuditLogService inventoryAuditLogService;
     private final VendorReturnService vendorReturnService;
@@ -269,6 +272,18 @@ public class GRNService {
     }
 
     private GrnResponse toResponse(GoodsReceiptNote grn) {
+        Set<Long> itemIds = Optional.ofNullable(grn.getLines())
+                .orElseGet(Collections::emptyList)
+                .stream()
+                .map(GoodsReceiptNoteLine::getItemId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, String> itemNamesById = itemIds.isEmpty()
+                ? Collections.emptyMap()
+                : inventoryItemRepository.findAllById(itemIds).stream()
+                .collect(Collectors.toMap(InventoryItem::getId, InventoryItem::getItemName));
+
         List<GrnLineResponse> lines = Optional.ofNullable(grn.getLines())
                 .orElseGet(Collections::emptyList)
                 .stream()
@@ -276,17 +291,26 @@ public class GRNService {
                         .id(line.getId())
                         .poLineId(line.getPoLineId())
                         .itemId(line.getItemId())
+                        .itemName(itemNamesById.get(line.getItemId()))
                         .orderedQty(line.getOrderedQty())
                         .receivedQty(line.getReceivedQty())
                         .returnQty(line.getReturnQty())
                         .build())
                 .toList();
 
+        String vendorName = null;
+        if (grn.getVendorId() != null) {
+            vendorName = vendorRepository.findById(grn.getVendorId())
+                    .map(Vendor::getVendorName)
+                    .orElse(null);
+        }
+
         return GrnResponse.builder()
                 .id(grn.getId())
                 .grnNumber(grn.getGrnNumber())
                 .poId(grn.getPoId())
                 .vendorId(grn.getVendorId())
+                .vendorName(vendorName)
                 .receivedByUserId(grn.getReceivedByUserId())
                 .receivedAtUtc(grn.getReceivedAtUtc())
                 .dayKeyUtc(grn.getDayKeyUtc())

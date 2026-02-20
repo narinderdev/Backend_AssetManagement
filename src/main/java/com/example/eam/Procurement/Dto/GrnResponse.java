@@ -18,6 +18,7 @@ public class GrnResponse {
     private String grnNumber;
     private Long poId;
     private Long vendorId;
+    private String vendorName;
     private String receivedByUserId;
     private Instant receivedAtUtc;
     private String dayKeyUtc;
