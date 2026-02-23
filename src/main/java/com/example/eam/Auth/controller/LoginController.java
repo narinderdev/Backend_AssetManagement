@@ -11,6 +11,7 @@ import org.springframework.web.bind.annotation.RestController;
 import com.example.eam.Auth.dto.LoginDto;
 import com.example.eam.Auth.dto.LoginResponseDto;
 import com.example.eam.Auth.dto.MfaCodeDto;
+import com.example.eam.Auth.dto.MfaEmailRequestDto;
 import com.example.eam.Auth.dto.MfaLoginDto;
 import com.example.eam.Auth.service.LogoutService;
 import com.example.eam.Auth.service.LoginService;
@@ -57,9 +58,8 @@ public class LoginController {
     }
 
     @PostMapping("/mfa/email/send")
-    public ResponseEntity<ApiResponse<Void>> sendMfaEmailOtp() {
-        String email = currentUserEmail();
-        mfaService.sendEmailOtp(email);
+    public ResponseEntity<ApiResponse<Void>> sendMfaEmailOtp(@Valid @RequestBody MfaEmailRequestDto dto) {
+        mfaService.sendEmailOtp(dto.getEmail());
         ApiResponse<Void> body = ApiResponse.successResponse(
                 200,
                 "Email OTP sent successfully",
