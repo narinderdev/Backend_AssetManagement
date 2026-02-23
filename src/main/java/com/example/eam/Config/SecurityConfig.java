@@ -34,7 +34,7 @@ public class SecurityConfig {
      * Comma-separated list of allowed origins. Defaults cover local dev and the
      * current public IP/ports for HTTP-only deployment.
      */
-    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://54.225.63.207:4300,http://54.225.63.207}")
+    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://54.225.63.207:4300,http://54.225.63.207,http://3.94.209.54:4300,http://3.94.209.54}")
     private String allowedOrigins;
 
     /**
