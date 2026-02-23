@@ -6,6 +6,7 @@ import org.springframework.web.bind.annotation.*;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.User.dto.ChangePasswordDto;
+import com.example.eam.User.dto.ForgotPasswordDto;
 import com.example.eam.User.dto.UserCreateDto;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.service.UserService;
@@ -43,6 +44,15 @@ public class UserController {
     ) {
         userService.changePassword(dto.getEmail(), dto);
         ApiResponse<Void> response = ApiResponse.successResponse(200, "Password updated successfully", null);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<ApiResponse<Void>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordDto dto
+    ) {
+        userService.forgotPassword(dto);
+        ApiResponse<Void> response = ApiResponse.successResponse(200, "Password reset successfully", null);
         return ResponseEntity.ok(response);
     }
 }

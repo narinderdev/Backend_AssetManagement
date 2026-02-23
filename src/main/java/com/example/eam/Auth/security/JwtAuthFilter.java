@@ -115,6 +115,7 @@ public class JwtAuthFilter extends OncePerRequestFilter {
         if (path == null) return false;
         // Allow password change / reset endpoints even when password is expired
         return path.contains("/users/change-password")
+                || path.contains("/users/forgot-password")
                 || path.contains("/users/set-password")
                 || path.contains("/users/accept");
     }

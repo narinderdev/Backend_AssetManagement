@@ -71,7 +71,7 @@ public class SecurityConfig {
                         "/users/set-password"
                 ).permitAll()
                 .requestMatchers(HttpMethod.POST, "/users", "/users/").permitAll()
-                .requestMatchers(HttpMethod.POST, "/users/change-password").permitAll()
+                .requestMatchers(HttpMethod.POST, "/users/change-password", "/users/forgot-password").permitAll()
                 .requestMatchers(HttpMethod.POST, "/users/invite").hasRole("Admin")
                 .anyRequest().authenticated()
             )

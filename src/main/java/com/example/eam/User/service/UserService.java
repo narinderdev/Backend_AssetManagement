@@ -7,6 +7,7 @@ import org.springframework.web.server.ResponseStatusException;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.ChangePasswordDto;
+import com.example.eam.User.dto.ForgotPasswordDto;
 import com.example.eam.User.dto.UserCreateDto;
 import com.example.eam.User.dto.UserSummaryDto;
 import com.example.eam.User.entity.UserRole;
@@ -114,6 +115,31 @@ public class UserService {
             user.setUpdatedAt(Instant.now());
             usersRepository.save(user);
             logEvent(SecurityEventType.PASSWORD_CHANGED, user, "Password changed via change-password");
+        }
+
+        @Transactional
+        public void forgotPassword(ForgotPasswordDto dto) {
+            String normalizedEmail = dto.getEmail() != null ? dto.getEmail().trim().toLowerCase() : null;
+            if (normalizedEmail == null || normalizedEmail.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Email is required");
+            }
+
+            Users user = usersRepository.findByEmailAndDeletedFalse(normalizedEmail)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+            if (user.getStatus() != UserStatus.ACTIVE) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User is not active");
+            }
+
+            if (user.getPassword() != null && !user.getPassword().isBlank()
+                    && passwordEncoder.matches(dto.getNewPassword(), user.getPassword())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must be different from current password");
+            }
+
+            user.setPassword(passwordEncoder.encode(dto.getNewPassword()));
+            user.setUpdatedAt(Instant.now());
+            usersRepository.save(user);
+            logEvent(SecurityEventType.PASSWORD_CHANGED, user, "Password changed via forgot-password");
         }
 
         @Transactional(readOnly = true)
