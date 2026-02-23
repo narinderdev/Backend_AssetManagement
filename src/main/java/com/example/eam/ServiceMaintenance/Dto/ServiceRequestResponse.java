@@ -20,6 +20,7 @@ public class ServiceRequestResponse {
     private LocalDateTime requestDate;
 
     private String requesterName;
+    private String requesterPhoneNumber;
     private String requesterContact;
     private String department;
 

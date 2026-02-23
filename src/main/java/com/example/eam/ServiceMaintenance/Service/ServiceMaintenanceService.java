@@ -56,6 +56,7 @@ public class ServiceMaintenanceService {
                 .requestId(requestId)
                 .requestDate(LocalDateTime.now())
                 .requesterName(dto.getRequesterName())
+                .requesterPhoneNumber(trim(dto.getRequesterPhoneNumber()))
                 .requesterContact(dto.getRequesterContact())
                 .department(dto.getDepartment())
                 .asset(asset)
@@ -174,6 +175,7 @@ public class ServiceMaintenanceService {
 
         updateIfNotBlank(dto.getLocation(), entity::setLocation);
         updateIfNotBlank(dto.getRequesterName(), entity::setRequesterName);
+        updateIfNotBlank(dto.getRequesterPhoneNumber(), entity::setRequesterPhoneNumber);
         updateIfNotBlank(dto.getRequesterContact(), entity::setRequesterContact);
         updateIfNotBlank(dto.getDepartment(), entity::setDepartment);
         updateIfNotBlank(dto.getShortTitle(), entity::setShortTitle);
@@ -299,6 +301,7 @@ public class ServiceMaintenanceService {
                 .requestId(entity.getRequestId())
                 .requestDate(entity.getRequestDate())
                 .requesterName(entity.getRequesterName())
+                .requesterPhoneNumber(entity.getRequesterPhoneNumber())
                 .requesterContact(entity.getRequesterContact())
                 .department(entity.getDepartment())
                 .assetDbId(asset != null ? asset.getId() : null)

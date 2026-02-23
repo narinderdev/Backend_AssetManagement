@@ -35,6 +35,9 @@ public class ServiceMaintenance {
     @Column(name = "requester_name", nullable = false, length = 255)
     private String requesterName;
 
+    @Column(name = "requester_phone_number", length = 20)
+    private String requesterPhoneNumber;
+
     @Column(name = "requester_contact", length = 255)
     private String requesterContact;
 

@@ -14,6 +14,7 @@ public class ServiceRequestUpdateDto {
     private String requestId;          // allow change (with uniqueness check)
 
     private String requesterName;
+    private String requesterPhoneNumber;
     private String requesterContact;
     private String department;
 
