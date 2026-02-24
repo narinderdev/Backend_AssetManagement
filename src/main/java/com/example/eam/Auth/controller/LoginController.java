@@ -10,8 +10,8 @@ import org.springframework.web.bind.annotation.RestController;
 
 import com.example.eam.Auth.dto.LoginDto;
 import com.example.eam.Auth.dto.LoginResponseDto;
-import com.example.eam.Auth.dto.MfaCodeDto;
 import com.example.eam.Auth.dto.MfaEmailRequestDto;
+import com.example.eam.Auth.dto.MfaEmailVerifyDto;
 import com.example.eam.Auth.dto.MfaLoginDto;
 import com.example.eam.Auth.service.LogoutService;
 import com.example.eam.Auth.service.LoginService;
@@ -69,9 +69,8 @@ public class LoginController {
     }
 
     @PostMapping("/mfa/email/verify")
-    public ResponseEntity<ApiResponse<Void>> verifyMfaEmailOtp(@Valid @RequestBody MfaCodeDto dto) {
-        String email = currentUserEmail();
-        mfaService.verifyEmailOtp(email, dto.getCode());
+    public ResponseEntity<ApiResponse<Void>> verifyMfaEmailOtp(@Valid @RequestBody MfaEmailVerifyDto dto) {
+        mfaService.verifyEmailOtp(dto.getEmail(), dto.getCode());
         ApiResponse<Void> body = ApiResponse.successResponse(
                 200,
                 "Email OTP verified successfully",

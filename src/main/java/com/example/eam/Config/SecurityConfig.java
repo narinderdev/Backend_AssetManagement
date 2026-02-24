@@ -34,7 +34,7 @@ public class SecurityConfig {
      * Comma-separated list of allowed origins. Defaults cover local dev and the
      * current public IP/ports for HTTP-only deployment.
      */
-    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://54.225.63.207:4300,http://54.225.63.207,http://3.94.209.54:4300,http://3.94.209.54}")
+    @Value("${app.cors.allowed-origins:http://localhost:4200,http://localhost:4300,http://54.225.63.207:4300,http://54.225.63.207,http://3.84.76.210:4300,http://3.84.76.210}")
     private String allowedOrigins;
 
     /**
@@ -64,7 +64,8 @@ public class SecurityConfig {
                         "/auth",
                         "/auth/",
                         "/auth/login/mfa",
-                        "/auth/mfa/email/send"
+                        "/auth/mfa/email/send",
+                        "/auth/mfa/email/verify"
                 ).permitAll()
                 .requestMatchers("/auth/signup/**").permitAll()
                 .requestMatchers(
