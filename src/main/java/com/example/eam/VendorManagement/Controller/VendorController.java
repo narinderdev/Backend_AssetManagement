@@ -61,5 +61,17 @@ public class VendorController {
         vendorService.delete(id);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Vendor deleted successfully", null));
     }
-}
 
+    @PostMapping("/{id}/approve")
+    public ResponseEntity<ApiResponse<VendorResponse>> approve(@PathVariable Long id) {
+        VendorResponse data = vendorService.approve(id);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Vendor approved successfully", data));
+    }
+
+    @PostMapping("/{id}/reject")
+    public ResponseEntity<ApiResponse<VendorResponse>> reject(@PathVariable Long id,
+                                                              @Valid @RequestBody VendorRejectRequest request) {
+        VendorResponse data = vendorService.reject(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Vendor rejected successfully", data));
+    }
+}

@@ -1,5 +1,6 @@
 package com.example.eam.VendorManagement.Service;
 
+import com.example.eam.Enum.VendorStatus;
 import com.example.eam.VendorManagement.Dto.*;
 import com.example.eam.VendorManagement.Entity.Vendor;
 import com.example.eam.VendorManagement.Repository.VendorRepository;
@@ -13,6 +14,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
+import java.util.List;
 import java.util.concurrent.ThreadLocalRandom;
 import java.util.function.Consumer;
 
@@ -37,6 +39,7 @@ public class VendorService {
                 .phone(req.getPhone().trim())
                 .paymentTerms(req.getPaymentTerms())
                 .rating(req.getRating())
+                .status(VendorStatus.PENDING)
                 .active(req.getActive() == null || req.getActive())
                 .build();
 
@@ -72,16 +75,39 @@ public class VendorService {
 
     @Transactional(readOnly = true)
     public VendorResponse get(Long id) {
-        return toResponse(getOrThrowActive(id));
+        return toResponse(getOrThrowActiveAndVisible(id));
     }
 
     @Transactional(readOnly = true)
     public Page<VendorResponse> list(Pageable pageable, boolean includeInactive) {
+        List<VendorStatus> visible = List.of(VendorStatus.APPROVED, VendorStatus.PENDING);
         Page<Vendor> page = includeInactive
-                ? vendorRepository.findAll(pageable)
-                : vendorRepository.findByActiveTrue(pageable);
+                ? vendorRepository.findByStatusIn(visible, pageable)
+                : vendorRepository.findByActiveTrueAndStatusIn(visible, pageable);
 
         return page.map(this::toResponse);
+    }
+
+    @Transactional
+    public VendorResponse approve(Long id) {
+        Vendor vendor = getOrThrowActive(id);
+        if (vendor.getStatus() != VendorStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor is already " + vendor.getStatus().name().toLowerCase());
+        }
+        vendor.setStatus(VendorStatus.APPROVED);
+        vendor.setRejectionComment(null);
+        return toResponse(vendorRepository.save(vendor));
+    }
+
+    @Transactional
+    public VendorResponse reject(Long id, VendorRejectRequest req) {
+        Vendor vendor = getOrThrowActive(id);
+        if (vendor.getStatus() != VendorStatus.PENDING) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor is already " + vendor.getStatus().name().toLowerCase());
+        }
+        vendor.setStatus(VendorStatus.REJECTED);
+        vendor.setRejectionComment(req.getComment().trim());
+        return toResponse(vendorRepository.save(vendor));
     }
 
     /**
@@ -99,6 +125,14 @@ public class VendorService {
     private Vendor getOrThrowActive(Long id) {
         return vendorRepository.findByIdAndActiveTrue(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vendor not found"));
+    }
+
+    private Vendor getOrThrowActiveAndVisible(Long id) {
+        Vendor vendor = getOrThrowActive(id);
+        if (vendor.getStatus() == VendorStatus.REJECTED) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vendor not found or rejected");
+        }
+        return vendor;
     }
 
     private void updateIfNotBlank(String value, Consumer<String> setter) {
@@ -157,6 +191,8 @@ public class VendorService {
                 .phone(v.getPhone())
                 .paymentTerms(v.getPaymentTerms())
                 .rating(v.getRating())
+                .status(v.getStatus())
+                .rejectionComment(v.getRejectionComment())
                 .active(v.isActive())
                 .createdAt(v.getCreatedAt())
                 .updatedAt(v.getUpdatedAt())

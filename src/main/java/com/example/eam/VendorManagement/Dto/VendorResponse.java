@@ -2,6 +2,7 @@ package com.example.eam.VendorManagement.Dto;
 
 
 import com.example.eam.Enum.PaymentTerms;
+import com.example.eam.Enum.VendorStatus;
 import lombok.Builder;
 import lombok.Data;
 
@@ -22,6 +23,8 @@ public class VendorResponse {
 
     private PaymentTerms paymentTerms;
     private Integer rating;
+    private VendorStatus status;
+    private String rejectionComment;
     private boolean active;
 
     private LocalDateTime createdAt;
