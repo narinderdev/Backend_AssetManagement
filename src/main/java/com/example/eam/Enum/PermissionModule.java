@@ -3,8 +3,11 @@ package com.example.eam.Enum;
 
 public enum PermissionModule {
     ASSET,
+    ASSET_TYPE,
     SERVICE_REQUEST,
     WORK_ORDER,
+    WORK_ORDER_TYPE,
+    CORRECTIVE_MAINTENANCE,
     PREVENTIVE_MAINTENANCE,
     MATERIAL_REQUISITION,
     PURCHASE_ORDER,
@@ -13,6 +16,8 @@ public enum PermissionModule {
     INVENTORY,
     TECHNICIAN,
     TECHNICIAN_TEAM,
+    DASHBOARD,
+    REPORTS,
     MANAGE_USERS,
     MANAGE_ROLES,
     INVITE_USER

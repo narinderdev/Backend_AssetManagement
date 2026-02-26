@@ -29,8 +29,11 @@ public class PermissionSeeder implements ApplicationRunner {
 
         // CRUD modules (create/view/update/delete)
         seedCrud(toInsert, PermissionModule.ASSET, "asset", sort); sort += 4;
+        seedCrud(toInsert, PermissionModule.ASSET_TYPE, "asset_type", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.SERVICE_REQUEST, "service_request", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.WORK_ORDER, "work_order", sort); sort += 4;
+        seedCrud(toInsert, PermissionModule.WORK_ORDER_TYPE, "work_order_type", sort); sort += 4;
+        seedCrud(toInsert, PermissionModule.CORRECTIVE_MAINTENANCE, "corrective_maintenance", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.PREVENTIVE_MAINTENANCE, "preventive_maintenance", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.MATERIAL_REQUISITION, "material_requisition", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.PURCHASE_ORDER, "purchase_order", sort); sort += 4;
@@ -39,6 +42,8 @@ public class PermissionSeeder implements ApplicationRunner {
         seedCrud(toInsert, PermissionModule.INVENTORY, "inventory", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN, "technician", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN_TEAM, "technician_team", sort); sort += 4;
+        seedViewOnly(toInsert, PermissionModule.DASHBOARD, "dashboard", sort++);
+        seedViewOnly(toInsert, PermissionModule.REPORTS, "reports", sort++);
 
         // Access-only modules (no CRUD)
         seedAccess(toInsert, PermissionModule.MANAGE_USERS, "manage_users", sort++); 
@@ -59,6 +64,10 @@ public class PermissionSeeder implements ApplicationRunner {
 
     private void seedAccess(List<AppPermission> toInsert, PermissionModule module, String code, int sortOrder) {
         seedOne(toInsert, module, PermissionAction.ACCESS, code, "Access " + title(code), sortOrder);
+    }
+
+    private void seedViewOnly(List<AppPermission> toInsert, PermissionModule module, String moduleCode, int sortOrder) {
+        seedOne(toInsert, module, PermissionAction.VIEW, "view_" + moduleCode, "View " + title(moduleCode), sortOrder);
     }
 
     private void seedOne(List<AppPermission> toInsert,
