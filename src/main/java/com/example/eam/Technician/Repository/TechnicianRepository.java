@@ -21,6 +21,12 @@ public interface TechnicianRepository extends JpaRepository<Technician, Long> {
 
     boolean existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
 
+    Optional<Technician> findByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
+
+    Optional<Technician> findFirstByTechnicianIdIgnoreCase(String technicianId);
+
+    Optional<Technician> findFirstByEmailIgnoreCase(String email);
+
     List<Technician> findByIdInAndIsDeletedFalse(Iterable<Long> ids);
 
     /**
