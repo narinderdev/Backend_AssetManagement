@@ -38,6 +38,16 @@ public class InventoryAuditLogService {
         return repository.findByInventoryItem_IdOrderByCreatedAtDesc(itemId, pageable).map(this::toResponse);
     }
 
+    @Transactional(readOnly = true)
+    public Page<InventoryAuditLogResponse> searchBySku(String sku, Pageable pageable) {
+        String normalizedSku = trim(sku);
+        if (normalizedSku == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sku is required");
+        }
+        return repository.findByInventoryItem_SkuNumberContainingIgnoreCaseOrderByCreatedAtDesc(normalizedSku, pageable)
+                .map(this::toResponse);
+    }
+
     private InventoryAuditLogResponse toResponse(InventoryAuditLog log) {
         InventoryItem item = log.getInventoryItem();
         return InventoryAuditLogResponse.builder()

@@ -29,4 +29,12 @@ public class InventoryAuditLogController {
         Page<InventoryAuditLogResponse> data = service.list(pageable);
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Audit logs fetched", data));
     }
+
+    @GetMapping("/search")
+    public ResponseEntity<ApiResponse<Page<InventoryAuditLogResponse>>> searchBySku(
+            @RequestParam String sku,
+            Pageable pageable) {
+        Page<InventoryAuditLogResponse> data = service.searchBySku(sku, pageable);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Audit logs fetched", data));
+    }
 }
