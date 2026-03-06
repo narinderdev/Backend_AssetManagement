@@ -5,9 +5,12 @@ import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.Procurement.Dto.*;
 import com.example.eam.Procurement.Entity.MaterialRequisition;
 import com.example.eam.Procurement.Entity.MaterialRequisitionLine;
+import com.example.eam.Procurement.Entity.PurchaseOrder;
 import com.example.eam.Procurement.Enum.MaterialRequisitionStatus;
 import com.example.eam.Procurement.Enum.MaterialRequisitionShipToType;
+import com.example.eam.Procurement.Repository.GoodsReceiptNoteRepository;
 import com.example.eam.Procurement.Repository.MaterialRequisitionRepository;
+import com.example.eam.Procurement.Repository.PurchaseOrderRepository;
 import com.example.eam.InventoryManagement.Repository.WarehouseRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import lombok.RequiredArgsConstructor;
@@ -34,6 +37,8 @@ public class MaterialRequisitionService {
     private final WarehouseRepository warehouseRepository;
     private final WorkOrderRepository workOrderRepository;
     private final NumberGeneratorService numberGeneratorService;
+    private final PurchaseOrderRepository poRepository;
+    private final GoodsReceiptNoteRepository grnRepository;
 
     @Transactional
     public MaterialRequisitionResponse create(CreateMaterialRequisitionRequest request) {
@@ -165,12 +170,29 @@ public class MaterialRequisitionService {
 
     @Transactional(readOnly = true)
     public MaterialRequisitionResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        MaterialRequisition mr = getOrThrow(id);
+        return toResponse(mr, findLinkedPo(mr.getId()), true);
     }
 
     @Transactional(readOnly = true)
     public Page<MaterialRequisitionResponse> list(Pageable pageable) {
-        return mrRepository.findAll(pageable).map(this::toResponse);
+        Page<MaterialRequisition> mrPage = mrRepository.findAll(pageable);
+        Set<Long> mrIds = mrPage.getContent().stream()
+                .map(MaterialRequisition::getId)
+                .filter(Objects::nonNull)
+                .collect(Collectors.toSet());
+
+        Map<Long, PurchaseOrder> poByMrId = mrIds.isEmpty()
+                ? Collections.emptyMap()
+                : poRepository.findByMrIdIn(mrIds).stream()
+                .filter(po -> po.getMrId() != null)
+                .collect(Collectors.toMap(
+                        PurchaseOrder::getMrId,
+                        Function.identity(),
+                        (left, right) -> left
+                ));
+
+        return mrPage.map(mr -> toResponse(mr, poByMrId.get(mr.getId()), false));
     }
 
     // Helpers
@@ -224,6 +246,12 @@ public class MaterialRequisitionService {
     }
 
     private MaterialRequisitionResponse toResponse(MaterialRequisition mr) {
+        return toResponse(mr, null, false);
+    }
+
+    private MaterialRequisitionResponse toResponse(MaterialRequisition mr,
+                                                   PurchaseOrder linkedPo,
+                                                   boolean includeLinkedGrns) {
         List<MaterialRequisitionLine> mrLines = Optional.ofNullable(mr.getLines())
                 .orElseGet(Collections::emptyList);
 
@@ -246,8 +274,25 @@ public class MaterialRequisitionService {
                         .costPerUnit(costPerUnitByItemId.get(line.getItemId()))
                         .uom(line.getUom())
                         .remarks(line.getRemarks())
-                        .build())
+                .build())
                 .toList();
+
+        Long linkedPoId = null;
+        String linkedPoNumber = null;
+        List<MaterialRequisitionLinkedGrnResponse> linkedGrns = Collections.emptyList();
+
+        if (linkedPo != null) {
+            linkedPoId = linkedPo.getId();
+            linkedPoNumber = linkedPo.getPoNumber();
+        }
+        if (includeLinkedGrns && linkedPo != null) {
+            linkedGrns = grnRepository.findByPoId(linkedPo.getId()).stream()
+                    .map(grn -> MaterialRequisitionLinkedGrnResponse.builder()
+                            .id(grn.getId())
+                            .grnNumber(grn.getGrnNumber())
+                            .build())
+                    .toList();
+        }
 
         return MaterialRequisitionResponse.builder()
                 .id(mr.getId())
@@ -267,8 +312,16 @@ public class MaterialRequisitionService {
                 .rejectionReason(mr.getRejectionReason())
                 .createdAt(mr.getCreatedAt())
                 .updatedAt(mr.getUpdatedAt())
+                .poId(linkedPoId)
+                .poNumber(linkedPoNumber)
+                .linkedGrns(linkedGrns)
                 .lines(lines)
                 .build();
+    }
+
+    private PurchaseOrder findLinkedPo(Long mrId) {
+        if (mrId == null) return null;
+        return poRepository.findByMrId(mrId).stream().findFirst().orElse(null);
     }
 
     private String trim(String value) {

@@ -33,5 +33,8 @@ public class MaterialRequisitionResponse {
     private String rejectionReason;
     private Instant createdAt;
     private Instant updatedAt;
+    private Long poId;
+    private String poNumber;
+    private List<MaterialRequisitionLinkedGrnResponse> linkedGrns;
     private List<MaterialRequisitionLineResponse> lines;
 }
