@@ -44,7 +44,7 @@ public class InventoryAuditLogService {
         if (normalizedSku == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sku is required");
         }
-        return repository.findByInventoryItem_SkuNumberContainingIgnoreCaseOrderByCreatedAtDesc(normalizedSku, pageable)
+        return repository.searchBySku(normalizedSku, pageable)
                 .map(this::toResponse);
     }
 

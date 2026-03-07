@@ -13,6 +13,7 @@ import java.util.Optional;
 public interface RoleRepository extends JpaRepository<Role, Long> {
     boolean existsByNameIgnoreCase(String name);
     Optional<Role> findByNameIgnoreCase(String name);
+    Optional<Role> findFirstByTechnicianRoleTrueAndActiveTrue();
     Optional<Role> findByIdAndActiveTrue(Long id);
     Page<Role> findByActiveTrue(Pageable pageable);
 
