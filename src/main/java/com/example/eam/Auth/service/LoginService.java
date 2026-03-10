@@ -3,11 +3,13 @@ package com.example.eam.Auth.service;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -362,6 +364,8 @@ public class LoginService {
                             .firstName(defaultName(user.getFirstName(), "Technician"))
                             .lastName(defaultName(user.getLastName(), "User"))
                             .email(normalizedEmail)
+                            .badgeNumber(generateUniqueBadgeNumber())
+                            .technicianId(generateUniqueTechnicianId())
                             .technicianType(TechnicianType.FULL_TIME)
                             .status(TechnicianStatus.ACTIVE)
                             .build();
@@ -413,6 +417,30 @@ public class LoginService {
         }
         String trimmed = value.trim();
         return trimmed.isBlank() ? fallback : trimmed;
+    }
+
+    private String generateUniqueBadgeNumber() {
+        String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        for (int i = 0; i < 50; i++) {
+            int rand = ThreadLocalRandom.current().nextInt(0, 100000);
+            String candidate = String.format("BDG-%s-%05d", date, rand);
+            if (!technicianRepository.existsByBadgeNumberIgnoreCaseAndIsDeletedFalse(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate badge number");
+    }
+
+    private String generateUniqueTechnicianId() {
+        String date = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
+        for (int i = 0; i < 50; i++) {
+            int rand = ThreadLocalRandom.current().nextInt(0, 10000);
+            String candidate = String.format("TECH-%s-%04d", date, rand);
+            if (!technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(candidate)) {
+                return candidate;
+            }
+        }
+        throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate technicianId");
     }
 
     private Role resolveOrCreateTechnicianRole() {

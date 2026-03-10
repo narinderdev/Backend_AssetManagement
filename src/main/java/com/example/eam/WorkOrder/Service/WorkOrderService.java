@@ -113,6 +113,7 @@ private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
         WorkOrderStatus.APPROVED
 );
+private static final BigDecimal MIN_BILLABLE_HOURS = new BigDecimal("0.01");
 
 private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIONS = Map.of(
         WorkOrderStatus.NEW, Set.of(WorkOrderStatus.APPROVED, WorkOrderStatus.REJECTED),
@@ -1622,6 +1623,9 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         for (Map.Entry<Long, Long> entry : workingSecondsByTechnician.entrySet()) {
             BigDecimal hours = BigDecimal.valueOf(entry.getValue())
                     .divide(BigDecimal.valueOf(3600), 2, RoundingMode.HALF_UP);
+            if (entry.getValue() > 0 && hours.compareTo(MIN_BILLABLE_HOURS) < 0) {
+                hours = MIN_BILLABLE_HOURS;
+            }
             workingHoursByTechnician.put(entry.getKey(), hours);
         }
         return workingHoursByTechnician;
