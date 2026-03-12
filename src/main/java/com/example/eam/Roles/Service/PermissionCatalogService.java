@@ -157,7 +157,9 @@ public class PermissionCatalogService {
                 permissionClass("Procurement", List.of(
                         permissionObject("Material Requisition", grouped, PermissionModule.MATERIAL_REQUISITION, false),
                         permissionObject("Purchase Order", grouped, PermissionModule.PURCHASE_ORDER, false),
-                        permissionObject("Goods Receipt Notes", grouped, PermissionModule.GOODS_RECEIPT_NOTE, false),
+                        permissionObject("Goods Receipt Notes", grouped, PermissionModule.GOODS_RECEIPT_NOTE, false)
+                )),
+                permissionClass("Vendor", List.of(
                         permissionObject("Vendor", grouped, PermissionModule.VENDOR, false)
                 )),
                 permissionClass("Technician", List.of(
