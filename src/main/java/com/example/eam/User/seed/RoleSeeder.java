@@ -32,7 +32,7 @@ public class RoleSeeder implements ApplicationRunner {
                         .build()
                 );
 
-        List<AppPermission> permissions = appPermissionRepository.findAll();
+        List<AppPermission> permissions = appPermissionRepository.findByActiveTrueOrderByModuleAscSortOrderAsc();
         admin.setPermissions(new HashSet<>(permissions));
 
         roleRepository.save(admin);
