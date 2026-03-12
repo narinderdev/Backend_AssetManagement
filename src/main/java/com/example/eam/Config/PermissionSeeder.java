@@ -31,7 +31,9 @@ public class PermissionSeeder implements ApplicationRunner {
         seedCrud(toInsert, PermissionModule.ASSET, "asset", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.ASSET_TYPE, "asset_type", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.SERVICE_REQUEST, "service_request", sort); sort += 4;
+        seedApprove(toInsert, PermissionModule.SERVICE_REQUEST, "service_request", sort++);
         seedCrud(toInsert, PermissionModule.WORK_ORDER, "work_order", sort); sort += 4;
+        seedApprove(toInsert, PermissionModule.WORK_ORDER, "work_order", sort++);
         seedCrud(toInsert, PermissionModule.WORK_ORDER_TYPE, "work_order_type", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.CORRECTIVE_MAINTENANCE, "corrective_maintenance", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.PREVENTIVE_MAINTENANCE, "preventive_maintenance", sort); sort += 4;
@@ -39,16 +41,17 @@ public class PermissionSeeder implements ApplicationRunner {
         seedCrud(toInsert, PermissionModule.PURCHASE_ORDER, "purchase_order", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.GOODS_RECEIPT_NOTE, "goods_receipt_note", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.VENDOR, "vendor", sort); sort += 4;
+        seedApprove(toInsert, PermissionModule.VENDOR, "vendor", sort++);
         seedCrud(toInsert, PermissionModule.INVENTORY, "inventory", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN, "technician", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN_TEAM, "technician_team", sort); sort += 4;
         seedViewOnly(toInsert, PermissionModule.DASHBOARD, "dashboard", sort++);
-        seedViewOnly(toInsert, PermissionModule.REPORTS, "reports", sort++);
+        seedReport(toInsert, PermissionModule.REPORTS, "reports", sort); sort += 2;
 
         // Access-only modules (no CRUD)
         seedAccess(toInsert, PermissionModule.MANAGE_USERS, "manage_users", sort++); 
         seedAccess(toInsert, PermissionModule.MANAGE_ROLES, "manage_roles", sort++);
-        seedAccess(toInsert, PermissionModule.INVITE_USER, "invite_user", sort++);
+        seedViewOnly(toInsert, PermissionModule.INVITE_USER, "invite_user", sort++);
 
         if (!toInsert.isEmpty()) {
             permissionRepository.saveAll(toInsert);
@@ -64,6 +67,15 @@ public class PermissionSeeder implements ApplicationRunner {
 
     private void seedAccess(List<AppPermission> toInsert, PermissionModule module, String code, int sortOrder) {
         seedOne(toInsert, module, PermissionAction.ACCESS, code, "Access " + title(code), sortOrder);
+    }
+
+    private void seedApprove(List<AppPermission> toInsert, PermissionModule module, String moduleCode, int sortOrder) {
+        seedOne(toInsert, module, PermissionAction.APPROVE, "approve_" + moduleCode, "Approve " + title(moduleCode), sortOrder);
+    }
+
+    private void seedReport(List<AppPermission> toInsert, PermissionModule module, String moduleCode, int startSort) {
+        seedOne(toInsert, module, PermissionAction.VIEW, "view_" + moduleCode, "View " + title(moduleCode), startSort);
+        seedOne(toInsert, module, PermissionAction.EXPORT, "export_" + moduleCode, "Export " + title(moduleCode), startSort + 1);
     }
 
     private void seedViewOnly(List<AppPermission> toInsert, PermissionModule module, String moduleCode, int sortOrder) {
