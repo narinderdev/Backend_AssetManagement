@@ -1,14 +1,46 @@
 -- Create asset_categories table (id + unique name)
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'asset_categories')
+IF OBJECT_ID('dbo.asset_categories', 'U') IS NULL
 BEGIN
-    CREATE TABLE asset_categories (
+    CREATE TABLE dbo.asset_categories (
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         name NVARCHAR(255) NOT NULL,
         created_at DATETIME2 NOT NULL CONSTRAINT df_asset_categories_created_at DEFAULT SYSUTCDATETIME(),
         updated_at DATETIME2 NOT NULL CONSTRAINT df_asset_categories_updated_at DEFAULT SYSUTCDATETIME()
     );
+END;
 
-    CREATE UNIQUE INDEX ux_asset_categories_name ON asset_categories(name);
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_asset_categories_name' AND object_id = OBJECT_ID('dbo.asset_categories'))
+BEGIN
+    CREATE UNIQUE INDEX ux_asset_categories_name ON dbo.asset_categories(name);
+END;
+
+-- If table was pre-created (e.g. by Hibernate), ensure defaults exist for timestamp columns.
+IF COL_LENGTH('dbo.asset_categories', 'created_at') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.default_constraints dc
+       INNER JOIN sys.columns c
+           ON c.default_object_id = dc.object_id
+       WHERE dc.parent_object_id = OBJECT_ID('dbo.asset_categories')
+         AND c.name = 'created_at'
+   )
+BEGIN
+    ALTER TABLE dbo.asset_categories
+    ADD CONSTRAINT df_asset_categories_created_at DEFAULT SYSUTCDATETIME() FOR created_at;
+END;
+
+IF COL_LENGTH('dbo.asset_categories', 'updated_at') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.default_constraints dc
+       INNER JOIN sys.columns c
+           ON c.default_object_id = dc.object_id
+       WHERE dc.parent_object_id = OBJECT_ID('dbo.asset_categories')
+         AND c.name = 'updated_at'
+   )
+BEGIN
+    ALTER TABLE dbo.asset_categories
+    ADD CONSTRAINT df_asset_categories_updated_at DEFAULT SYSUTCDATETIME() FOR updated_at;
 END;
 
 -- Seed default categories (idempotent)
@@ -30,43 +62,43 @@ INSERT INTO @seed (name) VALUES
  (N'Medical Equipment'),
  (N'Furniture & Fixtures');
 
-INSERT INTO asset_categories (name)
-SELECT s.name
+INSERT INTO dbo.asset_categories (name, created_at, updated_at)
+SELECT s.name, SYSUTCDATETIME(), SYSUTCDATETIME()
 FROM @seed s
-WHERE NOT EXISTS (SELECT 1 FROM asset_categories ac WHERE ac.name = s.name);
+WHERE NOT EXISTS (SELECT 1 FROM dbo.asset_categories ac WHERE ac.name = s.name);
 
--- Add FK column on assets if missing
-IF COL_LENGTH('assets', 'asset_category_id') IS NULL
+-- Legacy data migration for assets table (skip safely when base table is absent).
+IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL
 BEGIN
-    ALTER TABLE assets ADD asset_category_id BIGINT NULL;
-END;
+    IF COL_LENGTH('dbo.assets', 'asset_category_id') IS NULL
+    BEGIN
+        ALTER TABLE dbo.assets ADD asset_category_id BIGINT NULL;
+    END;
 
--- Backfill categories from existing asset rows
-INSERT INTO asset_categories (name)
-SELECT DISTINCT LTRIM(RTRIM(a.asset_category))
-FROM assets a
-WHERE a.asset_category IS NOT NULL
-  AND LEN(LTRIM(RTRIM(a.asset_category))) > 0
-  AND NOT EXISTS (
-      SELECT 1 FROM asset_categories ac WHERE ac.name = LTRIM(RTRIM(a.asset_category))
-  );
+    INSERT INTO dbo.asset_categories (name, created_at, updated_at)
+    SELECT DISTINCT LTRIM(RTRIM(a.asset_category)), SYSUTCDATETIME(), SYSUTCDATETIME()
+    FROM dbo.assets a
+    WHERE a.asset_category IS NOT NULL
+      AND LEN(LTRIM(RTRIM(a.asset_category))) > 0
+      AND NOT EXISTS (
+          SELECT 1 FROM dbo.asset_categories ac WHERE ac.name = LTRIM(RTRIM(a.asset_category))
+      );
 
--- Link assets to categories
-UPDATE a
-SET asset_category_id = ac.id
-FROM assets a
-JOIN asset_categories ac ON ac.name = LTRIM(RTRIM(a.asset_category))
-WHERE a.asset_category IS NOT NULL
-  AND a.asset_category_id IS NULL;
+    UPDATE a
+    SET asset_category_id = ac.id
+    FROM dbo.assets a
+    JOIN dbo.asset_categories ac ON ac.name = LTRIM(RTRIM(a.asset_category))
+    WHERE a.asset_category IS NOT NULL
+      AND a.asset_category_id IS NULL;
 
--- Foreign key & index for faster lookups
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_assets_asset_category')
-BEGIN
-    ALTER TABLE assets
-    ADD CONSTRAINT fk_assets_asset_category FOREIGN KEY (asset_category_id) REFERENCES asset_categories(id);
-END;
+    IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_assets_asset_category')
+    BEGIN
+        ALTER TABLE dbo.assets
+        ADD CONSTRAINT fk_assets_asset_category FOREIGN KEY (asset_category_id) REFERENCES dbo.asset_categories(id);
+    END;
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_assets_asset_category_id' AND object_id = OBJECT_ID('assets'))
-BEGIN
-    CREATE INDEX idx_assets_asset_category_id ON assets(asset_category_id);
+    IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_assets_asset_category_id' AND object_id = OBJECT_ID('dbo.assets'))
+    BEGIN
+        CREATE INDEX idx_assets_asset_category_id ON dbo.assets(asset_category_id);
+    END;
 END;

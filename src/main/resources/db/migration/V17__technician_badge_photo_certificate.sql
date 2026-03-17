@@ -45,19 +45,68 @@ WHERE (t.technician_id = 'PENDING' OR t.technician_id IS NULL)
 GO
 
 -- Make technician_id and badge_number non-null after backfill
-ALTER TABLE technicians ALTER COLUMN technician_id NVARCHAR(64) NOT NULL;
-ALTER TABLE technicians ALTER COLUMN badge_number NVARCHAR(64) NOT NULL;
-GO
-
--- Unique constraints/indexes
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_technicians_badge' AND object_id = OBJECT_ID('technicians'))
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('dbo.technicians')
+      AND name = 'technician_id'
+      AND is_nullable = 1
+)
 BEGIN
-    CREATE UNIQUE INDEX ux_technicians_badge ON technicians(badge_number);
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_technicians_identifier' AND object_id = OBJECT_ID('dbo.technicians'))
+    BEGIN
+        DROP INDEX idx_technicians_identifier ON dbo.technicians;
+    END;
+
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_technicians_identifier' AND object_id = OBJECT_ID('dbo.technicians'))
+    BEGIN
+        DROP INDEX ux_technicians_identifier ON dbo.technicians;
+    END;
+
+    ALTER TABLE dbo.technicians ALTER COLUMN technician_id NVARCHAR(64) NOT NULL;
+END;
+
+IF EXISTS (
+    SELECT 1
+    FROM sys.columns
+    WHERE object_id = OBJECT_ID('dbo.technicians')
+      AND name = 'badge_number'
+      AND is_nullable = 1
+)
+BEGIN
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_technicians_badge' AND object_id = OBJECT_ID('dbo.technicians'))
+    BEGIN
+        DROP INDEX idx_technicians_badge ON dbo.technicians;
+    END;
+
+    IF EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_technicians_badge' AND object_id = OBJECT_ID('dbo.technicians'))
+    BEGIN
+        DROP INDEX ux_technicians_badge ON dbo.technicians;
+    END;
+
+    ALTER TABLE dbo.technicians ALTER COLUMN badge_number NVARCHAR(64) NOT NULL;
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_technicians_identifier' AND object_id = OBJECT_ID('technicians'))
+-- Unique constraints/indexes
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.technicians')
+      AND name IN ('ux_technicians_badge', 'idx_technicians_badge')
+)
 BEGIN
-    CREATE UNIQUE INDEX ux_technicians_identifier ON technicians(technician_id);
+    CREATE UNIQUE INDEX ux_technicians_badge ON dbo.technicians(badge_number);
+END;
+GO
+
+IF NOT EXISTS (
+    SELECT 1
+    FROM sys.indexes
+    WHERE object_id = OBJECT_ID('dbo.technicians')
+      AND name IN ('ux_technicians_identifier', 'idx_technicians_identifier')
+)
+BEGIN
+    CREATE UNIQUE INDEX ux_technicians_identifier ON dbo.technicians(technician_id);
 END;
 GO
