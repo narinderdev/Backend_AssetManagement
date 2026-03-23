@@ -47,6 +47,11 @@ public class Users {
     @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
     private List<UserRole> userRoles = new ArrayList<>();
 
+    @Default
+    @JsonIgnore
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    private List<UserCompany> userCompanies = new ArrayList<>();
+
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private Instant createdAt;

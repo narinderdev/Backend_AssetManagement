@@ -27,10 +27,12 @@ import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.User.entity.PasswordPolicy;
+import com.example.eam.User.entity.UserCompany;
 import com.example.eam.User.entity.UserRole;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.repository.PasswordPolicyRepository;
+import com.example.eam.User.repository.UserCompanyRepository;
 import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
 import com.example.eam.Enum.DevicePlatform;
@@ -57,6 +59,7 @@ public class LoginService {
     private final TechnicianDeviceTokenRepository technicianDeviceTokenRepository;
     private final TechnicianTeamMemberRepository technicianTeamMemberRepository;
     private final PasswordPolicyRepository passwordPolicyRepository;
+    private final UserCompanyRepository userCompanyRepository;
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
@@ -157,6 +160,26 @@ public class LoginService {
                 .stream()
                 .map(ur -> ur.getRole().getName())
                 .toList());
+        boolean isAdmin = roles.stream().anyMatch(this::isAdminRoleName);
+
+        List<LoginResponseDto.CompanySummary> companies = userCompanyRepository
+                .findByUser_IdAndCompany_ActiveTrue(user.getId())
+                .stream()
+                .map(UserCompany::getCompany)
+                .filter(Objects::nonNull)
+                .map(c -> new LoginResponseDto.CompanySummary(
+                        c.getId(),
+                        c.getCompanyLegalName(),
+                        c.getCompanyTradeName(),
+                        c.getCompanyNumber(),
+                        c.getAddress(),
+                        c.getCity(),
+                        c.getCountry(),
+                        c.getPostalCode()
+                ))
+                .toList();
+
+        Boolean isCompanySetup = isAdmin ? !companies.isEmpty() : null;
 
         boolean hasTechnicianRole = user.getUserRoles()
                 .stream()
@@ -207,7 +230,9 @@ public class LoginService {
                 daysUntilPasswordExpiry,
                 false,
                 mfaRequired,
-                mfaToken
+                mfaToken,
+                companies,
+                isCompanySetup
         );
     }
 
@@ -231,6 +256,10 @@ public class LoginService {
 
     private boolean isTechnicianRoleName(String roleName) {
         return roleName != null && TECHNICIAN_ROLE_NAME.equalsIgnoreCase(roleName.trim());
+    }
+
+    private boolean isAdminRoleName(String roleName) {
+        return roleName != null && "Admin".equalsIgnoreCase(roleName.trim());
     }
 
     private java.util.Optional<Users> provisionFromTmUserIfValid(String normalizedEmail, String rawPassword) {

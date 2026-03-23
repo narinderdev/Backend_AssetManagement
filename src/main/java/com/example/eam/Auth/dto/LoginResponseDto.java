@@ -17,6 +17,8 @@ public class LoginResponseDto {
     private Boolean technician;
     private Boolean teamLeader;
     private List<TeamSummary> leaderTeams;
+    private List<CompanySummary> companies;
+    private Boolean isCompanySetup;
     private Integer daysUntilPasswordExpiry;
     private Boolean passwordExpired;
     @JsonProperty("mfa_required")
@@ -32,6 +34,18 @@ public class LoginResponseDto {
 
     public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
                             List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired) {
+        this(token, user, technicianId, technician, teamLeader, leaderTeams, daysUntilPasswordExpiry, passwordExpired, null, null, null, null);
+    }
+
+    public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
+                            List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired,
+                            Boolean mfaRequired, String mfaToken) {
+        this(token, user, technicianId, technician, teamLeader, leaderTeams, daysUntilPasswordExpiry, passwordExpired, mfaRequired, mfaToken, null, null);
+    }
+
+    public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
+                            List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired,
+                            Boolean mfaRequired, String mfaToken, List<CompanySummary> companies, Boolean isCompanySetup) {
         this.token = token;
         this.user = user;
         this.technicianId = technicianId;
@@ -40,14 +54,10 @@ public class LoginResponseDto {
         this.leaderTeams = leaderTeams;
         this.daysUntilPasswordExpiry = daysUntilPasswordExpiry;
         this.passwordExpired = passwordExpired;
-    }
-
-    public LoginResponseDto(String token, Users user, Long technicianId, Boolean technician, Boolean teamLeader,
-                            List<TeamSummary> leaderTeams, Integer daysUntilPasswordExpiry, Boolean passwordExpired,
-                            Boolean mfaRequired, String mfaToken) {
-        this(token, user, technicianId, technician, teamLeader, leaderTeams, daysUntilPasswordExpiry, passwordExpired);
         this.mfaRequired = mfaRequired;
         this.mfaToken = mfaToken;
+        this.companies = companies;
+        this.isCompanySetup = isCompanySetup;
     }
 
     public LoginResponseDto(Boolean mfaRequired, String mfaToken) {
@@ -64,6 +74,31 @@ public class LoginResponseDto {
         public TeamSummary(Long id, String name) {
             this.id = id;
             this.name = name;
+        }
+    }
+
+    @Getter
+    @NoArgsConstructor
+    public static class CompanySummary {
+        private Long id;
+        private String companyLegalName;
+        private String companyTradeName;
+        private String companyNumber;
+        private String address;
+        private String city;
+        private String country;
+        private String postalCode;
+
+        public CompanySummary(Long id, String companyLegalName, String companyTradeName, String companyNumber,
+                              String address, String city, String country, String postalCode) {
+            this.id = id;
+            this.companyLegalName = companyLegalName;
+            this.companyTradeName = companyTradeName;
+            this.companyNumber = companyNumber;
+            this.address = address;
+            this.city = city;
+            this.country = country;
+            this.postalCode = postalCode;
         }
     }
 }

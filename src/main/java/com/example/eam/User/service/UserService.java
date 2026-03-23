@@ -4,15 +4,19 @@ import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
+import com.example.eam.CompanyManagement.Entity.Company;
+import com.example.eam.CompanyManagement.Repository.CompanyRepository;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.ChangePasswordDto;
 import com.example.eam.User.dto.ForgotPasswordDto;
 import com.example.eam.User.dto.UserCreateDto;
 import com.example.eam.User.dto.UserSummaryDto;
+import com.example.eam.User.entity.UserCompany;
 import com.example.eam.User.entity.UserRole;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
+import com.example.eam.User.repository.UserCompanyRepository;
 import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -28,6 +32,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 
 import lombok.RequiredArgsConstructor;
 import java.time.Instant;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -37,6 +43,8 @@ public class UserService {
     private final UsersRepository usersRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final UserCompanyRepository userCompanyRepository;
+    private final CompanyRepository companyRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityEventRepository securityEventRepository;
 
@@ -88,6 +96,8 @@ public class UserService {
 
             // Save the UserRole to establish the relationship between the user and the role
             userRoleRepository.save(userRole);
+
+            syncUserCompanies(savedUser, dto.getCompanyIds());
 
             logEvent(SecurityEventType.USER_CREATED, savedUser, "Admin user created");
             return savedUser;
@@ -184,6 +194,28 @@ public class UserService {
                     .details(details)
                     .build();
             securityEventRepository.save(event);
+        }
+
+        private void syncUserCompanies(Users user, List<Long> companyIds) {
+            userCompanyRepository.deleteByUser_Id(user.getId());
+
+            if (companyIds == null || companyIds.isEmpty()) {
+                return;
+            }
+
+            for (Long companyId : new HashSet<>(companyIds)) {
+                if (companyId == null) {
+                    continue;
+                }
+                Company company = companyRepository.findById(companyId)
+                        .filter(Company::isActive)
+                        .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found: " + companyId));
+
+                userCompanyRepository.save(UserCompany.builder()
+                        .user(user)
+                        .company(company)
+                        .build());
+            }
         }
 
         private String resolveCurrentUser() {

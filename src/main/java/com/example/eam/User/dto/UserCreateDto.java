@@ -3,6 +3,8 @@ package com.example.eam.User.dto;
 import jakarta.validation.constraints.*;
 import lombok.Data;
 
+import java.util.List;
+
 @Data
 public class UserCreateDto{
 
@@ -24,5 +26,8 @@ public class UserCreateDto{
     @Pattern(regexp = ".*[a-z].*", message = "Password must include at least one lowercase letter")
     @Pattern(regexp = ".*[^A-Za-z0-9\\s].*", message = "Password must include at least one special character")
     private String password;
+
+    // Optional: user can be linked to multiple companies at creation time
+    private List<Long> companyIds;
 
 }

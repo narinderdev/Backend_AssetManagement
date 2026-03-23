@@ -2,14 +2,18 @@ package com.example.eam.User.service;
 
 import com.example.eam.Common.EmailService;
 import com.example.eam.Common.EmailTemplateService;
+import com.example.eam.CompanyManagement.Entity.Company;
+import com.example.eam.CompanyManagement.Repository.CompanyRepository;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.InviteUserRequest;
 import com.example.eam.User.dto.UserRoleAssignmentResponse;
 import com.example.eam.User.dto.SetPasswordDto;
+import com.example.eam.User.entity.UserCompany;
 import com.example.eam.User.entity.UserRole;
 import com.example.eam.User.entity.UserStatus;
 import com.example.eam.User.entity.Users;
+import com.example.eam.User.repository.UserCompanyRepository;
 import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
 import com.example.eam.Enum.TechnicianStatus;
@@ -41,8 +45,10 @@ import java.util.concurrent.ThreadLocalRandom;
 public class InvitationService {
 
     private final UsersRepository usersRepository;
+    private final CompanyRepository companyRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
+    private final UserCompanyRepository userCompanyRepository;
     private final TechnicianRepository technicianRepository;
     private final EmailTemplateService emailTemplateService;
     private final EmailService emailService;
@@ -111,6 +117,8 @@ public class InvitationService {
                     .build());
         }
 
+        syncUserCompanies(saved, request.getCompanyIds());
+
         Long technicianId = technicianRoleAssigned
                 ? ensureTechnicianProfile(saved)
                 : null;
@@ -138,6 +146,29 @@ public class InvitationService {
                 .roles(assignedRoles)
                 .technicianId(technicianId)
                 .build();
+    }
+
+    private void syncUserCompanies(Users user, List<Long> companyIds) {
+        userCompanyRepository.deleteByUser_Id(user.getId());
+
+        if (companyIds == null || companyIds.isEmpty()) {
+            return;
+        }
+
+        Set<Long> uniqueCompanyIds = new HashSet<>(companyIds);
+        for (Long companyId : uniqueCompanyIds) {
+            if (companyId == null) {
+                continue;
+            }
+            Company company = companyRepository.findById(companyId)
+                    .filter(Company::isActive)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found: " + companyId));
+
+            userCompanyRepository.save(UserCompany.builder()
+                    .user(user)
+                    .company(company)
+                    .build());
+        }
     }
 
     public void validateInvite(String email) {

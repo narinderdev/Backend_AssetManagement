@@ -55,4 +55,5 @@ public class UserController {
         ApiResponse<Void> response = ApiResponse.successResponse(200, "Password reset successfully", null);
         return ResponseEntity.ok(response);
     }
+
 }

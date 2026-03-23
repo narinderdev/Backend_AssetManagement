@@ -23,4 +23,6 @@ public class InviteUserRequest {
 
     @NotEmpty(message = "At least one role is required")
     private List<Long> roleIds;
+
+    private List<Long> companyIds;
 }
