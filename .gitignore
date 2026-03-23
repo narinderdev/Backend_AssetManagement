@@ -56,3 +56,5 @@ src/main/resources/*firebase-adminsdk*.json
 
 # Test folder
 src/test/
+
+.gradle-user/
