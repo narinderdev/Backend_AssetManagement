@@ -54,6 +54,9 @@ public class WorkOrder {
     @Column(name = "work_order_number", unique = true, length = 50)
     private String woNumber;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "pm_plan_id")
     private PreventivePlan pmPlan;

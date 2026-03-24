@@ -4,6 +4,7 @@ import com.example.eam.Asset.Entity.Asset;
 import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.*;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanCreateRequest;
 import com.example.eam.Maintenance.Preventive.Dto.PreventivePlanPatchRequest;
@@ -47,14 +48,15 @@ public class PreventivePlanService {
 
     @Transactional
     public PreventivePlanResponse create(@Valid PreventivePlanCreateRequest req) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         PreventiveApplyTarget target = req.getApplyTo();
         if (target == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "applyTo is required");
         }
 
         java.util.List<Asset> targetAssets = switch (target) {
-            case ASSET -> java.util.List.of(resolveAssetRequired(req.getAssetId()));
-            case ASSET_TYPE -> resolveAssetsByType(req.getAssetTypeId());
+            case ASSET -> java.util.List.of(resolveAssetRequired(req.getAssetId(), companyId));
+            case ASSET_TYPE -> resolveAssetsByType(req.getAssetTypeId(), companyId);
         };
 
         if (targetAssets.isEmpty()) {
@@ -69,6 +71,7 @@ public class PreventivePlanService {
             String location = resolveLocation(asset, req.getLocation());
 
             PreventivePlan plan = PreventivePlan.builder()
+                    .companyId(companyId)
                     .planCode(generateUniquePlanCode())
                     .title(req.getTitle())
                     .asset(asset)
@@ -106,8 +109,9 @@ public class PreventivePlanService {
 
     @Transactional
     public PreventivePlanResponse patch(Long id, PreventivePlanPatchRequest req) {
-        PreventivePlan plan = getPlanOrThrow(id);
-        Asset asset = req.getAssetId() != null ? resolveAsset(req.getAssetId()) : plan.getAsset();
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        PreventivePlan plan = getPlanOrThrow(id, companyId);
+        Asset asset = req.getAssetId() != null ? resolveAsset(req.getAssetId(), companyId) : plan.getAsset();
         String location = req.getLocation() != null ? resolveLocation(asset, req.getLocation()) : plan.getLocation();
 
         if (req.getScheduleType() != null || req.getIntervalUnit() != null || req.getIntervalValue() != null
@@ -160,13 +164,14 @@ public class PreventivePlanService {
 
     @Transactional(readOnly = true)
     public PreventivePlanResponse get(Long id) {
-        PreventivePlan plan = getPlanOrThrow(id);
+        PreventivePlan plan = getPlanOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         return mapToResponse(plan);
     }
 
     @Transactional(readOnly = true)
     public Page<PreventivePlanResponse> list(Pageable pageable) {
-        return planRepository.findByDeletedFalse(pageable)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return planRepository.findByDeletedFalseAndCompanyId(companyId, pageable)
                 .map(this::mapToResponse);
     }
 
@@ -174,7 +179,7 @@ public class PreventivePlanService {
 
     @Transactional
     public void delete(Long id) {
-        PreventivePlan plan = getPlanOrThrow(id);
+        PreventivePlan plan = getPlanOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         plan.setDeleted(true);
         plan.setActive(false);
         plan.setUpdatedAt(LocalDateTime.now());
@@ -217,6 +222,7 @@ public class PreventivePlanService {
 
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
+                .companyId(plan.getCompanyId())
                 .pmPlan(plan)
                 .pmDueDate(dueDate)
                 .asset(plan.getAsset())
@@ -246,28 +252,34 @@ public class PreventivePlanService {
         workOrderRepository.save(saved);
     }
 
-    private PreventivePlan getPlanOrThrow(Long id) {
-        return planRepository.findByIdAndDeletedFalse(id)
+    private PreventivePlan getPlanOrThrow(Long id, Long companyId) {
+        return planRepository.findByIdAndDeletedFalseAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Preventive plan not found"));
     }
 
-    private Asset resolveAssetRequired(Long assetId) {
+    private Asset resolveAssetRequired(Long assetId, Long companyId) {
         if (assetId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assetId is required when applyTo is ASSET");
         }
-        return resolveAsset(assetId);
+        return resolveAsset(assetId, companyId);
     }
 
-    private java.util.List<Asset> resolveAssetsByType(Long assetTypeId) {
+    private java.util.List<Asset> resolveAssetsByType(Long assetTypeId, Long companyId) {
         if (assetTypeId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "assetTypeId is required when applyTo is ASSET_TYPE");
         }
         assetTypeService.getActiveAssetTypeOrThrow(assetTypeId);
-        return assetRepository.findByAssetTypeRef_Id(assetTypeId);
+        return assetRepository.findByAssetTypeRef_Id(assetTypeId).stream()
+                .filter(a -> companyId == null || companyId.equals(a.getCompanyId()))
+                .toList();
     }
 
-    private Asset resolveAsset(Long assetId) {
+    private Asset resolveAsset(Long assetId, Long companyId) {
         if (assetId == null) return null;
+        if (companyId != null) {
+            return assetRepository.findByIdAndCompanyId(assetId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
+        }
         return assetRepository.findById(assetId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
     }
@@ -311,11 +323,12 @@ public class PreventivePlanService {
     }
 
     private String generateUniquePlanCode() {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         for (int i = 0; i < 30; i++) {
             int rand = ThreadLocalRandom.current().nextInt(0, 10000);
             String candidate = String.format("PM-%s-%04d", datePart, rand);
-            if (!planRepository.existsByPlanCode(candidate)) {
+            if (!planRepository.existsByPlanCodeAndCompanyId(candidate, companyId)) {
                 return candidate;
             }
         }

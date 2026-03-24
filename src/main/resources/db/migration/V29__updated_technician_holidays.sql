@@ -30,8 +30,7 @@ BEGIN
     BEGIN
         DROP INDEX uk_technician_holidays_date ON dbo.technician_holidays;
     END;
-
-    IF COL_LENGTH('dbo.technician_holidays', 'technician_id') IS NOT NULL
+IF OBJECT_ID('dbo.technician_holidays', 'U') IS NOT NULL AND COL_LENGTH('dbo.technician_holidays', 'technician_id') IS NOT NULL
     BEGIN
         ALTER TABLE dbo.technician_holidays DROP COLUMN technician_id;
     END;
@@ -55,3 +54,4 @@ BEGIN
     END;
 END;
 GO
+

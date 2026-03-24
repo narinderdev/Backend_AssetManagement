@@ -1,5 +1,6 @@
 package com.example.eam.InventoryManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.InventoryReconciliationStatus;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationCreateRequest;
 import com.example.eam.InventoryManagement.Dto.InventoryReconciliationDecisionRequest;
@@ -35,9 +36,10 @@ public class InventoryReconciliationService {
 
     @Transactional
     public InventoryReconciliationResponse create(InventoryReconciliationCreateRequest req) {
-        Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Warehouse warehouse = warehouseRepository.findByIdAndDeletedFalseAndCompanyId(req.getWarehouseId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found"));
-        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(req.getInventoryItemId())
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(req.getInventoryItemId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
 
         int systemQty = item.getStockLevel() != null ? item.getStockLevel() : 0;
@@ -51,6 +53,7 @@ public class InventoryReconciliationService {
                 : InventoryReconciliationStatus.SUBMITTED;
 
         InventoryReconciliation entity = InventoryReconciliation.builder()
+                .companyId(companyId)
                 .warehouse(warehouse)
                 .inventoryItem(item)
                 .reconcileDate(req.getReconcileDate())
@@ -83,14 +86,15 @@ public class InventoryReconciliationService {
 
     @Transactional
     public InventoryReconciliationResponse update(Long id, InventoryReconciliationUpdateRequest req) {
-        InventoryReconciliation rec = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        InventoryReconciliation rec = getOrThrow(id, companyId);
         if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be edited");
         }
 
-        Warehouse warehouse = warehouseRepository.findById(req.getWarehouseId())
+        Warehouse warehouse = warehouseRepository.findByIdAndDeletedFalseAndCompanyId(req.getWarehouseId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found"));
-        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(req.getInventoryItemId())
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(req.getInventoryItemId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
 
         int systemQty = item.getStockLevel() != null ? item.getStockLevel() : 0;
@@ -137,7 +141,7 @@ public class InventoryReconciliationService {
 
     @Transactional
     public InventoryReconciliationResponse approve(Long id, InventoryReconciliationDecisionRequest req) {
-        InventoryReconciliation rec = getOrThrow(id);
+        InventoryReconciliation rec = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be approved");
         }
@@ -151,7 +155,7 @@ public class InventoryReconciliationService {
 
     @Transactional
     public InventoryReconciliationResponse reject(Long id, InventoryReconciliationDecisionRequest req) {
-        InventoryReconciliation rec = getOrThrow(id);
+        InventoryReconciliation rec = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (rec.getStatus() != InventoryReconciliationStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED records can be rejected");
         }
@@ -165,7 +169,7 @@ public class InventoryReconciliationService {
 
     @Transactional
     public InventoryReconciliationResponse post(Long id) {
-        InventoryReconciliation rec = getOrThrow(id);
+        InventoryReconciliation rec = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (rec.getStatus() == InventoryReconciliationStatus.POSTED) {
             return toResponse(rec);
         }
@@ -199,22 +203,23 @@ public class InventoryReconciliationService {
 
     @Transactional(readOnly = true)
     public InventoryReconciliationResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        return toResponse(getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null)));
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryReconciliationResponse> list(Pageable pageable) {
-        return reconciliationRepository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return reconciliationRepository.findByCompanyIdOrderByCreatedAtDesc(companyId, pageable).map(this::toResponse);
     }
 
     @Transactional
     public void delete(Long id) {
-        InventoryReconciliation rec = getOrThrow(id);
+        InventoryReconciliation rec = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         reconciliationRepository.delete(rec);
     }
 
-    private InventoryReconciliation getOrThrow(Long id) {
-        return reconciliationRepository.findById(id)
+    private InventoryReconciliation getOrThrow(Long id, Long companyId) {
+        return reconciliationRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory reconciliation not found"));
     }
 

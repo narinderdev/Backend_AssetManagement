@@ -1,7 +1,7 @@
 -- Asset insurance table to support expiry tracking and compliance visibility
-IF NOT EXISTS (SELECT 1 FROM sys.tables WHERE name = 'asset_insurance')
+IF OBJECT_ID('dbo.asset_insurance', 'U') IS NULL
 BEGIN
-    CREATE TABLE asset_insurance (
+    CREATE TABLE dbo.asset_insurance (
         id BIGINT IDENTITY(1,1) NOT NULL PRIMARY KEY,
         asset_id BIGINT NOT NULL,
         insurance_provider NVARCHAR(255) NOT NULL,
@@ -19,22 +19,41 @@ BEGIN
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_asset_insurance_asset')
+IF OBJECT_ID('dbo.asset_insurance', 'U') IS NOT NULL
+   AND OBJECT_ID('dbo.assets', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.foreign_keys
+       WHERE name = 'fk_asset_insurance_asset'
+         AND parent_object_id = OBJECT_ID('dbo.asset_insurance')
+   )
 BEGIN
-    ALTER TABLE asset_insurance
-        ADD CONSTRAINT fk_asset_insurance_asset FOREIGN KEY (asset_id) REFERENCES assets(id);
+    ALTER TABLE dbo.asset_insurance
+        ADD CONSTRAINT fk_asset_insurance_asset FOREIGN KEY (asset_id) REFERENCES dbo.assets(id);
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_asset_insurance_asset_id' AND object_id = OBJECT_ID('asset_insurance'))
+IF OBJECT_ID('dbo.asset_insurance', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'ux_asset_insurance_asset_id'
+         AND object_id = OBJECT_ID('dbo.asset_insurance')
+   )
 BEGIN
-    CREATE UNIQUE INDEX ux_asset_insurance_asset_id ON asset_insurance(asset_id);
+    CREATE UNIQUE INDEX ux_asset_insurance_asset_id ON dbo.asset_insurance(asset_id);
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.check_constraints WHERE name = 'chk_asset_insurance_expiry_after_start')
+IF OBJECT_ID('dbo.asset_insurance', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.check_constraints
+       WHERE name = 'chk_asset_insurance_expiry_after_start'
+         AND parent_object_id = OBJECT_ID('dbo.asset_insurance')
+   )
 BEGIN
-    ALTER TABLE asset_insurance
+    ALTER TABLE dbo.asset_insurance
         ADD CONSTRAINT chk_asset_insurance_expiry_after_start CHECK (policy_expiry_date >= policy_start_date);
 END;
 GO

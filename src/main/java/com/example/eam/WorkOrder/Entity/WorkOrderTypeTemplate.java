@@ -12,10 +12,11 @@ import java.time.LocalDateTime;
 @Table(
         name = "work_order_types",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_work_order_types_type", columnNames = "work_order_type")
+                @UniqueConstraint(name = "uk_work_order_types_company_type", columnNames = {"company_id", "work_order_type"})
         },
         indexes = {
-                @Index(name = "idx_work_order_types_active", columnList = "active")
+                @Index(name = "idx_work_order_types_active", columnList = "active"),
+                @Index(name = "idx_work_order_types_company_id", columnList = "company_id")
         }
 )
 @Data
@@ -27,6 +28,9 @@ public class WorkOrderTypeTemplate {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "company_id")
+    private Long companyId;
 
     @Column(name = "work_order_type", nullable = false, length = 128)
     private String workOrderType;

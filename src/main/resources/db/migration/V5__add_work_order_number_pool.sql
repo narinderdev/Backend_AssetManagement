@@ -35,7 +35,7 @@ BEGIN
 END;
 
 -- If table was pre-created (e.g. by Hibernate), ensure defaults exist.
-IF COL_LENGTH('dbo.wo_number_pool', 'is_assigned') IS NOT NULL
+IF OBJECT_ID('dbo.wo_number_pool', 'U') IS NOT NULL AND COL_LENGTH('dbo.wo_number_pool', 'is_assigned') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -48,8 +48,7 @@ BEGIN
     ALTER TABLE dbo.wo_number_pool
     ADD CONSTRAINT df_wo_number_pool_is_assigned DEFAULT 0 FOR is_assigned;
 END;
-
-IF COL_LENGTH('dbo.wo_number_pool', 'created_at') IS NOT NULL
+IF OBJECT_ID('dbo.wo_number_pool', 'U') IS NOT NULL AND COL_LENGTH('dbo.wo_number_pool', 'created_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -157,3 +156,4 @@ BEGIN
     JOIN dbo.work_orders wo ON wo.work_order_number = p.wo_number
     WHERE p.is_assigned = 0;
 END;
+

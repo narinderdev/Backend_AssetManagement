@@ -37,6 +37,9 @@ public class Technician {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "technician_id", nullable = false, length = 64)
     private String technicianId;
 

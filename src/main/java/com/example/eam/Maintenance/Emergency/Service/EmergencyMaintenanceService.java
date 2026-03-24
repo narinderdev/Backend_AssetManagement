@@ -4,6 +4,7 @@ import com.example.eam.Asset.Entity.Asset;
 import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.PriorityLevel;
 import com.example.eam.Enum.WorkOrderSource;
 import com.example.eam.Enum.WorkOrderStatus;
@@ -49,7 +50,8 @@ public class EmergencyMaintenanceService {
 
     @Transactional
     public WorkOrderDetailsResponse createEmergencyWo(@Valid EmergencyWorkOrderRequest req) {
-        Asset asset = resolveAsset(req.getAssetId());
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Asset asset = resolveAsset(req.getAssetId(), companyId);
         String location = resolveLocation(asset, req.getLocation());
         if (asset == null && (location == null || location.isBlank())) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset or location is required");
@@ -59,6 +61,7 @@ public class EmergencyMaintenanceService {
 
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
+                .companyId(companyId)
                 .asset(asset)
                 .workRequestType(workRequestType)
                 .location(location)
@@ -82,6 +85,7 @@ public class EmergencyMaintenanceService {
         saved = workOrderRepository.save(saved);
 
         EmergencyIncident incident = EmergencyIncident.builder()
+                .companyId(companyId)
                 .workOrder(saved)
                 .asset(asset)
                 .location(location)
@@ -108,13 +112,14 @@ public class EmergencyMaintenanceService {
 
     @Transactional(readOnly = true)
     public EmergencyIncidentResponse getIncident(Long id) {
-        EmergencyIncident incident = getIncidentOrThrow(id);
+        EmergencyIncident incident = getIncidentOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         return mapToResponse(incident);
     }
 
     @Transactional(readOnly = true)
     public EmergencyIncidentListResponse listIncidents(Pageable pageable) {
-        Page<EmergencyIncident> page = emergencyIncidentRepository.findAll(pageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<EmergencyIncident> page = emergencyIncidentRepository.findByCompanyId(companyId, pageable);
         return EmergencyIncidentListResponse.builder()
                 .incidents(page.getContent().stream().map(this::mapToResponse).toList())
                 .page(page.getNumber())
@@ -125,8 +130,12 @@ public class EmergencyMaintenanceService {
                 .build();
     }
 
-    private Asset resolveAsset(Long id) {
+    private Asset resolveAsset(Long id, Long companyId) {
         if (id == null) return null;
+        if (companyId != null) {
+            return assetRepository.findByIdAndCompanyId(id, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
+        }
         return assetRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
     }
@@ -155,8 +164,8 @@ public class EmergencyMaintenanceService {
                 "Unable to generate unique Work Order ID");
     }
 
-    private EmergencyIncident getIncidentOrThrow(Long id) {
-        return emergencyIncidentRepository.findById(id)
+    private EmergencyIncident getIncidentOrThrow(Long id, Long companyId) {
+        return emergencyIncidentRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Emergency incident not found"));
     }
 

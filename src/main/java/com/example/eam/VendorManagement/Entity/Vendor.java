@@ -33,6 +33,9 @@ public class Vendor {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // DB PK
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "vendor_id", nullable = false, unique = true, length = 64)
     private String vendorId; // Business ID (auto-generated)
 

@@ -23,6 +23,9 @@ public class ServiceMaintenance {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;                        // DB primary key
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "request_id", nullable = false, unique = true, length = 50)
     private String requestId;              // Business Request ID (SR-000001 etc.)
 

@@ -27,6 +27,9 @@ public class PreventivePlan {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "plan_code", nullable = false, unique = true, length = 64)
     private String planCode;
 

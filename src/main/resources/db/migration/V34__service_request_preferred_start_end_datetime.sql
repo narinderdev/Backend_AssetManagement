@@ -1,30 +1,27 @@
 -- Add preferred start/end date/time columns
-IF COL_LENGTH('service_requests', 'preferred_start_date') IS NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_start_date') IS NULL
 BEGIN
     ALTER TABLE service_requests ADD preferred_start_date DATE NULL;
 END;
 GO
-
-IF COL_LENGTH('service_requests', 'preferred_start_time') IS NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_start_time') IS NULL
 BEGIN
     ALTER TABLE service_requests ADD preferred_start_time TIME NULL;
 END;
 GO
-
-IF COL_LENGTH('service_requests', 'preferred_end_date') IS NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_end_date') IS NULL
 BEGIN
     ALTER TABLE service_requests ADD preferred_end_date DATE NULL;
 END;
 GO
-
-IF COL_LENGTH('service_requests', 'preferred_end_time') IS NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_end_time') IS NULL
 BEGIN
     ALTER TABLE service_requests ADD preferred_end_time TIME NULL;
 END;
 GO
 
 -- Migrate old preferred_date_time into preferred_start_* if present
-IF COL_LENGTH('service_requests', 'preferred_date_time') IS NOT NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_date_time') IS NOT NULL
 BEGIN
     EXEC('
         UPDATE service_requests
@@ -38,8 +35,9 @@ END;
 GO
 
 -- Drop old combined preferred_date_time column
-IF COL_LENGTH('service_requests', 'preferred_date_time') IS NOT NULL
+IF OBJECT_ID('service_requests', 'U') IS NOT NULL AND COL_LENGTH('service_requests', 'preferred_date_time') IS NOT NULL
 BEGIN
     ALTER TABLE service_requests DROP COLUMN preferred_date_time;
 END;
 GO
+

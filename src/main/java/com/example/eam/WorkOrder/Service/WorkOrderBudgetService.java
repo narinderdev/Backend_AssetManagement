@@ -1,5 +1,6 @@
 package com.example.eam.WorkOrder.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.WorkOrder.Dto.WorkOrderBudgetRowResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderBudgetSummaryResponse;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
@@ -35,10 +36,12 @@ public class WorkOrderBudgetService {
             String workOrderId,
             String period
     ) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         Long assetDbId = parseLongOrNull(assetId);
         Long workOrderDbId = parseLongOrNull(workOrderId);
         DateRange range = resolveDateRange(period);
         List<WorkOrder> workOrders = workOrderRepository.findForBudgetReport(
+                companyId,
                 assetId,
                 assetDbId,
                 workOrderId,

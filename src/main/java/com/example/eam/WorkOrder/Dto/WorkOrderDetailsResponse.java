@@ -18,6 +18,7 @@ import java.util.List;
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonPropertyOrder({
         "id",
+        "companyId",
         "workOrderNumber",
         "workOrderId",
         "linkedServiceRequestDbId",
@@ -100,6 +101,7 @@ import java.util.List;
 public class WorkOrderDetailsResponse {
 
     private Long id;
+    private Long companyId;
     private String workOrderNumber;
     private String workOrderId;
 

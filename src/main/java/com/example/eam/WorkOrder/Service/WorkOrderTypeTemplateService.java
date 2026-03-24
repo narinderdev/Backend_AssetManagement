@@ -1,5 +1,6 @@
 package com.example.eam.WorkOrder.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateCreateRequest;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateResponse;
 import com.example.eam.WorkOrder.Dto.WorkOrderTypeTemplateUpdateRequest;
@@ -23,12 +24,14 @@ public class WorkOrderTypeTemplateService {
 
     @Transactional
     public WorkOrderTypeTemplateResponse create(WorkOrderTypeTemplateCreateRequest req) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         String type = req.getWorkOrderType().trim();
-        if (repository.existsByWorkOrderTypeIgnoreCase(type)) {
+        if (repository.existsByWorkOrderTypeIgnoreCaseAndCompanyId(type, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type already exists: " + type);
         }
         boolean createAsset = Boolean.TRUE.equals(req.getCreateAsset());
         WorkOrderTypeTemplate saved = repository.save(WorkOrderTypeTemplate.builder()
+                .companyId(companyId)
                 .workOrderType(type)
                 .defaultGlAccount(trim(req.getDefaultGlAccount()))
                 .defaultUtilityAccount(trim(req.getDefaultUtilityAccount()))
@@ -49,24 +52,29 @@ public class WorkOrderTypeTemplateService {
 
     @Transactional(readOnly = true)
     public WorkOrderTypeTemplateResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        return toResponse(getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null)));
     }
 
     @Transactional(readOnly = true)
     public Page<WorkOrderTypeTemplateResponse> list(Pageable pageable) {
-        return repository.findAll(pageable).map(this::toResponse);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        if (companyId == null) {
+            return repository.findAll(pageable).map(this::toResponse);
+        }
+        return repository.findByCompanyId(companyId, pageable).map(this::toResponse);
     }
 
     @Transactional
     public WorkOrderTypeTemplateResponse update(Long id, WorkOrderTypeTemplateUpdateRequest req) {
-        WorkOrderTypeTemplate t = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        WorkOrderTypeTemplate t = getOrThrow(id, companyId);
 
         if (req.getWorkOrderType() != null) {
             String type = req.getWorkOrderType().trim();
             if (type.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderType cannot be blank");
             }
-            if (repository.existsByWorkOrderTypeIgnoreCaseAndIdNot(type, id)) {
+            if (repository.existsByWorkOrderTypeIgnoreCaseAndCompanyIdAndIdNot(type, companyId, id)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type already exists: " + type);
             }
             t.setWorkOrderType(type);
@@ -100,7 +108,7 @@ public class WorkOrderTypeTemplateService {
 
     @Transactional
     public void delete(Long id) {
-        WorkOrderTypeTemplate t = getOrThrow(id);
+        WorkOrderTypeTemplate t = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         long inUse = workOrderRepository.countByWorkOrderTypeTemplate_Id(id);
         if (inUse > 0) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Work order type is in use and cannot be deleted");
@@ -108,7 +116,11 @@ public class WorkOrderTypeTemplateService {
         repository.delete(t);
     }
 
-    private WorkOrderTypeTemplate getOrThrow(Long id) {
+    private WorkOrderTypeTemplate getOrThrow(Long id, Long companyId) {
+        if (companyId != null) {
+            return repository.findByIdAndCompanyId(id, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work order type not found"));
+        }
         return repository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work order type not found"));
     }
@@ -116,6 +128,7 @@ public class WorkOrderTypeTemplateService {
     private WorkOrderTypeTemplateResponse toResponse(WorkOrderTypeTemplate t) {
         return WorkOrderTypeTemplateResponse.builder()
                 .id(t.getId())
+                .companyId(t.getCompanyId())
                 .workOrderType(t.getWorkOrderType())
                 .defaultGlAccount(t.getDefaultGlAccount())
                 .defaultUtilityAccount(t.getDefaultUtilityAccount())

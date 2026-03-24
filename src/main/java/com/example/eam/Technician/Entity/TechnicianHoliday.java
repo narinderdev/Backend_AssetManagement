@@ -16,10 +16,11 @@ import java.time.LocalDateTime;
 @Entity
 @Table(name = "technician_holidays",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_technician_holidays_date", columnNames = {"holiday_date"})
+                @UniqueConstraint(name = "uk_technician_holidays_company_date", columnNames = {"company_id", "holiday_date"})
         },
         indexes = {
-                @Index(name = "idx_technician_holidays_type", columnList = "holiday_type")
+                @Index(name = "idx_technician_holidays_type", columnList = "holiday_type"),
+                @Index(name = "idx_technician_holidays_company", columnList = "company_id")
         })
 @Getter
 @Setter
@@ -31,6 +32,9 @@ public class TechnicianHoliday {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "company_id")
+    private Long companyId;
 
     @Column(name = "holiday_name", nullable = false, length = 255)
     private String holidayName;

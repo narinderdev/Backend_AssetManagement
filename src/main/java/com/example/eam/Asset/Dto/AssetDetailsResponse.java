@@ -12,6 +12,7 @@ import lombok.Data;
 @Builder
 @JsonPropertyOrder({
     "id",
+    "companyId",
     "assetId",
     "assetName",
     "assetTag",
@@ -43,6 +44,7 @@ import lombok.Data;
 public class AssetDetailsResponse {
 
     private Long id;
+    private Long companyId;
     private String assetId;
     private String assetName;
     private String shortDescription;

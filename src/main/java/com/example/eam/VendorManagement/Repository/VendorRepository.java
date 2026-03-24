@@ -13,15 +13,25 @@ import java.util.Optional;
 public interface VendorRepository extends JpaRepository<Vendor, Long> {
 
     boolean existsByVendorId(String vendorId);
+    boolean existsByVendorIdAndCompanyId(String vendorId, Long companyId);
     boolean existsByTaxIdIgnoreCase(String taxId);
+    boolean existsByTaxIdIgnoreCaseAndCompanyId(String taxId, Long companyId);
     Optional<Vendor> findByTaxIdIgnoreCase(String taxId);
+    Optional<Vendor> findByTaxIdIgnoreCaseAndCompanyId(String taxId, Long companyId);
 
     Optional<Vendor> findByIdAndActiveTrue(Long id);
+    Optional<Vendor> findByIdAndActiveTrueAndCompanyId(Long id, Long companyId);
+    Optional<Vendor> findByIdAndCompanyId(Long id, Long companyId);
     Optional<Vendor> findByIdAndActiveTrueAndStatus(Long id, VendorStatus status);
 
     Page<Vendor> findByActiveTrue(Pageable pageable);
+    Page<Vendor> findByActiveTrueAndCompanyId(Long companyId, Pageable pageable);
     Page<Vendor> findByActiveTrueAndStatus(VendorStatus status, Pageable pageable);
+    Page<Vendor> findByActiveTrueAndStatusAndCompanyId(VendorStatus status, Long companyId, Pageable pageable);
     Page<Vendor> findByStatus(VendorStatus status, Pageable pageable);
+    Page<Vendor> findByStatusAndCompanyId(VendorStatus status, Long companyId, Pageable pageable);
     Page<Vendor> findByStatusIn(List<VendorStatus> statuses, Pageable pageable);
+    Page<Vendor> findByStatusInAndCompanyId(List<VendorStatus> statuses, Long companyId, Pageable pageable);
     Page<Vendor> findByActiveTrueAndStatusIn(List<VendorStatus> statuses, Pageable pageable);
+    Page<Vendor> findByActiveTrueAndStatusInAndCompanyId(List<VendorStatus> statuses, Long companyId, Pageable pageable);
 }

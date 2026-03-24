@@ -28,9 +28,12 @@ BEGIN
     WHERE module = 'REPORTS'
       AND action NOT IN ('VIEW', 'EXPORT');
 
-    DELETE rp
-    FROM dbo.role_permissions rp
-    JOIN @toRemove r ON r.id = rp.permission_id;
+    IF OBJECT_ID('dbo.role_permissions', 'U') IS NOT NULL
+    BEGIN
+        DELETE rp
+        FROM dbo.role_permissions rp
+        JOIN @toRemove r ON r.id = rp.permission_id;
+    END;
 
     DELETE ap
     FROM dbo.app_permissions ap

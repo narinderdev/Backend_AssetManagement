@@ -1,5 +1,6 @@
 package com.example.eam.Dashboard.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Dashboard.Dto.*;
 import com.example.eam.Enum.AssetCriticality;
 import com.example.eam.Enum.ServiceRequestStatus;
@@ -56,6 +57,7 @@ public class DashboardService {
     private final TechnicianHolidayRepository technicianHolidayRepository;
 
     public DashboardResponse getDashboard() {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime weekStart = now.minusWeeks(1);
         LocalDateTime prevWeekStart = now.minusWeeks(2);
@@ -65,29 +67,29 @@ public class DashboardService {
         Instant twoWeeksAgoInstant = nowInstant.minus(14, ChronoUnit.DAYS);
 
         SummaryMetric openServiceRequests = buildMetric(
-                serviceMaintenanceRepository.countByDeletedFalseAndStatusIn(OPEN_SERVICE_REQUEST_STATUSES),
-                serviceMaintenanceRepository.countByDeletedFalseAndStatusInAndRequestDateBetween(OPEN_SERVICE_REQUEST_STATUSES, weekStart, now),
-                serviceMaintenanceRepository.countByDeletedFalseAndStatusInAndRequestDateBetween(OPEN_SERVICE_REQUEST_STATUSES, prevWeekStart, weekStart)
+                serviceMaintenanceRepository.countByDeletedFalseAndStatusInAndCompanyId(OPEN_SERVICE_REQUEST_STATUSES, companyId),
+                serviceMaintenanceRepository.countByDeletedFalseAndStatusInAndRequestDateBetweenAndCompanyId(OPEN_SERVICE_REQUEST_STATUSES, weekStart, now, companyId),
+                serviceMaintenanceRepository.countByDeletedFalseAndStatusInAndRequestDateBetweenAndCompanyId(OPEN_SERVICE_REQUEST_STATUSES, prevWeekStart, weekStart, companyId)
         );
 
         SummaryMetric activeWorkOrders = buildMetric(
-                workOrderRepository.countByStatusInAndDeletedFalse(ACTIVE_WORK_ORDER_STATUSES),
-                workOrderRepository.countByStatusInAndCreatedAtBetweenAndDeletedFalse(ACTIVE_WORK_ORDER_STATUSES, weekStart, now),
-                workOrderRepository.countByStatusInAndCreatedAtBetweenAndDeletedFalse(ACTIVE_WORK_ORDER_STATUSES, prevWeekStart, weekStart)
+                workOrderRepository.countByStatusInAndDeletedFalseAndCompanyId(ACTIVE_WORK_ORDER_STATUSES, companyId),
+                workOrderRepository.countByStatusInAndCreatedAtBetweenAndDeletedFalseAndCompanyId(ACTIVE_WORK_ORDER_STATUSES, weekStart, now, companyId),
+                workOrderRepository.countByStatusInAndCreatedAtBetweenAndDeletedFalseAndCompanyId(ACTIVE_WORK_ORDER_STATUSES, prevWeekStart, weekStart, companyId)
         );
 
         SummaryMetric activeMaterialRequisitions = buildMetric(
-                materialRequisitionRepository.countByStatusIn(ACTIVE_MR_STATUSES),
-                materialRequisitionRepository.countByStatusInAndCreatedAtBetween(ACTIVE_MR_STATUSES, weekAgoInstant, nowInstant),
-                materialRequisitionRepository.countByStatusInAndCreatedAtBetween(ACTIVE_MR_STATUSES, twoWeeksAgoInstant, weekAgoInstant)
+                materialRequisitionRepository.countByStatusInAndCompanyId(ACTIVE_MR_STATUSES, companyId),
+                materialRequisitionRepository.countByStatusInAndCreatedAtBetweenAndCompanyId(ACTIVE_MR_STATUSES, weekAgoInstant, nowInstant, companyId),
+                materialRequisitionRepository.countByStatusInAndCreatedAtBetweenAndCompanyId(ACTIVE_MR_STATUSES, twoWeeksAgoInstant, weekAgoInstant, companyId)
         );
 
         SummaryMetric criticalAssetsDown = buildMetric(
-                workOrderRepository.countActiveCriticalAssetsDown(AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES),
-                workOrderRepository.countByAsset_CriticalityAndStatusInAndDowntimeStartBetweenAndDeletedFalse(
-                        AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES, weekStart, now),
-                workOrderRepository.countByAsset_CriticalityAndStatusInAndDowntimeStartBetweenAndDeletedFalse(
-                        AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES, prevWeekStart, weekStart)
+                workOrderRepository.countActiveCriticalAssetsDown(companyId, AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES),
+                workOrderRepository.countByAsset_CriticalityAndStatusInAndDowntimeStartBetweenAndDeletedFalseAndCompanyId(
+                        AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES, weekStart, now, companyId),
+                workOrderRepository.countByAsset_CriticalityAndStatusInAndDowntimeStartBetweenAndDeletedFalseAndCompanyId(
+                        AssetCriticality.CRITICAL, ACTIVE_WORK_ORDER_STATUSES, prevWeekStart, weekStart, companyId)
         );
 
         SummaryMetrics summaryMetrics = SummaryMetrics.builder()
@@ -98,19 +100,19 @@ public class DashboardService {
                 .build();
 
         WorkOrderStatusSummary workOrdersByStatus = WorkOrderStatusSummary.builder()
-                .newCount(workOrderRepository.countByStatusAndDeletedFalse(WorkOrderStatus.NEW))
-                .inProgress(workOrderRepository.countByStatusAndDeletedFalse(WorkOrderStatus.IN_PROGRESS))
-                .completed(workOrderRepository.countByStatusInAndDeletedFalse(COMPLETED_STATUSES))
-                .total(workOrderRepository.countByDeletedFalse())
+                .newCount(workOrderRepository.countByStatusAndDeletedFalseAndCompanyId(WorkOrderStatus.NEW, companyId))
+                .inProgress(workOrderRepository.countByStatusAndDeletedFalseAndCompanyId(WorkOrderStatus.IN_PROGRESS, companyId))
+                .completed(workOrderRepository.countByStatusInAndDeletedFalseAndCompanyId(COMPLETED_STATUSES, companyId))
+                .total(workOrderRepository.countByDeletedFalseAndCompanyId(companyId))
                 .build();
 
         MaintenanceCostSummary maintenanceCostSummary = buildMaintenanceCostSummary();
         List<RecentWorkOrderDto> recentWorkOrders = mapRecentWorkOrders();
         List<NewServiceRequestDto> newServiceRequests = mapNewServiceRequests();
-        long requestsNotAcceptedCount = workOrderRepository.countByStatusAndDeletedFalse(WorkOrderStatus.NEW);
+        long requestsNotAcceptedCount = workOrderRepository.countByStatusAndDeletedFalseAndCompanyId(WorkOrderStatus.NEW, companyId);
         LocalDate today = LocalDate.now();
-        MaintenanceListSection upcomingMaintenance = buildUpcomingMaintenance(today);
-        MaintenanceListSection pastDueMaintenance = buildPastDueMaintenance(today);
+        MaintenanceListSection upcomingMaintenance = buildUpcomingMaintenance(today, companyId);
+        MaintenanceListSection pastDueMaintenance = buildPastDueMaintenance(today, companyId);
 
         DashboardMetadata metadata = DashboardMetadata.builder()
                 .generatedAt(Instant.now().toString())
@@ -131,28 +133,30 @@ public class DashboardService {
     }
 
     public TechnicianDashboardResponse getTechnicianDashboard(Integer limit) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         LocalDate today = LocalDate.now();
         LocalDateTime start = today.atStartOfDay();
         LocalDateTime end = today.plusDays(1).atStartOfDay();
 
-        long totalTechnicians = technicianRepository.count();
+        long totalTechnicians = technicianRepository.findByIsDeletedFalseAndCompanyId(companyId, org.springframework.data.domain.Pageable.unpaged()).getTotalElements();
 
-        boolean isHolidayToday = technicianHolidayRepository.existsByHolidayDate(today);
+        boolean isHolidayToday = technicianHolidayRepository.existsByHolidayDateAndCompanyId(today, companyId);
 
         // technicians busy today (direct or via team)
         List<Long> busyIds = workOrderRepository.findDistinctTechnicianIdsWithBookings(
+                companyId,
                 start,
                 end,
                 EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
         );
 
-        long onLeave = technicianLeaveRepository.countTechniciansOnLeave(today);
+        long onLeave = technicianLeaveRepository.countTechniciansOnLeave(today, companyId);
         long availableToday = isHolidayToday ? 0 : totalTechnicians - busyIds.size() - onLeave;
 
-        long totalWorkOrders = workOrderRepository.countByDeletedFalse();
+        long totalWorkOrders = workOrderRepository.countByDeletedFalseAndCompanyId(companyId);
 
         int resolvedLimit = resolveLimit(limit);
-        List<TechnicianActivityDto> activities = buildRecentTechnicianActivities(resolvedLimit);
+        List<TechnicianActivityDto> activities = buildRecentTechnicianActivities(resolvedLimit, companyId);
 
         return TechnicianDashboardResponse.builder()
                 .totalTechnicians(totalTechnicians)
@@ -163,8 +167,8 @@ public class DashboardService {
                 .build();
     }
 
-    private List<TechnicianActivityDto> buildRecentTechnicianActivities(int limit) {
-        return workOrderRepository.findByDeletedFalseOrderByUpdatedAtDesc(org.springframework.data.domain.PageRequest.of(0, limit)).stream()
+    private List<TechnicianActivityDto> buildRecentTechnicianActivities(int limit, Long companyId) {
+        return workOrderRepository.findByDeletedFalseAndCompanyIdOrderByUpdatedAtDesc(companyId, org.springframework.data.domain.PageRequest.of(0, limit)).stream()
                 .map(wo -> {
                     String technicianName = wo.getAssignedTechnician() != null
                             ? wo.getAssignedTechnician().getFullName()
@@ -226,13 +230,13 @@ public class DashboardService {
         return (diff / previous) * 100d;
     }
 
-    private MaintenanceListSection buildUpcomingMaintenance(LocalDate today) {
+    private MaintenanceListSection buildUpcomingMaintenance(LocalDate today, Long companyId) {
         List<WorkOrder> upcoming = workOrderRepository
-                .findTop5ByTargetCompletionDateAfterAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
-                        today, ACTIVE_WORK_ORDER_STATUSES);
+                .findTop5ByTargetCompletionDateAfterAndStatusInAndDeletedFalseAndCompanyIdOrderByTargetCompletionDateAsc(
+                        today, ACTIVE_WORK_ORDER_STATUSES, companyId);
 
-        long count = workOrderRepository.countByTargetCompletionDateAfterAndStatusInAndDeletedFalse(
-                today, ACTIVE_WORK_ORDER_STATUSES);
+        long count = workOrderRepository.countByTargetCompletionDateAfterAndStatusInAndDeletedFalseAndCompanyId(
+                today, ACTIVE_WORK_ORDER_STATUSES, companyId);
 
         return MaintenanceListSection.builder()
                 .count(count)
@@ -240,13 +244,13 @@ public class DashboardService {
                 .build();
     }
 
-    private MaintenanceListSection buildPastDueMaintenance(LocalDate today) {
+    private MaintenanceListSection buildPastDueMaintenance(LocalDate today, Long companyId) {
         List<WorkOrder> pastDue = workOrderRepository
-                .findTop5ByTargetCompletionDateBeforeAndStatusInAndDeletedFalseOrderByTargetCompletionDateAsc(
-                        today, ACTIVE_WORK_ORDER_STATUSES);
+                .findTop5ByTargetCompletionDateBeforeAndStatusInAndDeletedFalseAndCompanyIdOrderByTargetCompletionDateAsc(
+                        today, ACTIVE_WORK_ORDER_STATUSES, companyId);
 
-        long count = workOrderRepository.countByTargetCompletionDateBeforeAndStatusInAndDeletedFalse(
-                today, ACTIVE_WORK_ORDER_STATUSES);
+        long count = workOrderRepository.countByTargetCompletionDateBeforeAndStatusInAndDeletedFalseAndCompanyId(
+                today, ACTIVE_WORK_ORDER_STATUSES, companyId);
 
         return MaintenanceListSection.builder()
                 .count(count)
@@ -255,6 +259,7 @@ public class DashboardService {
     }
 
     private MaintenanceCostSummary buildMaintenanceCostSummary() {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         LocalDate firstMonth = LocalDate.now().withDayOfMonth(1).minusMonths(5);
         List<MaintenanceCostPoint> points = new ArrayList<>();
 
@@ -263,7 +268,7 @@ public class DashboardService {
             LocalDateTime start = monthStart.atStartOfDay();
             LocalDateTime end = monthStart.plusMonths(1).atStartOfDay();
 
-            BigDecimal monthlyCost = workOrderRepository.findByDeletedFalseAndCreatedAtBetween(start, end).stream()
+            BigDecimal monthlyCost = workOrderRepository.findByDeletedFalseAndCreatedAtBetweenAndCompanyId(start, end, companyId).stream()
                     .map(this::resolveWorkOrderCost)
                     .reduce(BigDecimal.ZERO, BigDecimal::add);
 
@@ -319,7 +324,8 @@ public class DashboardService {
     }
 
     private List<RecentWorkOrderDto> mapRecentWorkOrders() {
-        return workOrderRepository.findTop5ByDeletedFalseOrderByCreatedAtDesc().stream()
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return workOrderRepository.findTop5ByDeletedFalseAndCompanyIdOrderByCreatedAtDesc(companyId).stream()
                 .map(wo -> RecentWorkOrderDto.builder()
                         .workOrderDbId(wo.getId())
                         .workOrderId(wo.getWorkOrderId())
@@ -334,7 +340,8 @@ public class DashboardService {
     }
 
     private List<NewServiceRequestDto> mapNewServiceRequests() {
-        return serviceMaintenanceRepository.findByDeletedFalseAndStatusOrderByRequestDateDesc(ServiceRequestStatus.NEW).stream()
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return serviceMaintenanceRepository.findByDeletedFalseAndStatusAndCompanyIdOrderByRequestDateDesc(ServiceRequestStatus.NEW, companyId).stream()
                 .map(sr -> NewServiceRequestDto.builder()
                         .serviceRequestDbId(sr.getId())
                         .serviceRequestId(sr.getRequestId())

@@ -10,6 +10,7 @@ import java.time.LocalDateTime;
 @Builder
 public class WorkOrderTypeTemplateResponse {
     private Long id;
+    private Long companyId;
     private String workOrderType;
     private String defaultGlAccount;
     private String defaultUtilityAccount;

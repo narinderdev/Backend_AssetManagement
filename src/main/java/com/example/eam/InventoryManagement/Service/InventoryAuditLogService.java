@@ -1,5 +1,6 @@
 package com.example.eam.InventoryManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.InventoryReferenceType;
 import com.example.eam.Enum.InventoryTransactionType;
 import com.example.eam.InventoryManagement.Dto.InventoryAuditLogResponse;
@@ -24,27 +25,34 @@ public class InventoryAuditLogService {
 
     @Transactional(readOnly = true)
     public InventoryAuditLogResponse get(Long id) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         return toResponse(repository.findById(id)
+                .filter(log -> log.getInventoryItem() != null
+                        && (companyId == null || companyId.equals(log.getInventoryItem().getCompanyId())))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Audit log not found")));
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryAuditLogResponse> list(Pageable pageable) {
-        return repository.findAllByOrderByCreatedAtDesc(pageable).map(this::toResponse);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return repository.findByInventoryItem_CompanyIdOrderByCreatedAtDesc(companyId, pageable).map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryAuditLogResponse> listByItem(Long itemId, Pageable pageable) {
-        return repository.findByInventoryItem_IdOrderByCreatedAtDesc(itemId, pageable).map(this::toResponse);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return repository.findByInventoryItem_IdAndInventoryItem_CompanyIdOrderByCreatedAtDesc(itemId, companyId, pageable)
+                .map(this::toResponse);
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryAuditLogResponse> searchBySku(String sku, Pageable pageable) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         String normalizedSku = trim(sku);
         if (normalizedSku == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "sku is required");
         }
-        return repository.searchBySku(normalizedSku, pageable)
+        return repository.searchBySkuAndCompanyId(normalizedSku, companyId, pageable)
                 .map(this::toResponse);
     }
 

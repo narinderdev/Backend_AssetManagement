@@ -1,5 +1,6 @@
 package com.example.eam.Procurement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.Procurement.Dto.*;
@@ -50,21 +51,23 @@ public class PurchaseOrderService {
 
     @Transactional
     public PurchaseOrderResponse convertMrToPo(Long mrId, ConvertMrToPoRequest request) {
-        MaterialRequisition mr = mrRepository.findById(mrId)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        MaterialRequisition mr = mrRepository.findByIdAndCompanyId(mrId, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material Requisition not found"));
         if (mr.getStatus() != MaterialRequisitionStatus.APPROVED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only APPROVED MRs can be converted to PO");
         }
-        if (poRepository.existsByMrId(mrId)) {
+        if (poRepository.existsByMrIdAndCompanyId(mrId, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "MR already converted to PO");
         }
 
         ShippingTarget shipping = resolveShippingTarget(
+                companyId,
                 request.getShipToType() != null ? request.getShipToType() : (mr.getShipToType() != null ? mr.getShipToType().name() : null),
                 request.getShipToWarehouseId() != null ? request.getShipToWarehouseId() : mr.getShipToWarehouseId(),
                 request.getShipToWorkOrderId() != null ? request.getShipToWorkOrderId() : mr.getShipToWorkOrderId());
 
-        Vendor vendor = validateVendor(request.getVendorId());
+        Vendor vendor = validateVendor(request.getVendorId(), companyId);
         Map<Long, PoLineOverrideRequest> overrides = buildOverrideMap(request.getLineOverrides());
         if (!overrides.isEmpty()) {
             Set<Long> mrLineIds = Optional.ofNullable(mr.getLines())
@@ -80,6 +83,7 @@ public class PurchaseOrderService {
         }
 
         PurchaseOrder po = PurchaseOrder.builder()
+                .companyId(companyId)
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr.getId())
@@ -107,7 +111,7 @@ public class PurchaseOrderService {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "unitPrice must be greater than zero for MR line " + mrLine.getId());
             }
 
-            validateInventoryItemExists(mrLine.getItemId());
+            validateInventoryItemExists(mrLine.getItemId(), companyId);
 
             String uom = override != null && override.getUom() != null ? trim(override.getUom()) : mrLine.getUom();
             String lineRemarks = override != null && override.getRemarks() != null ? trim(override.getRemarks()) : mrLine.getRemarks();
@@ -138,26 +142,28 @@ public class PurchaseOrderService {
 
     @Transactional
     public PurchaseOrderResponse create(CreatePurchaseOrderRequest request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         if (request.getLines() == null || request.getLines().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one PO line is required");
         }
 
-        ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
+        ShippingTarget shipping = resolveShippingTarget(companyId, request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
 
-        Vendor vendor = validateVendor(request.getVendorId());
+        Vendor vendor = validateVendor(request.getVendorId(), companyId);
         MaterialRequisition mr = null;
         if (request.getMrId() != null) {
-            mr = mrRepository.findById(request.getMrId())
+            mr = mrRepository.findByIdAndCompanyId(request.getMrId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material Requisition not found"));
             if (mr.getStatus() != MaterialRequisitionStatus.APPROVED) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Linked MR must be APPROVED");
             }
-            if (poRepository.existsByMrId(request.getMrId())) {
+            if (poRepository.existsByMrIdAndCompanyId(request.getMrId(), companyId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "MR already converted to PO");
             }
         }
 
         PurchaseOrder po = PurchaseOrder.builder()
+                .companyId(companyId)
                 .poNumber(numberGeneratorService.generatePoNumber())
                 .vendorId(vendor.getId())
                 .mrId(mr != null ? mr.getId() : null)
@@ -173,7 +179,7 @@ public class PurchaseOrderService {
                 .build();
 
         for (PurchaseOrderLineRequest lineRequest : request.getLines()) {
-            validateInventoryItemExists(lineRequest.getItemId());
+            validateInventoryItemExists(lineRequest.getItemId(), companyId);
             BigDecimal qty = lineRequest.getOrderedQty();
             if (qty == null || qty.compareTo(BigDecimal.ZERO) <= 0) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "orderedQty must be greater than zero");
@@ -197,7 +203,8 @@ public class PurchaseOrderService {
 
     @Transactional
     public PurchaseOrderResponse updateStatus(Long id, PurchaseOrderStatus newStatus, String remarks) {
-        PurchaseOrder po = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        PurchaseOrder po = getOrThrow(id, companyId);
 
         if (newStatus == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "newStatus is required");
@@ -235,7 +242,7 @@ public class PurchaseOrderService {
                 }
             }
             case CANCELLED -> {
-                if (grnRepository.existsByPoId(po.getId())) {
+                if (grnRepository.existsByPoIdAndCompanyId(po.getId(), companyId)) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "PO with GRNs cannot be cancelled");
                 }
             }
@@ -252,27 +259,28 @@ public class PurchaseOrderService {
 
     @Transactional(readOnly = true)
     public PurchaseOrderResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        return toResponse(getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null)));
     }
 
     @Transactional(readOnly = true)
     public Page<PurchaseOrderResponse> list(Pageable pageable, Long mrId) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         if (mrId != null) {
-            List<PurchaseOrderResponse> responses = poRepository.findByMrId(mrId).stream()
+            List<PurchaseOrderResponse> responses = poRepository.findByMrIdAndCompanyId(mrId, companyId).stream()
                     .map(this::toResponse)
                     .toList();
             return new PageImpl<>(responses, pageable, responses.size());
         }
-        return poRepository.findAll(pageable).map(this::toResponse);
+        return poRepository.findByCompanyId(companyId, pageable).map(this::toResponse);
     }
 
     // Helpers
 
-    private Vendor validateVendor(Long vendorId) {
+    private Vendor validateVendor(Long vendorId, Long companyId) {
         if (vendorId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "vendorId is required");
         }
-        Vendor vendor = vendorRepository.findById(vendorId)
+        Vendor vendor = vendorRepository.findByIdAndCompanyId(vendorId, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found: " + vendorId));
         if (!vendor.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor is inactive: " + vendorId);
@@ -280,8 +288,8 @@ public class PurchaseOrderService {
         return vendor;
     }
 
-    private void validateInventoryItemExists(Long itemId) {
-        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(itemId)
+    private void validateInventoryItemExists(Long itemId, Long companyId) {
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(itemId, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item not found: " + itemId));
         if (!item.isActive()) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Inventory item is inactive: " + itemId);
@@ -305,8 +313,8 @@ public class PurchaseOrderService {
                 .allMatch(line -> line.getOrderedQty().compareTo(line.getReceivedQty()) == 0);
     }
 
-    private PurchaseOrder getOrThrow(Long id) {
-        return poRepository.findById(id)
+    private PurchaseOrder getOrThrow(Long id, Long companyId) {
+        return poRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase Order not found"));
     }
 
@@ -327,7 +335,8 @@ public class PurchaseOrderService {
 
         Vendor vendor = null;
         if (po.getVendorId() != null) {
-            vendor = vendorRepository.findById(po.getVendorId()).orElse(null);
+            Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+            vendor = vendorRepository.findByIdAndCompanyId(po.getVendorId(), companyId).orElse(null);
         }
 
         return PurchaseOrderResponse.builder()
@@ -370,7 +379,7 @@ public class PurchaseOrderService {
         return t;
     }
 
-    private ShippingTarget resolveShippingTarget(String shipToTypeRaw, Long warehouseId, Long workOrderId) {
+    private ShippingTarget resolveShippingTarget(Long companyId, String shipToTypeRaw, Long warehouseId, Long workOrderId) {
         if (shipToTypeRaw == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipToType is required (WAREHOUSE or WORK_SITE)");
         }
@@ -388,7 +397,7 @@ public class PurchaseOrderService {
             if (warehouseId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "warehouseId is required when shipToType=WAREHOUSE");
             }
-            var warehouse = warehouseRepository.findById(warehouseId)
+            var warehouse = warehouseRepository.findByIdAndDeletedFalseAndCompanyId(warehouseId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
             if (!warehouse.isActive()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
@@ -398,7 +407,7 @@ public class PurchaseOrderService {
             if (workOrderId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderId is required when shipToType=WORK_SITE");
             }
-            workOrderRepository.findByIdAndDeletedFalse(workOrderId)
+            workOrderRepository.findByIdAndDeletedFalseAndCompanyId(workOrderId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order not found"));
             resolvedWorkOrderId = workOrderId;
         }

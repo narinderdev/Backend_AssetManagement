@@ -16,7 +16,7 @@ BEGIN
 END;
 
 -- If table was pre-created (e.g. by Hibernate), ensure defaults exist for timestamp columns.
-IF COL_LENGTH('dbo.work_request_types', 'created_at') IS NOT NULL
+IF OBJECT_ID('dbo.work_request_types', 'U') IS NOT NULL AND COL_LENGTH('dbo.work_request_types', 'created_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -29,8 +29,7 @@ BEGIN
     ALTER TABLE dbo.work_request_types
     ADD CONSTRAINT df_work_request_types_created_at DEFAULT SYSUTCDATETIME() FOR created_at;
 END;
-
-IF COL_LENGTH('dbo.work_request_types', 'updated_at') IS NOT NULL
+IF OBJECT_ID('dbo.work_request_types', 'U') IS NOT NULL AND COL_LENGTH('dbo.work_request_types', 'updated_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -61,7 +60,7 @@ WHERE NOT EXISTS (
 -- Legacy data migration for work_orders table (skip safely when base table is absent).
 IF OBJECT_ID('dbo.work_orders', 'U') IS NOT NULL
 BEGIN
-    IF COL_LENGTH('dbo.work_orders', 'work_request_type_id') IS NULL
+IF OBJECT_ID('dbo.work_orders', 'U') IS NOT NULL AND COL_LENGTH('dbo.work_orders', 'work_request_type_id') IS NULL
     BEGIN
         ALTER TABLE dbo.work_orders ADD work_request_type_id BIGINT NULL;
     END;
@@ -83,3 +82,4 @@ BEGIN
         CREATE INDEX idx_work_orders_work_request_type_id ON dbo.work_orders(work_request_type_id);
     END;
 END;
+

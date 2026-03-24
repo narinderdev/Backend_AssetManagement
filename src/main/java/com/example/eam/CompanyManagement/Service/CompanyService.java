@@ -5,6 +5,14 @@ import com.example.eam.CompanyManagement.Dto.CompanyPatchRequest;
 import com.example.eam.CompanyManagement.Dto.CompanyResponse;
 import com.example.eam.CompanyManagement.Entity.Company;
 import com.example.eam.CompanyManagement.Repository.CompanyRepository;
+import com.example.eam.Roles.Entity.AppPermission;
+import com.example.eam.Roles.Entity.Role;
+import com.example.eam.Roles.Repository.AppPermissionRepository;
+import com.example.eam.Roles.Repository.RoleRepository;
+import com.example.eam.User.entity.UserCompany;
+import com.example.eam.User.entity.Users;
+import com.example.eam.User.repository.UserCompanyRepository;
+import com.example.eam.User.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -13,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
+import java.util.HashSet;
+import java.util.List;
 import java.util.function.Consumer;
 
 @Service
@@ -20,23 +30,50 @@ import java.util.function.Consumer;
 public class CompanyService {
 
     private final CompanyRepository companyRepository;
+    private final UsersRepository usersRepository;
+    private final UserCompanyRepository userCompanyRepository;
+    private final RoleRepository roleRepository;
+    private final AppPermissionRepository appPermissionRepository;
 
     @Transactional
     public CompanyResponse create(CompanyCreateRequest req) {
-        String companyNumber = requireUniqueCompanyNumber(req.getCompanyNumber(), null);
+        Users user = usersRepository.findByIdAndDeletedFalse(req.getUserId())
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+        String companyNumber = req.getCompanyNumber().trim();
 
-        Company company = Company.builder()
-                .companyLegalName(req.getCompanyLegalName().trim())
-                .companyTradeName(req.getCompanyTradeName().trim())
-                .companyNumber(companyNumber)
-                .address(req.getAddress().trim())
-                .city(req.getCity().trim())
-                .country(req.getCountry().trim())
-                .postalCode(req.getPostalCode().trim())
-                .active(req.getActive() == null || req.getActive())
-                .build();
+        Company saved = companyRepository.findByCompanyNumberIgnoreCase(companyNumber)
+                .map(existing -> {
+                    if (existing.isActive()) {
+                        throw new ResponseStatusException(HttpStatus.CONFLICT, "Company number already exists");
+                    }
 
-        Company saved = companyRepository.save(company);
+                    existing.setCompanyLegalName(req.getCompanyLegalName().trim());
+                    existing.setCompanyTradeName(req.getCompanyTradeName().trim());
+                    existing.setCompanyNumber(companyNumber);
+                    existing.setAddress(req.getAddress().trim());
+                    existing.setCity(req.getCity().trim());
+                    existing.setCountry(req.getCountry().trim());
+                    existing.setPostalCode(req.getPostalCode().trim());
+                    existing.setActive(req.getActive() == null || req.getActive());
+                    return companyRepository.save(existing);
+                })
+                .orElseGet(() -> {
+                    Company company = Company.builder()
+                            .companyLegalName(req.getCompanyLegalName().trim())
+                            .companyTradeName(req.getCompanyTradeName().trim())
+                            .companyNumber(companyNumber)
+                            .address(req.getAddress().trim())
+                            .city(req.getCity().trim())
+                            .country(req.getCountry().trim())
+                            .postalCode(req.getPostalCode().trim())
+                            .active(req.getActive() == null || req.getActive())
+                            .build();
+                    return companyRepository.save(company);
+                });
+
+        ensureUserCompanyMapping(user, saved);
+        ensureCompanyAdminRole(saved.getId());
+
         return toResponse(saved);
     }
 
@@ -125,5 +162,29 @@ public class CompanyService {
                 .createdAt(company.getCreatedAt())
                 .updatedAt(company.getUpdatedAt())
                 .build();
+    }
+
+    private void ensureUserCompanyMapping(Users user, Company company) {
+        if (!userCompanyRepository.existsByUser_IdAndCompany_Id(user.getId(), company.getId())) {
+            userCompanyRepository.save(UserCompany.builder()
+                    .user(user)
+                    .company(company)
+                    .build());
+        }
+    }
+
+    private void ensureCompanyAdminRole(Long companyId) {
+        List<AppPermission> permissions = appPermissionRepository.findByActiveTrueOrderByModuleAscSortOrderAsc();
+
+        Role companyAdmin = roleRepository.findFirstByNameIgnoreCaseAndCompanyIdOrderByIdAsc("Admin", companyId)
+                .orElseGet(() -> Role.builder()
+                        .companyId(companyId)
+                        .name("Admin")
+                        .description("Full access")
+                        .active(true)
+                        .build());
+
+        companyAdmin.setPermissions(new HashSet<>(permissions));
+        roleRepository.save(companyAdmin);
     }
 }

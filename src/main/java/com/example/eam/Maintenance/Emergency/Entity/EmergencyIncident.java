@@ -23,6 +23,9 @@ public class EmergencyIncident {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @OneToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "work_order_id", nullable = false, unique = true)
     private WorkOrder workOrder;

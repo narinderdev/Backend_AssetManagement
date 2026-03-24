@@ -28,6 +28,9 @@ public class TechnicianTeam {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "team_name", nullable = false, length = 100)
     private String teamName;
 

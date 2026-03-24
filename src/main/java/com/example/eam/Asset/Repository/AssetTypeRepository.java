@@ -5,16 +5,21 @@ import com.example.eam.Asset.Entity.AssetType;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
+import java.util.Optional;
 
 public interface AssetTypeRepository extends JpaRepository<AssetType, Long> {
 
-    List<AssetType> findAllByActiveTrue();
+    List<AssetType> findAllByCompanyIdOrderByNameAsc(Long companyId);
 
-    boolean existsByCodeIgnoreCase(String code);
+    List<AssetType> findAllByCompanyIdAndActiveTrueOrderByNameAsc(Long companyId);
 
-    boolean existsByNameIgnoreCase(String name);
+    Optional<AssetType> findByIdAndCompanyId(Long id, Long companyId);
 
-    boolean existsByCodeIgnoreCaseAndIdNot(String code, Long id);
+    boolean existsByCodeIgnoreCaseAndCompanyId(String code, Long companyId);
 
-    boolean existsByNameIgnoreCaseAndIdNot(String name, Long id);
+    boolean existsByNameIgnoreCaseAndCompanyId(String name, Long companyId);
+
+    boolean existsByCodeIgnoreCaseAndCompanyIdAndIdNot(String code, Long companyId, Long id);
+
+    boolean existsByNameIgnoreCaseAndCompanyIdAndIdNot(String name, Long companyId, Long id);
 }

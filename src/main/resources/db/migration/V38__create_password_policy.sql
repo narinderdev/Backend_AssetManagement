@@ -8,8 +8,7 @@ BEGIN
         updated_at DATETIME2 NOT NULL CONSTRAINT df_password_policy_updated DEFAULT SYSUTCDATETIME()
     );
 END;
-
-IF COL_LENGTH('dbo.password_policy', 'created_at') IS NOT NULL
+IF OBJECT_ID('dbo.password_policy', 'U') IS NOT NULL AND COL_LENGTH('dbo.password_policy', 'created_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -21,8 +20,7 @@ BEGIN
     ALTER TABLE dbo.password_policy
     ADD CONSTRAINT df_password_policy_created DEFAULT SYSUTCDATETIME() FOR created_at;
 END;
-
-IF COL_LENGTH('dbo.password_policy', 'updated_at') IS NOT NULL
+IF OBJECT_ID('dbo.password_policy', 'U') IS NOT NULL AND COL_LENGTH('dbo.password_policy', 'updated_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -40,3 +38,4 @@ BEGIN
     INSERT INTO dbo.password_policy (password_expiry_days, created_at, updated_at)
     VALUES (90, SYSUTCDATETIME(), SYSUTCDATETIME());
 END;
+

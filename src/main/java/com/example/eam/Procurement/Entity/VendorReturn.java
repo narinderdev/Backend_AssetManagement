@@ -27,6 +27,9 @@ public class VendorReturn {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "grn_id", nullable = false)
     private Long grnId;
 

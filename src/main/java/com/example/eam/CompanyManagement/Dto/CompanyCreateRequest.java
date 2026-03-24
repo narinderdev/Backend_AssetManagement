@@ -1,6 +1,7 @@
 package com.example.eam.CompanyManagement.Dto;
 
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
 import lombok.Data;
 
 @Data
@@ -26,6 +27,9 @@ public class CompanyCreateRequest {
 
     @NotBlank
     private String postalCode;
+
+    @NotNull
+    private Long userId;
 
     private Boolean active;
 }

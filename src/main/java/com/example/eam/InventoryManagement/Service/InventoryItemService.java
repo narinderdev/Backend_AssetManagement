@@ -1,5 +1,6 @@
 package com.example.eam.InventoryManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.ReorderStatus;
 import com.example.eam.InventoryManagement.Dto.*;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
@@ -35,19 +36,20 @@ public class InventoryItemService {
     // -------- CREATE --------
     @Transactional
     public InventoryItemResponse create(InventoryItemCreateRequest dto) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
 
-        String itemId = determineItemId(dto.getItemId());
-        String skuNumber = normalizeSkuForCreate(dto.getSkuNumber());
+        String itemId = determineItemId(dto.getItemId(), companyId);
+        String skuNumber = normalizeSkuForCreate(dto.getSkuNumber(), companyId);
 
         Vendor vendor = null;
         if (dto.getPrimaryVendorDbId() != null) {
-            vendor = vendorRepo.findById(dto.getPrimaryVendorDbId())
+            vendor = vendorRepo.findByIdAndCompanyId(dto.getPrimaryVendorDbId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
         }
 
         Warehouse warehouse = null;
         if (dto.getWarehouseId() != null) {
-            warehouse = warehouseRepo.findById(dto.getWarehouseId())
+            warehouse = warehouseRepo.findByIdAndDeletedFalseAndCompanyId(dto.getWarehouseId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
             if (!warehouse.isActive()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
@@ -57,6 +59,7 @@ public class InventoryItemService {
         validateMinMax(dto.getMinStockLevel(), dto.getMaxStockLevel());
 
         InventoryItem item = InventoryItem.builder()
+                .companyId(companyId)
                 .itemId(itemId)
                 .skuNumber(skuNumber)
                 .itemName(dto.getItemName().trim())
@@ -84,10 +87,11 @@ public class InventoryItemService {
     // -------- PATCH UPDATE --------
     @Transactional
     public InventoryItemResponse patch(Long id, InventoryItemPatchRequest dto) {
-        InventoryItem item = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        InventoryItem item = getOrThrow(id, companyId);
 
         if (dto.getPrimaryVendorDbId() != null) {
-            Vendor vendor = vendorRepo.findById(dto.getPrimaryVendorDbId())
+            Vendor vendor = vendorRepo.findByIdAndCompanyId(dto.getPrimaryVendorDbId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
             item.setPrimaryVendor(vendor);
         }
@@ -97,7 +101,7 @@ public class InventoryItemService {
             if (trimmed.isEmpty()) {
                 item.setSkuNumber(null);
             } else {
-                ensureSkuUnique(trimmed, item.getId());
+                ensureSkuUnique(trimmed, item.getId(), companyId);
                 item.setSkuNumber(trimmed);
             }
         }
@@ -113,6 +117,7 @@ public class InventoryItemService {
                 item.setWarehouse(null);
             } else {
                 Warehouse warehouse = warehouseRepo.findById(dto.getWarehouseId())
+                        .filter(w -> companyId == null || companyId.equals(w.getCompanyId()))
                         .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
                 if (!warehouse.isActive()) {
                     throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
@@ -159,18 +164,19 @@ public class InventoryItemService {
     // -------- READ --------
     @Transactional(readOnly = true)
     public InventoryItemResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        return toResponse(getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null)));
     }
 
     @Transactional(readOnly = true)
     public Page<InventoryItemResponse> list(Pageable pageable) {
-        return itemRepo.findByDeletedFalse(pageable).map(this::toResponse);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return itemRepo.findByDeletedFalseAndCompanyId(companyId, pageable).map(this::toResponse);
     }
 
     // -------- DELETE (soft delete) --------
     @Transactional
     public void delete(Long id) {
-        InventoryItem item = getOrThrow(id);
+        InventoryItem item = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         item.setDeleted(true);
         item.setActive(false);
         itemRepo.save(item);
@@ -179,11 +185,12 @@ public class InventoryItemService {
     // -------- REORDER ACTION --------
     @Transactional
     public InventoryReorderResponse reorder(Long itemDbId, InventoryReorderCreateRequest dto) {
-        InventoryItem item = getOrThrow(itemDbId);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        InventoryItem item = getOrThrow(itemDbId, companyId);
 
         Vendor vendor;
         if (dto.getVendorDbId() != null) {
-            vendor = vendorRepo.findById(dto.getVendorDbId())
+            vendor = vendorRepo.findByIdAndCompanyId(dto.getVendorDbId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Vendor not found"));
         } else {
             vendor = item.getPrimaryVendor();
@@ -228,8 +235,8 @@ public class InventoryItemService {
 
     // ---------------- Helpers ----------------
 
-    private InventoryItem getOrThrow(Long id) {
-        return itemRepo.findByIdAndDeletedFalse(id)
+    private InventoryItem getOrThrow(Long id, Long companyId) {
+        return itemRepo.findByIdAndDeletedFalseAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found"));
     }
 
@@ -303,24 +310,24 @@ public class InventoryItemService {
                 .build();
     }
 
-    private String determineItemId(String providedItemId) {
+    private String determineItemId(String providedItemId, Long companyId) {
         if (providedItemId != null && !providedItemId.trim().isEmpty()) {
             String trimmed = providedItemId.trim();
-            if (itemRepo.existsByItemId(trimmed)) {
+            if (itemRepo.existsByItemIdAndCompanyId(trimmed, companyId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Item ID already exists: " + trimmed);
             }
             return trimmed;
         }
 
-        return generateUniqueItemId();
+        return generateUniqueItemId(companyId);
     }
 
-    private String generateUniqueItemId() {
+    private String generateUniqueItemId(Long companyId) {
         String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE);
         for (int attempt = 0; attempt < 30; attempt++) {
             int rand = ThreadLocalRandom.current().nextInt(0, 10000);
             String candidate = String.format("ITEM-%s-%04d", datePart, rand);
-            if (!itemRepo.existsByItemId(candidate)) {
+            if (!itemRepo.existsByItemIdAndCompanyId(candidate, companyId)) {
                 return candidate;
             }
         }
@@ -337,18 +344,18 @@ public class InventoryItemService {
         throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate unique reorder ID");
     }
 
-    private String normalizeSkuForCreate(String skuNumber) {
+    private String normalizeSkuForCreate(String skuNumber, Long companyId) {
         if (skuNumber == null) return null;
         String trimmed = skuNumber.trim();
         if (trimmed.isEmpty()) return null;
-        if (itemRepo.existsBySkuNumberAndDeletedFalse(trimmed)) {
+        if (itemRepo.existsBySkuNumberAndDeletedFalseAndCompanyId(trimmed, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + trimmed);
         }
         return trimmed;
     }
 
-    private void ensureSkuUnique(String skuNumber, Long currentItemId) {
-        itemRepo.findBySkuNumberAndDeletedFalse(skuNumber).ifPresent(existing -> {
+    private void ensureSkuUnique(String skuNumber, Long currentItemId, Long companyId) {
+        itemRepo.findBySkuNumberAndDeletedFalseAndCompanyId(skuNumber, companyId).ifPresent(existing -> {
             if (!existing.getId().equals(currentItemId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "SKU already exists: " + skuNumber);
             }

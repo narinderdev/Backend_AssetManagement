@@ -23,16 +23,19 @@ public class UserController {
 
     @PostMapping
     public ResponseEntity<ApiResponse<Users>> createUser(
+        @RequestParam Long companyId,
         @Valid @RequestBody UserCreateDto dto
         ) {
-            Users user = userService.register(dto);
+            Users user = userService.register(dto, companyId);
             ApiResponse<Users> response = ApiResponse.successResponse(201, "User Created Successfully", user);
             return ResponseEntity.ok(response);
     }
 
     @GetMapping
-    public ResponseEntity<ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>>> listUsers() {
-        var users = userService.listUsers();
+    public ResponseEntity<ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>>> listUsers(
+            @RequestParam Long companyId
+    ) {
+        var users = userService.listUsers(companyId);
         ApiResponse<java.util.List<com.example.eam.User.dto.UserSummaryDto>> response =
                 ApiResponse.successResponse(200, "Users fetched successfully", users);
         return ResponseEntity.ok(response);

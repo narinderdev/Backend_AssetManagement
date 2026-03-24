@@ -23,6 +23,17 @@ public interface UsersRepository extends JpaRepository<Users, Long> {
         where u.deleted = false
     """)
     List<Users> findAllActiveWithRoles();
+
+    @Query("""
+        select distinct u from Users u
+        join u.userCompanies uc
+        left join fetch u.userRoles ur
+        left join fetch ur.role r
+        where u.deleted = false
+          and uc.company.id = :companyId
+          and uc.company.active = true
+    """)
+    List<Users> findAllActiveWithRolesByCompanyId(@Param("companyId") Long companyId);
 }
 
 

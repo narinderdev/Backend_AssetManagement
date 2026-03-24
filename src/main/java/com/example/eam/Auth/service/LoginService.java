@@ -478,7 +478,9 @@ public class LoginService {
             return configured;
         }
 
-        Role byName = roleRepository.findByNameIgnoreCase(TECHNICIAN_ROLE_NAME).orElse(null);
+        Role byName = roleRepository.findFirstByNameIgnoreCaseAndCompanyIdIsNullOrderByIdAsc(TECHNICIAN_ROLE_NAME)
+                .or(() -> roleRepository.findFirstByNameIgnoreCaseAndActiveTrueOrderByIdAsc(TECHNICIAN_ROLE_NAME))
+                .orElse(null);
         if (byName != null) {
             boolean changed = false;
             if (!byName.isActive()) {
@@ -493,6 +495,7 @@ public class LoginService {
         }
 
         return roleRepository.save(Role.builder()
+                .companyId(null)
                 .name(TECHNICIAN_ROLE_NAME)
                 .description("Auto-created technician role for TM user login")
                 .active(true)

@@ -12,10 +12,11 @@ import java.util.Set;
 @Entity
 @Table(
     name = "roles",
-    uniqueConstraints = @UniqueConstraint(name = "uk_role_name", columnNames = "name"),
+    uniqueConstraints = @UniqueConstraint(name = "uk_role_company_name", columnNames = {"company_id", "name"}),
     indexes = {
         @Index(name = "idx_role_active", columnList = "active"),
-        @Index(name = "idx_role_name", columnList = "name")
+        @Index(name = "idx_role_name", columnList = "name"),
+        @Index(name = "idx_role_company_id", columnList = "company_id")
     }
 )
 @Data
@@ -28,8 +29,11 @@ public class Role {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     // e.g. "Planner", "Technician", "Admin"
-    @Column(name = "name", nullable = false, unique = true, length = 80)
+    @Column(name = "name", nullable = false, length = 80)
     private String name;
 
     @Column(name = "description", length = 500)

@@ -8,8 +8,8 @@ import lombok.*;
 @Entity
 @Table(name = "asset_types",
         uniqueConstraints = {
-                @UniqueConstraint(name = "ux_asset_types_code", columnNames = "code"),
-                @UniqueConstraint(name = "ux_asset_types_name", columnNames = "name")
+                @UniqueConstraint(name = "uk_asset_types_company_code", columnNames = {"company_id", "code"}),
+                @UniqueConstraint(name = "uk_asset_types_company_name", columnNames = {"company_id", "name"})
         })
 @Getter
 @Setter
@@ -27,6 +27,9 @@ public class AssetType {
 
     @Column(name = "name", nullable = false, length = 255)
     private String name;
+
+    @Column(name = "company_id")
+    private Long companyId;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "asset_category_id")

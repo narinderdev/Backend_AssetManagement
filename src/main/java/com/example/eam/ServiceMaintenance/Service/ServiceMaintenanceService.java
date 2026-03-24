@@ -4,6 +4,7 @@ import com.example.eam.Asset.Entity.Asset;
 import com.example.eam.Asset.Entity.AssetLocation;
 import com.example.eam.Asset.Repository.AssetLocationRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.ServiceRequestStatus;
 import com.example.eam.ServiceMaintenance.Dto.ServiceRequestApproveDto;
 import com.example.eam.ServiceMaintenance.Dto.ServiceRequestCreateDto;
@@ -36,11 +37,12 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public ServiceRequestResponse create(ServiceRequestCreateDto dto) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         validatePreferredAssignment(dto.getPreferredTechnicianId(), dto.getPreferredTeamId());
 
         Asset asset = null;
         if (dto.getAssetId() != null) {
-            asset = assetRepository.findById(dto.getAssetId())
+            asset = assetRepository.findByIdAndCompanyId(dto.getAssetId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "Asset not found: " + dto.getAssetId()
@@ -48,11 +50,12 @@ public class ServiceMaintenanceService {
         }
 
         // Resolve requestId (manual or auto)
-        String requestId = resolveRequestIdOnCreate(dto.getRequestId());
+        String requestId = resolveRequestIdOnCreate(dto.getRequestId(), companyId);
 
         String resolvedLocation = resolveLocation(dto.getLocation(), asset);
 
         ServiceMaintenance entity = ServiceMaintenance.builder()
+                .companyId(companyId)
                 .requestId(requestId)
                 .requestDate(LocalDateTime.now())
                 .requesterName(dto.getRequesterName())
@@ -83,10 +86,10 @@ public class ServiceMaintenanceService {
         return toResponse(saved);
     }
 
-    private String resolveRequestIdOnCreate(String userProvided) {
+    private String resolveRequestIdOnCreate(String userProvided, Long companyId) {
         if (userProvided != null && !userProvided.isBlank()) {
             String trimmed = userProvided.trim();
-            if (serviceRepo.existsByRequestId(trimmed)) {
+            if (serviceRepo.existsByRequestIdAndCompanyId(trimmed, companyId)) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
                         "Service Request ID already exists: " + trimmed
@@ -96,12 +99,12 @@ public class ServiceMaintenanceService {
         }
 
         // Auto-generate: SR-000001 style using max DB id
-        return generateNextRequestId();
+        return generateNextRequestId(companyId);
     }
 
-    private String generateNextRequestId() {
+    private String generateNextRequestId(Long companyId) {
         String prefix = "SR-";
-        long base = serviceRepo.findTopByOrderByIdDesc()
+        long base = serviceRepo.findTopByCompanyIdOrderByIdDesc(companyId)
                 .map(ServiceMaintenance::getId)
                 .orElse(0L);
 
@@ -109,7 +112,7 @@ public class ServiceMaintenanceService {
         do {
             base++;
             candidate = prefix + String.format("%06d", base);
-        } while (serviceRepo.existsByRequestId(candidate));
+        } while (serviceRepo.existsByRequestIdAndCompanyId(candidate, companyId));
 
         return candidate;
     }
@@ -118,7 +121,7 @@ public class ServiceMaintenanceService {
 
     @Transactional(readOnly = true)
     public ServiceRequestResponse get(Long id) {
-        ServiceMaintenance entity = getOrThrow(id);
+        ServiceMaintenance entity = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         return toResponse(entity);
     }
 
@@ -126,7 +129,8 @@ public class ServiceMaintenanceService {
 
     @Transactional(readOnly = true)
     public Page<ServiceRequestResponse> list(Pageable pageable) {
-        return serviceRepo.findByDeletedFalseAndStatusNot(ServiceRequestStatus.CONVERTED_TO_WO, pageable)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return serviceRepo.findByDeletedFalseAndStatusNotAndCompanyId(ServiceRequestStatus.CONVERTED_TO_WO, companyId, pageable)
                 .map(this::toResponse);
     }
 
@@ -134,7 +138,8 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public ServiceRequestResponse update(Long id, ServiceRequestUpdateDto dto) {
-        ServiceMaintenance entity = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        ServiceMaintenance entity = getOrThrow(id, companyId);
 
         if (entity.getStatus() == ServiceRequestStatus.APPROVED
                 || entity.getStatus() == ServiceRequestStatus.REJECTED
@@ -147,7 +152,7 @@ public class ServiceMaintenanceService {
         if (dto.getRequestId() != null && !dto.getRequestId().isBlank()) {
             String newReqId = dto.getRequestId().trim();
             if (!newReqId.equals(entity.getRequestId())
-                    && serviceRepo.existsByRequestId(newReqId)) {
+                    && serviceRepo.existsByRequestIdAndCompanyId(newReqId, companyId)) {
                 throw new ResponseStatusException(
                         HttpStatus.CONFLICT,
                         "Service Request ID already exists: " + newReqId
@@ -158,7 +163,7 @@ public class ServiceMaintenanceService {
 
         // Asset / Location
         if (dto.getAssetId() != null) {
-            Asset asset = assetRepository.findById(dto.getAssetId())
+            Asset asset = assetRepository.findByIdAndCompanyId(dto.getAssetId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(
                             HttpStatus.BAD_REQUEST,
                             "Asset not found: " + dto.getAssetId()
@@ -215,7 +220,7 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public void delete(Long id) {
-        ServiceMaintenance entity = getOrThrow(id);
+        ServiceMaintenance entity = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         entity.setDeleted(true);
         serviceRepo.save(entity);
     }
@@ -224,7 +229,7 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public ServiceRequestResponse approve(Long id, ServiceRequestApproveDto dto) {
-        ServiceMaintenance entity = getOrThrow(id);
+        ServiceMaintenance entity = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (entity.getStatus() == ServiceRequestStatus.CONVERTED_TO_WO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Service request already converted to Work Order");
         }
@@ -241,7 +246,7 @@ public class ServiceMaintenanceService {
 
     @Transactional
     public ServiceRequestResponse reject(Long id, ServiceRequestRejectDto dto) {
-        ServiceMaintenance entity = getOrThrow(id);
+        ServiceMaintenance entity = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (entity.getStatus() == ServiceRequestStatus.CONVERTED_TO_WO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Service request already converted to Work Order");
         }
@@ -262,8 +267,8 @@ public class ServiceMaintenanceService {
 
     // ---------- Helpers ----------
 
-    private ServiceMaintenance getOrThrow(Long id) {
-        return serviceRepo.findByIdAndDeletedFalse(id)
+    private ServiceMaintenance getOrThrow(Long id, Long companyId) {
+        return serviceRepo.findByIdAndDeletedFalseAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND,
                         "Service request not found: " + id

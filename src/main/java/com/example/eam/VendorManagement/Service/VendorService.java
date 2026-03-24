@@ -1,5 +1,6 @@
 package com.example.eam.VendorManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.VendorStatus;
 import com.example.eam.VendorManagement.Dto.*;
 import com.example.eam.VendorManagement.Entity.Vendor;
@@ -26,13 +27,15 @@ public class VendorService {
 
     @Transactional
     public VendorResponse create(VendorCreateRequest req) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         // Determine vendor ID: use provided one or generate new one
-        String vendorId = determineVendorId(req.getVendorId());
+        String vendorId = determineVendorId(req.getVendorId(), companyId);
 
         Vendor vendor = Vendor.builder()
+                .companyId(companyId)
                 .vendorId(vendorId)
                 .vendorName(req.getVendorName().trim())
-                .taxId(normalizeAndEnsureUniqueTaxId(req.getTaxId(), null))
+                .taxId(normalizeAndEnsureUniqueTaxId(req.getTaxId(), null, companyId))
                 .address(req.getAddress())
                 .contactPerson(req.getContactPerson().trim())
                 .email(req.getEmail().trim())
@@ -49,7 +52,8 @@ public class VendorService {
 
     @Transactional
     public VendorResponse patch(Long id, VendorPatchRequest req) {
-        Vendor vendor = getOrThrowActive(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Vendor vendor = getOrThrowActive(id, companyId);
 
         updateIfNotBlank(req.getVendorName(), vendor::setVendorName);
         updateIfNotBlank(req.getAddress(), vendor::setAddress);
@@ -61,7 +65,7 @@ public class VendorService {
             if (taxId.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId cannot be blank");
             }
-            ensureTaxIdUnique(taxId, vendor.getId());
+            ensureTaxIdUnique(taxId, vendor.getId(), companyId);
             vendor.setTaxId(taxId);
         }
 
@@ -75,22 +79,24 @@ public class VendorService {
 
     @Transactional(readOnly = true)
     public VendorResponse get(Long id) {
-        return toResponse(getOrThrowActiveAndVisible(id));
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return toResponse(getOrThrowActiveAndVisible(id, companyId));
     }
 
     @Transactional(readOnly = true)
     public Page<VendorResponse> list(Pageable pageable, boolean includeInactive) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         List<VendorStatus> visible = List.of(VendorStatus.APPROVED, VendorStatus.PENDING);
         Page<Vendor> page = includeInactive
-                ? vendorRepository.findByStatusIn(visible, pageable)
-                : vendorRepository.findByActiveTrueAndStatusIn(visible, pageable);
+                ? vendorRepository.findByStatusInAndCompanyId(visible, companyId, pageable)
+                : vendorRepository.findByActiveTrueAndStatusInAndCompanyId(visible, companyId, pageable);
 
         return page.map(this::toResponse);
     }
 
     @Transactional
     public VendorResponse approve(Long id) {
-        Vendor vendor = getOrThrowActive(id);
+        Vendor vendor = getOrThrowActive(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (vendor.getStatus() != VendorStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor is already " + vendor.getStatus().name().toLowerCase());
         }
@@ -101,7 +107,7 @@ public class VendorService {
 
     @Transactional
     public VendorResponse reject(Long id, VendorRejectRequest req) {
-        Vendor vendor = getOrThrowActive(id);
+        Vendor vendor = getOrThrowActive(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (vendor.getStatus() != VendorStatus.PENDING) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Vendor is already " + vendor.getStatus().name().toLowerCase());
         }
@@ -115,20 +121,20 @@ public class VendorService {
      */
     @Transactional
     public void delete(Long id) {
-        Vendor vendor = getOrThrowActive(id);
+        Vendor vendor = getOrThrowActive(id, CompanyContextHolder.getCompanyId().orElse(null));
         vendor.setActive(false);
         vendorRepository.save(vendor);
     }
 
     // ---------------- Helpers ----------------
 
-    private Vendor getOrThrowActive(Long id) {
-        return vendorRepository.findByIdAndActiveTrue(id)
+    private Vendor getOrThrowActive(Long id, Long companyId) {
+        return vendorRepository.findByIdAndActiveTrueAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Vendor not found"));
     }
 
-    private Vendor getOrThrowActiveAndVisible(Long id) {
-        Vendor vendor = getOrThrowActive(id);
+    private Vendor getOrThrowActiveAndVisible(Long id, Long companyId) {
+        Vendor vendor = getOrThrowActive(id, companyId);
         if (vendor.getStatus() == VendorStatus.REJECTED) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Vendor not found or rejected");
         }
@@ -145,13 +151,13 @@ public class VendorService {
      * Determines vendor ID: uses provided ID if valid, otherwise generates a new one.
      * Validates that the provided ID is unique.
      */
-    private String determineVendorId(String providedVendorId) {
+    private String determineVendorId(String providedVendorId, Long companyId) {
         // If user provided a vendor ID
         if (providedVendorId != null && !providedVendorId.trim().isEmpty()) {
             String trimmedId = providedVendorId.trim();
             
             // Check if the provided vendor ID already exists
-            if (vendorRepository.existsByVendorId(trimmedId)) {
+            if (vendorRepository.existsByVendorIdAndCompanyId(trimmedId, companyId)) {
                 throw new ResponseStatusException(
                     HttpStatus.CONFLICT, 
                     "Vendor ID '" + trimmedId + "' already exists"
@@ -162,16 +168,16 @@ public class VendorService {
         }
         
         // Otherwise, generate a new unique vendor ID
-        return generateUniqueVendorId();
+        return generateUniqueVendorId(companyId);
     }
 
-    private String generateUniqueVendorId() {
+    private String generateUniqueVendorId(Long companyId) {
         String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE); // YYYYMMDD
 
         for (int attempt = 0; attempt < 30; attempt++) {
             int rand = ThreadLocalRandom.current().nextInt(0, 10000);
             String candidate = String.format("VND-%s-%04d", datePart, rand);
-            if (!vendorRepository.existsByVendorId(candidate)) {
+            if (!vendorRepository.existsByVendorIdAndCompanyId(candidate, companyId)) {
                 return candidate;
             }
         }
@@ -199,7 +205,7 @@ public class VendorService {
                 .build();
     }
 
-    private String normalizeAndEnsureUniqueTaxId(String taxId, Long currentId) {
+    private String normalizeAndEnsureUniqueTaxId(String taxId, Long currentId, Long companyId) {
         if (taxId == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId is required");
         }
@@ -207,12 +213,12 @@ public class VendorService {
         if (trimmed.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "taxId cannot be blank");
         }
-        ensureTaxIdUnique(trimmed, currentId);
+        ensureTaxIdUnique(trimmed, currentId, companyId);
         return trimmed;
     }
 
-    private void ensureTaxIdUnique(String taxId, Long currentId) {
-        vendorRepository.findByTaxIdIgnoreCase(taxId).ifPresent(existing -> {
+    private void ensureTaxIdUnique(String taxId, Long currentId, Long companyId) {
+        vendorRepository.findByTaxIdIgnoreCaseAndCompanyId(taxId, companyId).ifPresent(existing -> {
             if (currentId == null || !existing.getId().equals(currentId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Tax ID already exists");
             }

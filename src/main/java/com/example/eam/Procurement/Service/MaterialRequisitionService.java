@@ -1,5 +1,6 @@
 package com.example.eam.Procurement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.Procurement.Dto.*;
@@ -42,11 +43,13 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse create(CreateMaterialRequisitionRequest request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         validateLines(request.getLines());
-        ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
+        ShippingTarget shipping = resolveShippingTarget(companyId, request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
 
         String mrNumber = numberGeneratorService.generateMrNumber();
         MaterialRequisition mr = MaterialRequisition.builder()
+                .companyId(companyId)
                 .mrNumber(mrNumber)
                 .requestedByUserId(requireText(request.getRequestedByUserId(), "requestedByUserId is required"))
                 .neededByDate(request.getNeededByDate())
@@ -68,7 +71,8 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse update(Long id, UpdateMaterialRequisitionRequest request) {
-        MaterialRequisition mr = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        MaterialRequisition mr = getOrThrow(id, companyId);
         if (mr.getStatus() == MaterialRequisitionStatus.APPROVED
                 || mr.getStatus() == MaterialRequisitionStatus.REJECTED
                 || mr.getStatus() == MaterialRequisitionStatus.CANCELLED) {
@@ -88,7 +92,7 @@ public class MaterialRequisitionService {
             mr.setDepartment(trim(request.getDepartment()));
         }
         if (request.getShipToType() != null || request.getShipToWarehouseId() != null || request.getShipToWorkOrderId() != null) {
-            ShippingTarget shipping = resolveShippingTarget(request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
+            ShippingTarget shipping = resolveShippingTarget(companyId, request.getShipToType(), request.getShipToWarehouseId(), request.getShipToWorkOrderId());
             mr.setShipToType(shipping.type);
             mr.setShipToWarehouseId(shipping.warehouseId);
             mr.setShipToWorkOrderId(shipping.workOrderId);
@@ -108,7 +112,7 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse submit(Long id) {
-        MaterialRequisition mr = getOrThrow(id);
+        MaterialRequisition mr = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (mr.getLines() == null || mr.getLines().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Material Requisition requires at least one line");
         }
@@ -125,7 +129,7 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse approve(Long id, MrApprovalRequest request) {
-        MaterialRequisition mr = getOrThrow(id);
+        MaterialRequisition mr = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (mr.getStatus() != MaterialRequisitionStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED MRs can be approved");
         }
@@ -141,7 +145,7 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse reject(Long id, MrRejectionRequest request) {
-        MaterialRequisition mr = getOrThrow(id);
+        MaterialRequisition mr = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (mr.getStatus() != MaterialRequisitionStatus.SUBMITTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SUBMITTED MRs can be rejected");
         }
@@ -155,7 +159,7 @@ public class MaterialRequisitionService {
 
     @Transactional
     public MaterialRequisitionResponse cancel(Long id) {
-        MaterialRequisition mr = getOrThrow(id);
+        MaterialRequisition mr = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         if (mr.getStatus() == MaterialRequisitionStatus.APPROVED
                 || mr.getStatus() == MaterialRequisitionStatus.REJECTED) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Cannot cancel MR in status " + mr.getStatus());
@@ -170,13 +174,15 @@ public class MaterialRequisitionService {
 
     @Transactional(readOnly = true)
     public MaterialRequisitionResponse get(Long id) {
-        MaterialRequisition mr = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        MaterialRequisition mr = getOrThrow(id, companyId);
         return toResponse(mr, findLinkedPo(mr.getId()), true);
     }
 
     @Transactional(readOnly = true)
     public Page<MaterialRequisitionResponse> list(Pageable pageable) {
-        Page<MaterialRequisition> mrPage = mrRepository.findAll(pageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<MaterialRequisition> mrPage = mrRepository.findByCompanyId(companyId, pageable);
         Set<Long> mrIds = mrPage.getContent().stream()
                 .map(MaterialRequisition::getId)
                 .filter(Objects::nonNull)
@@ -184,7 +190,7 @@ public class MaterialRequisitionService {
 
         Map<Long, PurchaseOrder> poByMrId = mrIds.isEmpty()
                 ? Collections.emptyMap()
-                : poRepository.findByMrIdIn(mrIds).stream()
+                : poRepository.findByMrIdInAndCompanyId(mrIds, companyId).stream()
                 .filter(po -> po.getMrId() != null)
                 .collect(Collectors.toMap(
                         PurchaseOrder::getMrId,
@@ -201,9 +207,11 @@ public class MaterialRequisitionService {
         if (lines == null || lines.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one MR line is required");
         }
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         Set<Long> itemIds = lines.stream().map(MaterialRequisitionLineRequest::getItemId).collect(Collectors.toSet());
         Map<Long, InventoryItem> itemsById = inventoryItemRepository.findAllById(itemIds).stream()
                 .filter(item -> !item.isDeleted())
+                .filter(item -> companyId == null || companyId.equals(item.getCompanyId()))
                 .collect(Collectors.toMap(InventoryItem::getId, Function.identity()));
 
         for (MaterialRequisitionLineRequest line : lines) {
@@ -221,7 +229,8 @@ public class MaterialRequisitionService {
     }
 
     private MaterialRequisitionLine buildLine(MaterialRequisition mr, MaterialRequisitionLineRequest request) {
-        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(request.getItemId())
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(request.getItemId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item not found: " + request.getItemId()));
 
         BigDecimal qty = request.getRequestedQty().setScale(4, RoundingMode.HALF_UP);
@@ -240,8 +249,8 @@ public class MaterialRequisitionService {
                 .build();
     }
 
-    private MaterialRequisition getOrThrow(Long id) {
-        return mrRepository.findById(id)
+    private MaterialRequisition getOrThrow(Long id, Long companyId) {
+        return mrRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Material Requisition not found"));
     }
 
@@ -264,6 +273,10 @@ public class MaterialRequisitionService {
                 ? Collections.emptyMap()
                 : inventoryItemRepository.findAllById(itemIds).stream()
                 .filter(item -> !item.isDeleted())
+                .filter(item -> {
+                    Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+                    return companyId == null || companyId.equals(item.getCompanyId());
+                })
                 .collect(Collectors.toMap(InventoryItem::getId, InventoryItem::getCostPerUnit));
 
         List<MaterialRequisitionLineResponse> lines = mrLines.stream()
@@ -286,7 +299,8 @@ public class MaterialRequisitionService {
             linkedPoNumber = linkedPo.getPoNumber();
         }
         if (includeLinkedGrns && linkedPo != null) {
-            linkedGrns = grnRepository.findByPoId(linkedPo.getId()).stream()
+            Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+            linkedGrns = grnRepository.findByPoIdAndCompanyId(linkedPo.getId(), companyId).stream()
                     .map(grn -> MaterialRequisitionLinkedGrnResponse.builder()
                             .id(grn.getId())
                             .grnNumber(grn.getGrnNumber())
@@ -321,7 +335,8 @@ public class MaterialRequisitionService {
 
     private PurchaseOrder findLinkedPo(Long mrId) {
         if (mrId == null) return null;
-        return poRepository.findByMrId(mrId).stream().findFirst().orElse(null);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return poRepository.findByMrIdAndCompanyId(mrId, companyId).stream().findFirst().orElse(null);
     }
 
     private String trim(String value) {
@@ -338,7 +353,7 @@ public class MaterialRequisitionService {
         return trimmed;
     }
 
-    private ShippingTarget resolveShippingTarget(String shipToTypeRaw, Long warehouseId, Long workOrderId) {
+    private ShippingTarget resolveShippingTarget(Long companyId, String shipToTypeRaw, Long warehouseId, Long workOrderId) {
         if (shipToTypeRaw == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "shipToType is required (WAREHOUSE or WORK_SITE)");
         }
@@ -356,7 +371,7 @@ public class MaterialRequisitionService {
             if (warehouseId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "warehouseId is required when shipToType=WAREHOUSE");
             }
-            var warehouse = warehouseRepository.findById(warehouseId)
+            var warehouse = warehouseRepository.findByIdAndDeletedFalseAndCompanyId(warehouseId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse not found"));
             if (!warehouse.isActive()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Warehouse is inactive");
@@ -366,7 +381,7 @@ public class MaterialRequisitionService {
             if (workOrderId == null) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "workOrderId is required when shipToType=WORK_SITE");
             }
-            workOrderRepository.findByIdAndDeletedFalse(workOrderId)
+            workOrderRepository.findByIdAndDeletedFalseAndCompanyId(workOrderId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order not found"));
             resolvedWorkOrderId = workOrderId;
         }

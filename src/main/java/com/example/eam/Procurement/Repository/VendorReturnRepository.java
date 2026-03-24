@@ -11,12 +11,14 @@ public interface VendorReturnRepository extends JpaRepository<VendorReturn, Long
 
     @Query("""
         select r from VendorReturn r
-        where (:grnId is null or r.grnId = :grnId)
+        where r.companyId = :companyId
+          and (:grnId is null or r.grnId = :grnId)
           and (:vendorId is null or r.vendorId = :vendorId)
           and (:itemId is null or r.itemId = :itemId)
         order by r.id desc
     """)
-    List<VendorReturn> findByFilters(@Param("grnId") Long grnId,
+    List<VendorReturn> findByFilters(@Param("companyId") Long companyId,
+                                     @Param("grnId") Long grnId,
                                      @Param("vendorId") Long vendorId,
                                      @Param("itemId") Long itemId);
 }

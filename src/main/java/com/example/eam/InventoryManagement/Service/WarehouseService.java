@@ -1,5 +1,6 @@
 package com.example.eam.InventoryManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.InventoryManagement.Dto.WarehouseCreateRequest;
 import com.example.eam.InventoryManagement.Dto.WarehousePatchRequest;
 import com.example.eam.InventoryManagement.Dto.WarehouseResponse;
@@ -21,12 +22,14 @@ public class WarehouseService {
 
     @Transactional
     public WarehouseResponse create(WarehouseCreateRequest dto) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         String name = normalizeName(dto.getName());
-        if (warehouseRepo.existsByNameIgnoreCaseAndDeletedFalse(name)) {
+        if (warehouseRepo.existsByNameIgnoreCaseAndDeletedFalseAndCompanyId(name, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Warehouse name already exists");
         }
 
         Warehouse warehouse = Warehouse.builder()
+                .companyId(companyId)
                 .name(name)
                 .address(trimToNull(dto.getAddress()))
                 .zoneAisle(trimToNull(dto.getZoneAisle()))
@@ -42,11 +45,12 @@ public class WarehouseService {
 
     @Transactional
     public WarehouseResponse patch(Long id, WarehousePatchRequest dto) {
-        Warehouse warehouse = getOrThrow(id);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Warehouse warehouse = getOrThrow(id, companyId);
 
         if (dto.getName() != null) {
             String name = normalizeName(dto.getName());
-            warehouseRepo.findByNameIgnoreCaseAndDeletedFalse(name).ifPresent(existing -> {
+            warehouseRepo.findByNameIgnoreCaseAndDeletedFalseAndCompanyId(name, companyId).ifPresent(existing -> {
                 if (!existing.getId().equals(warehouse.getId())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Warehouse name already exists");
                 }
@@ -80,12 +84,13 @@ public class WarehouseService {
 
     @Transactional(readOnly = true)
     public WarehouseResponse get(Long id) {
-        return toResponse(getOrThrow(id));
+        return toResponse(getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null)));
     }
 
     @Transactional(readOnly = true)
     public List<WarehouseResponse> listActive() {
-        return warehouseRepo.findByActiveTrueAndDeletedFalse()
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return warehouseRepo.findByActiveTrueAndDeletedFalseAndCompanyId(companyId)
                 .stream()
                 .map(this::toResponse)
                 .toList();
@@ -93,13 +98,26 @@ public class WarehouseService {
 
     @Transactional
     public void delete(Long id) {
-        Warehouse warehouse = getOrThrow(id);
+        Warehouse warehouse = getOrThrow(id, CompanyContextHolder.getCompanyId().orElse(null));
         warehouse.setActive(false);
         warehouse.setDeleted(true);
         warehouseRepo.save(warehouse);
     }
 
     // -------- helpers ----------
+    private Warehouse getOrThrow(Long id, Long companyId) {
+        Warehouse warehouse = companyId != null
+                ? warehouseRepo.findByIdAndDeletedFalseAndCompanyId(id, companyId).orElse(null)
+                : warehouseRepo.findById(id).orElse(null);
+        if (warehouse == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found");
+        }
+        if (warehouse.isDeleted()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found");
+        }
+        return warehouse;
+    }
+
     private Warehouse getOrThrow(Long id) {
         Warehouse warehouse = warehouseRepo.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Warehouse not found"));

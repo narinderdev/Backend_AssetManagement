@@ -28,6 +28,9 @@ public class InventoryReconciliation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // Reconciliation ID
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "warehouse_id", nullable = false)
     private Warehouse warehouse;

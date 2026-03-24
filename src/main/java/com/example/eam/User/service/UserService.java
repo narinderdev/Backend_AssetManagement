@@ -6,7 +6,9 @@ import org.springframework.web.server.ResponseStatusException;
 
 import com.example.eam.CompanyManagement.Entity.Company;
 import com.example.eam.CompanyManagement.Repository.CompanyRepository;
+import com.example.eam.Roles.Entity.AppPermission;
 import com.example.eam.Roles.Entity.Role;
+import com.example.eam.Roles.Repository.AppPermissionRepository;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.ChangePasswordDto;
 import com.example.eam.User.dto.ForgotPasswordDto;
@@ -20,6 +22,7 @@ import com.example.eam.User.repository.UserCompanyRepository;
 import com.example.eam.User.repository.UserRoleRepository;
 import com.example.eam.User.repository.UsersRepository;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 
 import com.example.eam.Enum.SecurityEventCategory;
 import com.example.eam.Enum.SecurityEventResult;
@@ -42,6 +45,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class UserService {
     private final UsersRepository usersRepository;
     private final RoleRepository roleRepository;
+    private final AppPermissionRepository appPermissionRepository;
     private final UserRoleRepository userRoleRepository;
     private final UserCompanyRepository userCompanyRepository;
     private final CompanyRepository companyRepository;
@@ -50,7 +54,10 @@ public class UserService {
 
 
     //create user
-        public Users register(UserCreateDto dto) {
+        public Users register(UserCreateDto dto, Long companyId) {
+            Long resolvedCompanyId = resolveActiveCompanyId(companyId);
+            ensureCurrentUserCanAccessCompany(resolvedCompanyId);
+
             // Destructure the DTO (Java-style)
             String firstName = dto.getFirstName();
             String lastName = dto.getLastName();
@@ -64,14 +71,14 @@ public class UserService {
             }
 
             // Enforce single Admin assignment
-            long adminCount = userRoleRepository.countByRole_NameIgnoreCaseAndUser_DeletedFalse("Admin");
+            long adminCount = userRoleRepository
+                    .countByRoleNameIgnoreCaseAndCompanyIdAndUserDeletedFalse("Admin", resolvedCompanyId);
             if (adminCount > 0) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Admin role is already assigned to another user");
             }
 
             // Assign Admin role to the new user
-            Role ownerRole = roleRepository.findByNameIgnoreCase("Admin")
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Admin role not found"));
+            Role ownerRole = resolveOrSeedCompanyAdminRole(resolvedCompanyId);
 
             // Create the user object and assign the role
             Users newUser = new Users();
@@ -97,7 +104,11 @@ public class UserService {
             // Save the UserRole to establish the relationship between the user and the role
             userRoleRepository.save(userRole);
 
-            syncUserCompanies(savedUser, dto.getCompanyIds());
+            if (dto.getCompanyIds() != null && !dto.getCompanyIds().isEmpty()
+                    && !new HashSet<>(dto.getCompanyIds()).contains(resolvedCompanyId)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "User must be mapped to the selected company");
+            }
+            syncUserCompanies(savedUser, List.of(resolvedCompanyId));
 
             logEvent(SecurityEventType.USER_CREATED, savedUser, "Admin user created");
             return savedUser;
@@ -153,8 +164,11 @@ public class UserService {
         }
 
         @Transactional(readOnly = true)
-        public java.util.List<UserSummaryDto> listUsers() {
-            return usersRepository.findAllActiveWithRoles()
+        public java.util.List<UserSummaryDto> listUsers(Long companyId) {
+            Long resolvedCompanyId = resolveActiveCompanyId(companyId);
+            ensureCurrentUserCanAccessCompany(resolvedCompanyId);
+
+            return usersRepository.findAllActiveWithRolesByCompanyId(resolvedCompanyId)
                     .stream()
                     .map(this::toSummary)
                     .toList();
@@ -226,6 +240,66 @@ public class UserService {
                 }
             } catch (Exception ignored) { }
             return "system";
+        }
+
+        private Long resolveActiveCompanyId(Long companyId) {
+            if (companyId == null || companyId <= 0) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId query parameter is required");
+            }
+            companyRepository.findById(companyId)
+                    .filter(Company::isActive)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
+            return companyId;
+        }
+
+        private void ensureCurrentUserCanAccessCompany(Long companyId) {
+            String currentEmail = resolveCurrentUserEmail();
+            if (currentEmail == null) {
+                return;
+            }
+            boolean allowed = userCompanyRepository.existsActiveMapping(currentEmail, companyId);
+            if (!allowed) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not assigned to this company");
+            }
+        }
+
+        private String resolveCurrentUserEmail() {
+            try {
+                Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+                if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+                    return null;
+                }
+                Object principal = auth.getPrincipal();
+                if (principal == null) {
+                    return null;
+                }
+                String email = String.valueOf(principal).trim();
+                return email.isBlank() ? null : email;
+            } catch (Exception ignored) {
+                return null;
+            }
+        }
+
+        private Role resolveOrSeedCompanyAdminRole(Long companyId) {
+            Role existing = roleRepository.findFirstByNameIgnoreCaseAndCompanyIdOrderByIdAsc("Admin", companyId)
+                    .orElse(null);
+            if (existing != null) {
+                if (!existing.isActive()) {
+                    existing.setActive(true);
+                    return roleRepository.save(existing);
+                }
+                return existing;
+            }
+
+            java.util.List<AppPermission> permissions = appPermissionRepository.findByActiveTrueOrderByModuleAscSortOrderAsc();
+            Role seeded = Role.builder()
+                    .companyId(companyId)
+                    .name("Admin")
+                    .description("Full access")
+                    .active(true)
+                    .permissions(new java.util.HashSet<>(permissions))
+                    .build();
+            return roleRepository.save(seeded);
         }
 
 }

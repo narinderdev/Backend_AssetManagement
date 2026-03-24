@@ -1,5 +1,6 @@
 package com.example.eam.Procurement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.InventoryReferenceType;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
@@ -44,6 +45,7 @@ public class VendorReturnService {
 
     @Transactional
     private VendorReturnResponse recordReturnForGrnLine(GoodsReceiptNoteLine line, GoodsReceiptNote grn) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         BigDecimal returnQty = line.getReturnQty();
         if (returnQty == null || returnQty.compareTo(BigDecimal.ZERO) <= 0) {
             return null;
@@ -55,7 +57,7 @@ public class VendorReturnService {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Return exceeds received quantity");
         }
 
-        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(line.getItemId())
+        InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(line.getItemId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Inventory item not found for GRN line"));
 
         int deltaUnits = toWholeUnits(returnQty);
@@ -74,6 +76,7 @@ public class VendorReturnService {
         inventoryItemRepository.save(item);
 
         VendorReturn saved = vendorReturnRepository.save(VendorReturn.builder()
+                .companyId(companyId)
                 .grnId(grn.getId())
                 .grnLineId(line.getId())
                 .poId(grn.getPoId())
@@ -104,7 +107,8 @@ public class VendorReturnService {
 
     @Transactional(readOnly = true)
     public List<VendorReturnResponse> list(Long grnId, Long vendorId, Long itemId) {
-        List<VendorReturn> returns = vendorReturnRepository.findByFilters(grnId, vendorId, itemId);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        List<VendorReturn> returns = vendorReturnRepository.findByFilters(companyId, grnId, vendorId, itemId);
         if (returns.isEmpty()) return List.of();
 
         Map<Long, GoodsReceiptNoteLine> linesById = grnLineRepository.findAllById(
@@ -115,6 +119,7 @@ public class VendorReturnService {
         Map<Long, InventoryItem> itemsById = inventoryItemRepository.findAllById(
                         returns.stream().map(VendorReturn::getItemId).collect(Collectors.toSet()))
                 .stream()
+                .filter(item -> companyId == null || companyId.equals(item.getCompanyId()))
                 .collect(Collectors.toMap(InventoryItem::getId, i -> i));
 
         List<VendorReturnResponse> responses = new ArrayList<>(returns.size());

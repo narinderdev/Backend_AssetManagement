@@ -98,10 +98,21 @@ public class InvitationService {
                             HttpStatus.NOT_FOUND, "Role not found: " + roleId
                     ));
 
-            if ("admin".equalsIgnoreCase(role.getName())) {
-                long adminCount = userRoleRepository.countByRole_NameIgnoreCaseAndUser_IdNotAndUser_DeletedFalse(
-                        "Admin", saved.getId()
+            if (role.getCompanyId() != null
+                    && request.getCompanyIds() != null
+                    && !request.getCompanyIds().isEmpty()
+                    && !request.getCompanyIds().contains(role.getCompanyId())) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "Role " + roleId + " does not belong to selected company mapping"
                 );
+            }
+
+            if ("admin".equalsIgnoreCase(role.getName())) {
+                long adminCount = role.getCompanyId() != null
+                        ? userRoleRepository.countByRoleNameIgnoreCaseAndCompanyIdAndUserIdNotAndUserDeletedFalse(
+                                "Admin", role.getCompanyId(), saved.getId())
+                        : userRoleRepository.countByRole_NameIgnoreCaseAndUser_IdNotAndUser_DeletedFalse("Admin", saved.getId());
                 if (adminCount > 0) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Admin role is already assigned to another user");
                 }

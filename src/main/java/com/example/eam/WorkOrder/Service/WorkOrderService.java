@@ -42,6 +42,7 @@ import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderPauseLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Common.NotificationService;
 import com.example.eam.WorkOrder.Dto.WorkOrderTeamMemberResponse;
 import com.example.eam.WorkOrder.Repository.WorkOrderTypeTemplateRepository;
@@ -128,11 +129,16 @@ private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIO
 
     @Transactional
     public WorkOrderDetailsResponse createWorkOrder(WorkOrderCreateRequest request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
 
         Asset asset = null;
         if (request.getAssetId() != null) {
-            asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
+            asset = companyId != null
+                    ? assetRepository.findByIdAndCompanyId(request.getAssetId(), companyId).orElse(null)
+                    : assetRepository.findById(request.getAssetId()).orElse(null);
+            if (asset == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found");
+            }
         }
 
         String location = resolveLocation(asset, request.getLocation());
@@ -151,8 +157,12 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
 
         WorkOrderTypeTemplate woType = null;
         if (request.getWorkOrderTypeId() != null) {
-            woType = workOrderTypeTemplateRepository.findById(request.getWorkOrderTypeId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order type not found"));
+            woType = companyId != null
+                    ? workOrderTypeTemplateRepository.findByIdAndCompanyId(request.getWorkOrderTypeId(), companyId).orElse(null)
+                    : workOrderTypeTemplateRepository.findById(request.getWorkOrderTypeId()).orElse(null);
+            if (woType == null) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order type not found");
+            }
             if (!woType.isActive()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Work order type is inactive");
             }
@@ -165,6 +175,7 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
 
         WorkOrder wo = WorkOrder.builder()
                 .workOrderId(generateUniqueWorkOrderId())
+                .companyId(companyId)
                 .linkedRequest(null)
                 .asset(asset)
                 .workRequestType(workRequestType)
@@ -209,9 +220,14 @@ WorkOrderStatus status = WorkOrderStatus.NEW;
 public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceRequestDbId) {
     try {
         log.info("Starting conversion of Service Request ID: {}", serviceRequestDbId);
-        
-        ServiceMaintenance sr = serviceMaintenanceRepository.findByIdAndDeletedFalse(serviceRequestDbId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Service Request not found"));
+
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        ServiceMaintenance sr = companyId != null
+                ? serviceMaintenanceRepository.findByIdAndDeletedFalseAndCompanyId(serviceRequestDbId, companyId).orElse(null)
+                : serviceMaintenanceRepository.findByIdAndDeletedFalse(serviceRequestDbId).orElse(null);
+        if (sr == null) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Service Request not found");
+        }
 
         log.info("Found Service Request: {}, Status: {}", sr.getRequestId(), sr.getStatus());
 
@@ -223,9 +239,15 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         if (sr.getStatus() == ServiceRequestStatus.CONVERTED_TO_WO) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Service Request is already converted to Work Order");
         }
-        workOrderRepository.findByLinkedRequest_Id(serviceRequestDbId).ifPresent(existing -> {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order already exists for this Service Request");
-        });
+        if (companyId != null) {
+            workOrderRepository.findByLinkedRequest_IdAndCompanyId(serviceRequestDbId, companyId).ifPresent(existing -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order already exists for this Service Request");
+            });
+        } else {
+            workOrderRepository.findByLinkedRequest_Id(serviceRequestDbId).ifPresent(existing -> {
+                throw new ResponseStatusException(HttpStatus.CONFLICT, "Work Order already exists for this Service Request");
+            });
+        }
 
         Asset asset = sr.getAsset();
         log.info("Asset: {}", asset != null ? asset.getAssetId() : "null");
@@ -262,6 +284,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         WorkOrder wo = WorkOrder.builder()
         .workOrderId(generatedWoId)
+        .companyId(companyId != null ? companyId : sr.getCompanyId())
         .linkedRequest(sr)
         .asset(asset)
         .workRequestType(workRequestType)
@@ -332,8 +355,13 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         // asset update
         if (request.getAssetId() != null) {
-            Asset asset = assetRepository.findById(request.getAssetId())
-                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
+            Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+            Asset asset = companyId != null
+                    ? assetRepository.findByIdAndCompanyId(request.getAssetId(), companyId).orElse(null)
+                    : assetRepository.findById(request.getAssetId()).orElse(null);
+            if (asset == null) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found");
+            }
             wo.setAsset(asset);
 
             // if caller did not send location, recalc location from asset
@@ -592,8 +620,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId is required");
         }
 
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         Page<WorkOrder> page = workOrderRepository.findByTechnicianOrTeamMember(
                 technicianId,
+                companyId,
                 pageable
         );
 
@@ -1186,7 +1216,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     Sort.by("plannedEndDateTime").ascending().and(Sort.by("id").ascending())
             );
         }
-        Page<WorkOrder> page = workOrderRepository.findByDeletedFalse(effectivePageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<WorkOrder> page = companyId != null
+                ? workOrderRepository.findByDeletedFalseAndCompanyId(companyId, effectivePageable)
+                : workOrderRepository.findByDeletedFalse(effectivePageable);
         List<WorkOrderDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
@@ -1214,7 +1247,10 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     Sort.by("plannedEndDateTime").ascending().and(Sort.by("id").ascending())
             );
         }
-        Page<WorkOrder> page = workOrderRepository.findByDeletedFalseAndStatusIn(statuses, effectivePageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<WorkOrder> page = companyId != null
+                ? workOrderRepository.findByDeletedFalseAndStatusInAndCompanyId(statuses, companyId, effectivePageable)
+                : workOrderRepository.findByDeletedFalseAndStatusIn(statuses, effectivePageable);
         List<WorkOrderDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
@@ -1244,6 +1280,11 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     // ---------------- Helpers ----------------
 
     private WorkOrder getWorkOrderOrThrow(Long id) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        if (companyId != null) {
+            return workOrderRepository.findByIdAndDeletedFalseAndCompanyId(id, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work Order not found"));
+        }
         return workOrderRepository.findByIdAndDeletedFalse(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Work Order not found"));
     }
@@ -1289,9 +1330,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         dto.setUtilityAccount(trim(utility));
 
         AssetDetailsResponse created = assetService.createAsset(dto);
-        Asset asset = assetRepository.findById(created.getId())
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load auto-created asset"));
+        Asset asset = wo.getCompanyId() != null
+                ? assetRepository.findByIdAndCompanyId(created.getId(), wo.getCompanyId()).orElse(null)
+                : assetRepository.findById(created.getId()).orElse(null);
+        if (asset == null) {
+            throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Failed to load auto-created asset");
+        }
 
         if (!isBlank(wo.getLocation())) {
             AssetLocation loc = AssetLocation.builder()
@@ -1633,6 +1677,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     private Technician resolveTechnician(Long technicianId) {
         if (technicianId == null) return null;
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        if (companyId != null) {
+            return technicianRepository.findByIdAndIsDeletedFalseAndCompanyId(technicianId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Technician not found: " + technicianId));
+        }
         return technicianRepository.findByIdAndIsDeletedFalse(technicianId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Technician not found: " + technicianId));
@@ -1640,6 +1690,12 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
     private TechnicianTeam resolveTeam(Long teamId) {
         if (teamId == null) return null;
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        if (companyId != null) {
+            return technicianTeamRepository.findByIdAndCompanyId(teamId, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
+                            "Technician team not found: " + teamId));
+        }
         return technicianTeamRepository.findById(teamId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND,
                         "Technician team not found: " + teamId));
@@ -1850,6 +1906,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         List<WorkOrder> bookings = workOrderRepository.findBookingsForAssignments(
                 technicianId,
                 teamId,
+                CompanyContextHolder.getCompanyId().orElse(null),
                 rangeStart,
                 rangeEnd,
                 Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
@@ -1924,6 +1981,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         List<WorkOrder> bookings = workOrderRepository.findBookingsForAssignments(
                 technicianId,
                 teamId,
+                CompanyContextHolder.getCompanyId().orElse(null),
                 rangeStart,
                 rangeEnd,
                 Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
@@ -2267,6 +2325,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         return WorkOrderDetailsResponse.builder()
                 .id(wo.getId())
+                .companyId(wo.getCompanyId())
                 .workOrderNumber(wo.getWoNumber())
                 .workOrderId(wo.getWorkOrderId())
                 .linkedServiceRequestDbId(sr != null ? sr.getId() : null)

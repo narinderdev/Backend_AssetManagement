@@ -10,24 +10,32 @@ import java.util.Optional;
 public interface TechnicianRepository extends JpaRepository<Technician, Long> {
 
     Optional<Technician> findByIdAndIsDeletedFalse(Long id);
+    Optional<Technician> findByIdAndIsDeletedFalseAndCompanyId(Long id, Long companyId);
 
     Page<Technician> findByIsDeletedFalse(Pageable pageable);
+    Page<Technician> findByIsDeletedFalseAndCompanyId(Long companyId, Pageable pageable);
 
     boolean existsByEmailIgnoreCaseAndIsDeletedFalse(String email);
+    boolean existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(String email, Long companyId);
 
     Optional<Technician> findByEmailIgnoreCaseAndIsDeletedFalse(String email);
+    Optional<Technician> findByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(String email, Long companyId);
 
     boolean existsByBadgeNumberIgnoreCaseAndIsDeletedFalse(String badgeNumber);
+    boolean existsByBadgeNumberIgnoreCaseAndIsDeletedFalseAndCompanyId(String badgeNumber, Long companyId);
 
     boolean existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
+    boolean existsByTechnicianIdIgnoreCaseAndIsDeletedFalseAndCompanyId(String technicianId, Long companyId);
 
     Optional<Technician> findByTechnicianIdIgnoreCaseAndIsDeletedFalse(String technicianId);
+    Optional<Technician> findByTechnicianIdIgnoreCaseAndIsDeletedFalseAndCompanyId(String technicianId, Long companyId);
 
     Optional<Technician> findFirstByTechnicianIdIgnoreCase(String technicianId);
 
     Optional<Technician> findFirstByEmailIgnoreCase(String email);
 
     List<Technician> findByIdInAndIsDeletedFalse(Iterable<Long> ids);
+    List<Technician> findByIdInAndIsDeletedFalseAndCompanyId(Iterable<Long> ids, Long companyId);
 
     /**
      * Backward-compatible helpers used in older code/tests. They delegate to the

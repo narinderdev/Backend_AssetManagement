@@ -1,5 +1,6 @@
 package com.example.eam.Roles.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Roles.Dto.RoleCreateRequest;
 import com.example.eam.Roles.Dto.RolePatchRequest;
 import com.example.eam.Roles.Dto.RoleResponse;
@@ -39,15 +40,17 @@ public class RoleService {
 
     @Transactional
     public RoleResponse create(RoleCreateRequest req) {
+        Long companyId = requireCompanyId();
         String name = req.getName().trim();
 
-        if (roleRepository.existsByNameIgnoreCase(name)) {
+        if (roleRepository.existsByNameIgnoreCaseAndCompanyId(name, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Role name already exists: " + name);
         }
 
         Set<AppPermission> permissions = resolvePermissions(req.getPermissionCodes());
 
         Role role = Role.builder()
+                .companyId(companyId)
                 .name(name)
                 .description(req.getDescription())
                 .active(true)
@@ -62,12 +65,14 @@ public class RoleService {
 
     @Transactional
     public RoleResponse patch(Long id, RolePatchRequest req) {
-        Role role = roleRepository.findByIdAndActiveTrue(id)
+        Long companyId = requireCompanyId();
+        Role role = roleRepository.findByIdAndActiveTrueAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found"));
 
         if (req.getName() != null && !req.getName().trim().isEmpty()) {
             String newName = req.getName().trim();
-            if (!newName.equalsIgnoreCase(role.getName()) && roleRepository.existsByNameIgnoreCase(newName)) {
+            if (!newName.equalsIgnoreCase(role.getName())
+                    && roleRepository.existsByNameIgnoreCaseAndCompanyId(newName, companyId)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Role name already exists: " + newName);
             }
             role.setName(newName);
@@ -101,23 +106,31 @@ public class RoleService {
 
     @Transactional(readOnly = true)
     public RoleResponse get(Long id) {
-        Role role = roleRepository.findByIdAndActiveTrue(id)
+        Long companyId = requireCompanyId();
+        Role role = roleRepository.findByIdAndActiveTrueAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found"));
         return toResponse(role);
     }
 
     @Transactional(readOnly = true)
     public Page<RoleResponse> list(Pageable pageable) {
-        return roleRepository.findByActiveTrue(pageable).map(this::toResponse);
+        Long companyId = requireCompanyId();
+        return roleRepository.findByActiveTrueAndCompanyId(companyId, pageable).map(this::toResponse);
     }
 
     @Transactional
     public void delete(Long id) {
-        Role role = roleRepository.findByIdAndActiveTrue(id)
+        Long companyId = requireCompanyId();
+        Role role = roleRepository.findByIdAndActiveTrueAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Role not found"));
         role.setActive(false);
         roleRepository.save(role);
         logEvent(SecurityEventType.ROLE_UPDATED, role, role.getPermissions(), Set.of(), "Role deactivated");
+    }
+
+    private Long requireCompanyId() {
+        return CompanyContextHolder.getCompanyId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId query parameter is required"));
     }
 
     private Set<AppPermission> resolvePermissions(Set<String> codes) {

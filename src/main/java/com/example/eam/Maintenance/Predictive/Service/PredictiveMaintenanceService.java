@@ -2,6 +2,7 @@ package com.example.eam.Maintenance.Predictive.Service;
 
 import com.example.eam.Asset.Entity.Asset;
 import com.example.eam.Asset.Repository.AssetRepository;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.MeterType;
 import com.example.eam.Enum.PriorityLevel;
 import com.example.eam.Enum.WorkOrderSource;
@@ -51,10 +52,11 @@ public class PredictiveMaintenanceService {
 
     @Transactional
     public AssetThresholdResponse createThreshold(@Valid AssetThresholdRequest req) {
-        Asset asset = assetRepository.findById(req.getAssetId())
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Asset asset = assetRepository.findByIdAndCompanyId(req.getAssetId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        thresholdRepository.findByAsset_Id(req.getAssetId())
+        thresholdRepository.findByAsset_IdAndAsset_CompanyId(req.getAssetId(), companyId)
                 .ifPresent(existing -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
                 });
@@ -79,13 +81,14 @@ public class PredictiveMaintenanceService {
 
     @Transactional
     public AssetThresholdResponse updateThreshold(Long id, @Valid AssetThresholdRequest req) {
-        AssetThreshold threshold = thresholdRepository.findById(id)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        AssetThreshold threshold = thresholdRepository.findByIdAndAsset_CompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
 
-        Asset asset = assetRepository.findById(req.getAssetId())
+        Asset asset = assetRepository.findByIdAndCompanyId(req.getAssetId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        thresholdRepository.findByAsset_Id(req.getAssetId())
+        thresholdRepository.findByAsset_IdAndAsset_CompanyId(req.getAssetId(), companyId)
                 .filter(existing -> !existing.getId().equals(id))
                 .ifPresent(existing -> {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Predictive threshold already exists for this asset");
@@ -109,7 +112,8 @@ public class PredictiveMaintenanceService {
 
     @Transactional(readOnly = true)
     public AssetThresholdResponse getThreshold(Long id) {
-        AssetThreshold threshold = thresholdRepository.findById(id)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        AssetThreshold threshold = thresholdRepository.findByIdAndAsset_CompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
         List<PredictiveMeterReading> readings = meterReadingRepository.findByThreshold_Id(threshold.getId());
         return toResponse(threshold, readings);
@@ -117,7 +121,8 @@ public class PredictiveMaintenanceService {
 
     @Transactional(readOnly = true)
     public AssetThresholdListResponse listThresholds(Pageable pageable) {
-        Page<AssetThreshold> page = thresholdRepository.findAll(pageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<AssetThreshold> page = thresholdRepository.findByAsset_CompanyId(companyId, pageable);
         List<Long> ids = page.getContent().stream().map(AssetThreshold::getId).toList();
         Map<Long, List<PredictiveMeterReading>> readingsByThreshold = meterReadingRepository.findByThreshold_IdIn(ids).stream()
                 .collect(Collectors.groupingBy(reading -> reading.getThreshold().getId()));
@@ -138,7 +143,8 @@ public class PredictiveMaintenanceService {
 
     @Transactional
     public void deleteThreshold(Long id) {
-        AssetThreshold threshold = thresholdRepository.findById(id)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        AssetThreshold threshold = thresholdRepository.findByIdAndAsset_CompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Threshold not found"));
         meterReadingRepository.deleteByThreshold_Id(threshold.getId());
         thresholdRepository.delete(threshold);
@@ -146,10 +152,11 @@ public class PredictiveMaintenanceService {
 
     @Transactional
     public void recordMeterReading(@Valid MeterReadingRequest req) {
-        Asset asset = assetRepository.findById(req.getAssetId())
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Asset asset = assetRepository.findByIdAndCompanyId(req.getAssetId(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Asset not found"));
 
-        AssetThreshold threshold = thresholdRepository.findByAsset_IdAndMeterType(req.getAssetId(), req.getMeterType())
+        AssetThreshold threshold = thresholdRepository.findByAsset_IdAndMeterTypeAndAsset_CompanyId(req.getAssetId(), req.getMeterType(), companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "No threshold configured for this meter type"));
 
         double value = req.getReadingValue();
@@ -198,6 +205,7 @@ public class PredictiveMaintenanceService {
           WorkRequestType workRequestType = workRequestTypeService.getOrCreateDefaultExpenseType();
           WorkOrder wo = WorkOrder.builder()
                   .workOrderId(generateUniqueWorkOrderId())
+                  .companyId(asset.getCompanyId())
                   .pmPlan(null)
                   .pmDueDate(null)
                   .asset(asset)

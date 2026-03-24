@@ -1,5 +1,6 @@
 package com.example.eam.TechnicianTeam.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.TechnicianTeamStatus;
 import com.example.eam.Technician.Dto.TechnicianDetailsResponse;
 import com.example.eam.Technician.Dto.TechnicianTeamMembershipResponse;
@@ -37,13 +38,15 @@ public class TechnicianTeamService {
 
     @Transactional
     public TechnicianTeamDetailsResponse createTeam(TechnicianTeamCreateRequest request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         String name = request.getTeamName().trim();
-        if (technicianTeamRepository.existsByTeamNameIgnoreCase(name)) {
+        if (technicianTeamRepository.existsByTeamNameIgnoreCaseAndCompanyId(name, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician team with the same name already exists");
         }
         TechnicianTeamStatus status = request.getStatus() != null ? request.getStatus() : TechnicianTeamStatus.ACTIVE;
 
         TechnicianTeam team = TechnicianTeam.builder()
+                .companyId(companyId)
                 .teamName(name)
                 .teamDescription(request.getTeamDescription())
                 .status(status)
@@ -66,7 +69,8 @@ public class TechnicianTeamService {
 
     @Transactional(readOnly = true)
     public TechnicianTeamListResponse listTeams(Pageable pageable) {
-        Page<TechnicianTeam> page = technicianTeamRepository.findAll(pageable);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<TechnicianTeam> page = technicianTeamRepository.findByCompanyId(companyId, pageable);
         List<TechnicianTeamDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
@@ -90,7 +94,11 @@ public class TechnicianTeamService {
             if (name.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team name cannot be blank");
             }
-            if (technicianTeamRepository.existsByTeamNameIgnoreCaseAndIdNot(name, id)) {
+            if (technicianTeamRepository.existsByTeamNameIgnoreCaseAndCompanyIdAndIdNot(
+                    name,
+                    CompanyContextHolder.getCompanyId().orElse(null),
+                    id
+            )) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician team with the same name already exists");
             }
             team.setTeamName(name);
@@ -160,7 +168,8 @@ public class TechnicianTeamService {
             return;
         }
 
-        List<Technician> requestedTechnicians = technicianRepository.findByIdInAndIsDeletedFalse(desiredIds);
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        List<Technician> requestedTechnicians = technicianRepository.findByIdInAndIsDeletedFalseAndCompanyId(desiredIds, companyId);
         if (requestedTechnicians.size() != desiredIds.size()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "One or more technicians were not found");
         }
@@ -240,7 +249,8 @@ public class TechnicianTeamService {
     }
 
     private TechnicianTeam getTeamOrThrow(Long id) {
-        return technicianTeamRepository.findById(id)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return technicianTeamRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician team not found"));
     }
 
@@ -278,6 +288,7 @@ public class TechnicianTeamService {
         var bookings = workOrderRepository.findBookingsForAssignments(
                 null,
                 teamId,
+                CompanyContextHolder.getCompanyId().orElse(null),
                 start,
                 end,
                 EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)

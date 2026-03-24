@@ -66,6 +66,9 @@ public class Asset {
     @Column(name = "asset_tag", length = 128)
     private String assetTag; // Tag / Barcode / RFID
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "functional_class", length = 128)
     private String functionalClass;
 

@@ -3,6 +3,7 @@ package com.example.eam.Asset.Service;
 import com.example.eam.Asset.Dto.*;
 import com.example.eam.Asset.Entity.*;
 import com.example.eam.Asset.Repository.*;
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Maintenance.Predictive.Dto.AssetThresholdResponse;
 import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
 import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
@@ -46,6 +47,7 @@ public class AssetService {
 
     @Transactional
     public AssetDetailsResponse createAsset(CreateAssetDto request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
 
         String assetId = determineAssetId(request.getAssetId());
         AssetCategory category = assetCategoryService.getOrCreateByName(request.getAssetCategory());
@@ -82,6 +84,7 @@ public class AssetService {
                         : assetType != null ? assetType.getDefaultCriticality() : null)
                 .ownership(request.getOwnership())
                 .assetTag(request.getAssetTag())
+                .companyId(companyId)
                 .functionalClass(request.getFunctionalClass())
                 .retirementUnit(request.getRetirementUnit())
                 .utilityAccount(request.getUtilityAccount())
@@ -483,7 +486,12 @@ public class AssetService {
 
     @Transactional(readOnly = true)
     public Page<AssetDetailsResponse> listAssets(Pageable pageable) {
-        return assetRepository.findAll(pageable)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        Page<Asset> page = companyId != null
+                ? assetRepository.findByCompanyId(companyId, pageable)
+                : assetRepository.findAll(pageable);
+
+        return page
                 .map(asset -> {
                     Long id = asset.getId();
                     AssetLocation loc = locationRepository.findByAsset_Id(id).orElse(null);
@@ -502,6 +510,7 @@ public class AssetService {
                                                    Long assetTypeId,
                                                    Integer warrantyExpiryDays,
                                                    Pageable pageable) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         LocalDate warrantyStart = null;
         LocalDate warrantyEnd = null;
         if (warrantyExpiryDays != null) {
@@ -512,7 +521,7 @@ public class AssetService {
             warrantyEnd = warrantyStart.plusDays(warrantyExpiryDays);
         }
 
-        return assetRepository.findForReport(statuses, criticality, assetTypeId, warrantyStart, warrantyEnd, pageable)
+        return assetRepository.findForReport(statuses, companyId, criticality, assetTypeId, warrantyStart, warrantyEnd, pageable)
                 .map(asset -> {
                     Long id = asset.getId();
                     AssetLocation loc = locationRepository.findByAsset_Id(id).orElse(null);
@@ -579,6 +588,11 @@ public class AssetService {
     }
 
     private Asset getAssetOrThrow(Long id) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        if (companyId != null) {
+            return assetRepository.findByIdAndCompanyId(id, companyId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
+        }
         return assetRepository.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset not found"));
     }
@@ -719,6 +733,7 @@ public class AssetService {
 
         return AssetDetailsResponse.builder()
                 .id(asset.getId())
+                .companyId(asset.getCompanyId())
                 .assetId(asset.getAssetId())
                 .assetName(asset.getAssetName())
                 .shortDescription(asset.getShortDescription())

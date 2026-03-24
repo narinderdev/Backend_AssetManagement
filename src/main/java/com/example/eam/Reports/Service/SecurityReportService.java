@@ -1,12 +1,15 @@
 package com.example.eam.Reports.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Reports.Dto.SecurityRoleReportItem;
 import com.example.eam.Roles.Entity.AppPermission;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.RoleRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -19,7 +22,9 @@ public class SecurityReportService {
 
     @Transactional(readOnly = true)
     public List<SecurityRoleReportItem> getRolePermissionReport() {
-        List<Role> roles = roleRepository.findByActiveTrueOrderByNameAsc();
+        Long companyId = CompanyContextHolder.getCompanyId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId query parameter is required"));
+        List<Role> roles = roleRepository.findByActiveTrueAndCompanyIdOrderByNameAsc(companyId);
 
         return roles.stream()
                 .map(this::toReportItem)

@@ -9,6 +9,7 @@ import com.example.eam.Asset.Entity.AssetType;
 import com.example.eam.Asset.Repository.AssetTypeRepository;
 import com.example.eam.Asset.Repository.AssetRepository;
 import com.example.eam.Asset.Service.AssetCategoryService;
+import com.example.eam.Common.CompanyContextHolder;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -27,7 +28,8 @@ public class AssetTypeService {
 
     @Transactional(readOnly = true)
     public AssetType getActiveAssetTypeOrThrow(Long id) {
-        AssetType assetType = assetTypeRepository.findById(id)
+        Long companyId = requireCompanyId();
+        AssetType assetType = assetTypeRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset type not found"));
 
         if (Boolean.FALSE.equals(assetType.getActive())) {
@@ -39,13 +41,14 @@ public class AssetTypeService {
 
     @Transactional
     public AssetTypeResponse create(AssetTypeCreateRequest request) {
+        Long companyId = requireCompanyId();
         String code = normalize(request.getCode(), "Asset type code");
         String name = normalize(request.getName(), "Asset type name");
 
-        if (assetTypeRepository.existsByCodeIgnoreCase(code)) {
+        if (assetTypeRepository.existsByCodeIgnoreCaseAndCompanyId(code, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Asset type code already exists");
         }
-        if (assetTypeRepository.existsByNameIgnoreCase(name)) {
+        if (assetTypeRepository.existsByNameIgnoreCaseAndCompanyId(name, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Asset type name already exists");
         }
 
@@ -57,6 +60,7 @@ public class AssetTypeService {
         AssetType assetType = AssetType.builder()
                 .code(code)
                 .name(name)
+                .companyId(companyId)
                 .assetCategory(category)
                 .defaultCriticality(request.getDefaultCriticality())
                 .defaultGlAccount(trimToNull(request.getDefaultGlAccount()))
@@ -72,30 +76,33 @@ public class AssetTypeService {
 
     @Transactional(readOnly = true)
     public List<AssetTypeResponse> listAll() {
-        return assetTypeRepository.findAll().stream()
+        Long companyId = requireCompanyId();
+        return assetTypeRepository.findAllByCompanyIdOrderByNameAsc(companyId).stream()
                 .map(this::toResponse)
                 .toList();
     }
 
     @Transactional(readOnly = true)
     public AssetTypeResponse getById(Long id) {
-        AssetType at = assetTypeRepository.findById(id)
+        Long companyId = requireCompanyId();
+        AssetType at = assetTypeRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset type not found"));
         return toResponse(at);
     }
 
     @Transactional
     public AssetTypeResponse update(Long id, AssetTypeUpdateRequest request) {
-        AssetType existing = assetTypeRepository.findById(id)
+        Long companyId = requireCompanyId();
+        AssetType existing = assetTypeRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset type not found"));
 
         String code = normalize(request.getCode(), "Asset type code");
         String name = normalize(request.getName(), "Asset type name");
 
-        if (assetTypeRepository.existsByCodeIgnoreCaseAndIdNot(code, id)) {
+        if (assetTypeRepository.existsByCodeIgnoreCaseAndCompanyIdAndIdNot(code, companyId, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Asset type code already exists");
         }
-        if (assetTypeRepository.existsByNameIgnoreCaseAndIdNot(name, id)) {
+        if (assetTypeRepository.existsByNameIgnoreCaseAndCompanyIdAndIdNot(name, companyId, id)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Asset type name already exists");
         }
 
@@ -120,7 +127,8 @@ public class AssetTypeService {
 
     @Transactional
     public void delete(Long id) {
-        AssetType existing = assetTypeRepository.findById(id)
+        Long companyId = requireCompanyId();
+        AssetType existing = assetTypeRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Asset type not found"));
 
         if (assetRepository.existsByAssetTypeRef_Id(id)) {
@@ -135,6 +143,7 @@ public class AssetTypeService {
                 .id(assetType.getId())
                 .code(assetType.getCode())
                 .name(assetType.getName())
+                .companyId(assetType.getCompanyId())
                 .assetCategoryId(assetType.getAssetCategory() != null ? assetType.getAssetCategory().getId() : null)
                 .assetCategory(assetType.getAssetCategory() != null ? assetType.getAssetCategory().getName() : null)
                 .defaultCriticality(assetType.getDefaultCriticality())
@@ -163,5 +172,10 @@ public class AssetTypeService {
         }
         String trimmed = raw.trim();
         return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private Long requireCompanyId() {
+        return CompanyContextHolder.getCompanyId()
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "companyId query parameter is required"));
     }
 }

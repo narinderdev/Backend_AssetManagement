@@ -34,6 +34,9 @@ public class InventoryItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id; // DB PK
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "item_id", nullable = false, unique = true, length = 64)
     private String itemId; // Business ID
 

@@ -11,7 +11,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.server.ResponseStatusException;
 
 import com.example.eam.Common.EmailService;
+import com.example.eam.Roles.Entity.AppPermission;
 import com.example.eam.Roles.Entity.Role;
+import com.example.eam.Roles.Repository.AppPermissionRepository;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.User.dto.SignupVerifyDto;
 import com.example.eam.User.dto.UserCreateDto;
@@ -33,6 +35,7 @@ public class SignupService {
     private final PendingUserSignupRepository pendingRepo;
     private final UsersRepository usersRepository;
     private final RoleRepository roleRepository;
+    private final AppPermissionRepository appPermissionRepository;
     private final UserRoleRepository userRoleRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
@@ -134,10 +137,7 @@ public class SignupService {
             );
         }
 
-        Role role = roleRepository.findByNameIgnoreCase("Admin")
-                .orElseThrow(() -> new ResponseStatusException(
-                        HttpStatus.NOT_FOUND, "Admin role not found"
-                ));
+        Role role = resolveOrSeedGlobalAdminRole();
 
         Users user = new Users();
         user.setFirstName(pending.getFirstName());
@@ -165,5 +165,27 @@ public class SignupService {
 
     private String generateOtp() {
         return String.valueOf(100000 + new SecureRandom().nextInt(900000));
+    }
+
+    private Role resolveOrSeedGlobalAdminRole() {
+        Role globalAdmin = roleRepository.findFirstByNameIgnoreCaseAndCompanyIdIsNullOrderByIdAsc("Admin")
+                .orElse(null);
+        if (globalAdmin != null) {
+            if (!globalAdmin.isActive()) {
+                globalAdmin.setActive(true);
+                return roleRepository.save(globalAdmin);
+            }
+            return globalAdmin;
+        }
+
+        java.util.List<AppPermission> permissions = appPermissionRepository.findByActiveTrueOrderByModuleAscSortOrderAsc();
+        Role seeded = Role.builder()
+                .companyId(null)
+                .name("Admin")
+                .description("Full access")
+                .active(true)
+                .permissions(new java.util.HashSet<>(permissions))
+                .build();
+        return roleRepository.save(seeded);
     }
 }

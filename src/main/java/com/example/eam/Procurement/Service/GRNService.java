@@ -1,5 +1,6 @@
 package com.example.eam.Procurement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.InventoryManagement.Entity.InventoryItem;
 import com.example.eam.InventoryManagement.Repository.InventoryItemRepository;
 import com.example.eam.InventoryManagement.Service.InventoryAuditLogService;
@@ -51,10 +52,11 @@ public class GRNService {
 
     @Transactional
     public GrnResponse create(CreateGrnRequest request) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         PurchaseOrder po = null;
         Map<Long, PurchaseOrderLine> poLinesById = new HashMap<>();
         if (request.getPoId() != null) {
-            po = poRepository.findById(request.getPoId())
+            po = poRepository.findByIdAndCompanyId(request.getPoId(), companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Purchase Order not found"));
             if (po.getStatus() != PurchaseOrderStatus.DELIVERED) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "GRN can only be created when PO status is DELIVERED");
@@ -73,6 +75,7 @@ public class GRNService {
 
         Instant now = Instant.now();
         GoodsReceiptNote grn = GoodsReceiptNote.builder()
+                .companyId(companyId)
                 .grnNumber(numberGeneratorService.generateGrnNumber())
                 .poId(po != null ? po.getId() : null)
                 .vendorId(po != null ? po.getVendorId() : null)
@@ -177,14 +180,18 @@ public class GRNService {
 
     @Transactional(readOnly = true)
     public GrnResponse get(Long id) {
-        GoodsReceiptNote grn = grnRepository.findById(id)
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        GoodsReceiptNote grn = grnRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "GRN not found"));
         return toResponse(grn);
     }
 
     @Transactional(readOnly = true)
     public List<GrnResponse> list(Long poId) {
-        List<GoodsReceiptNote> grns = (poId != null) ? grnRepository.findByPoId(poId) : grnRepository.findAll();
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        List<GoodsReceiptNote> grns = (poId != null)
+                ? grnRepository.findByPoIdAndCompanyId(poId, companyId)
+                : grnRepository.findByCompanyId(companyId);
         return grns.stream().map(this::toResponse).toList();
     }
 
@@ -198,7 +205,8 @@ public class GRNService {
         }
         String fromKey = DateTimeFormatter.ISO_LOCAL_DATE.format(from);
         String toKey = DateTimeFormatter.ISO_LOCAL_DATE.format(to);
-        return grnRepository.findByDayKeyUtcBetween(fromKey, toKey).stream()
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return grnRepository.findByDayKeyUtcBetweenAndCompanyId(fromKey, toKey, companyId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -209,7 +217,8 @@ public class GRNService {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "month must be between 1 and 12");
         }
         String prefix = String.format("%04d-%02d", year, month);
-        return grnRepository.findByDayKeyUtcStartingWith(prefix).stream()
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+        return grnRepository.findByDayKeyUtcStartingWithAndCompanyId(prefix, companyId).stream()
                 .map(this::toResponse)
                 .toList();
     }
@@ -218,12 +227,13 @@ public class GRNService {
 
     private void incrementStock(Map<Long, BigDecimal> qtyByItem, GoodsReceiptNote grn) {
         if (qtyByItem.isEmpty()) return;
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
 
         List<StockLedgerEntry> ledgerEntries = new ArrayList<>();
         for (Map.Entry<Long, BigDecimal> entry : qtyByItem.entrySet()) {
             Long itemId = entry.getKey();
             BigDecimal qty = entry.getValue();
-            InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalse(itemId)
+            InventoryItem item = inventoryItemRepository.findByIdAndDeletedFalseAndCompanyId(itemId, companyId)
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.BAD_REQUEST, "Inventory item not found: " + itemId));
 
             int delta = toWholeUnits(qty);
@@ -282,6 +292,10 @@ public class GRNService {
         Map<Long, String> itemNamesById = itemIds.isEmpty()
                 ? Collections.emptyMap()
                 : inventoryItemRepository.findAllById(itemIds).stream()
+                .filter(item -> {
+                    Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+                    return companyId == null || companyId.equals(item.getCompanyId());
+                })
                 .collect(Collectors.toMap(InventoryItem::getId, InventoryItem::getItemName));
 
         List<GrnLineResponse> lines = Optional.ofNullable(grn.getLines())
@@ -300,7 +314,8 @@ public class GRNService {
 
         String vendorName = null;
         if (grn.getVendorId() != null) {
-            vendorName = vendorRepository.findById(grn.getVendorId())
+            Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
+            vendorName = vendorRepository.findByIdAndCompanyId(grn.getVendorId(), companyId)
                     .map(Vendor::getVendorName)
                     .orElse(null);
         }

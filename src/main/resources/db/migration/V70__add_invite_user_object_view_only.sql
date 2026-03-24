@@ -25,9 +25,12 @@ BEGIN
     WHERE module = 'INVITE_USER'
       AND action <> 'VIEW';
 
-    DELETE rp
-    FROM dbo.role_permissions rp
-    JOIN @toRemoveInvite r ON r.id = rp.permission_id;
+    IF OBJECT_ID('dbo.role_permissions', 'U') IS NOT NULL
+    BEGIN
+        DELETE rp
+        FROM dbo.role_permissions rp
+        JOIN @toRemoveInvite r ON r.id = rp.permission_id;
+    END;
 
     DELETE ap
     FROM dbo.app_permissions ap

@@ -32,6 +32,9 @@ public class GoodsReceiptNote {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "company_id")
+    private Long companyId;
+
     @Column(name = "grn_number", nullable = false, unique = true, length = 64)
     private String grnNumber;
 

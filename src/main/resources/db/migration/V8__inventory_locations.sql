@@ -56,36 +56,57 @@ END;
 GO
 
 -- Add SKU and location references to inventory_items
-IF COL_LENGTH('inventory_items', 'sku_number') IS NULL
+IF OBJECT_ID('dbo.inventory_items', 'U') IS NOT NULL
+   AND COL_LENGTH('dbo.inventory_items', 'sku_number') IS NULL
 BEGIN
-    ALTER TABLE inventory_items ADD sku_number NVARCHAR(128) NULL;
+    ALTER TABLE dbo.inventory_items ADD sku_number NVARCHAR(128) NULL;
 END;
 GO
 
-IF COL_LENGTH('inventory_items', 'location_id') IS NULL
+IF OBJECT_ID('dbo.inventory_items', 'U') IS NOT NULL
+   AND COL_LENGTH('dbo.inventory_items', 'location_id') IS NULL
 BEGIN
-    ALTER TABLE inventory_items ADD location_id BIGINT NULL;
+    ALTER TABLE dbo.inventory_items ADD location_id BIGINT NULL;
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_inventory_items_location')
+IF OBJECT_ID('dbo.inventory_items', 'U') IS NOT NULL
+   AND OBJECT_ID('dbo.inventory_locations', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.foreign_keys
+       WHERE name = 'fk_inventory_items_location'
+         AND parent_object_id = OBJECT_ID('dbo.inventory_items')
+   )
 BEGIN
-    ALTER TABLE inventory_items
-        ADD CONSTRAINT fk_inventory_items_location FOREIGN KEY (location_id) REFERENCES inventory_locations(id);
+    ALTER TABLE dbo.inventory_items
+        ADD CONSTRAINT fk_inventory_items_location FOREIGN KEY (location_id) REFERENCES dbo.inventory_locations(id);
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_inventory_items_location' AND object_id = OBJECT_ID('inventory_items'))
+IF OBJECT_ID('dbo.inventory_items', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'idx_inventory_items_location'
+         AND object_id = OBJECT_ID('dbo.inventory_items')
+   )
 BEGIN
-    CREATE INDEX idx_inventory_items_location ON inventory_items(location_id);
+    CREATE INDEX idx_inventory_items_location ON dbo.inventory_items(location_id);
 END;
 GO
 
 -- Enforce SKU uniqueness for non-deleted rows
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'ux_inventory_items_sku_active' AND object_id = OBJECT_ID('inventory_items'))
+IF OBJECT_ID('dbo.inventory_items', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'ux_inventory_items_sku_active'
+         AND object_id = OBJECT_ID('dbo.inventory_items')
+   )
 BEGIN
     CREATE UNIQUE INDEX ux_inventory_items_sku_active
-        ON inventory_items(sku_number)
+        ON dbo.inventory_items(sku_number)
         WHERE sku_number IS NOT NULL AND deleted = 0;
 END;
 GO

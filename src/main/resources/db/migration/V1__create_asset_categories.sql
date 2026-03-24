@@ -15,7 +15,7 @@ BEGIN
 END;
 
 -- If table was pre-created (e.g. by Hibernate), ensure defaults exist for timestamp columns.
-IF COL_LENGTH('dbo.asset_categories', 'created_at') IS NOT NULL
+IF OBJECT_ID('dbo.asset_categories', 'U') IS NOT NULL AND COL_LENGTH('dbo.asset_categories', 'created_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -28,8 +28,7 @@ BEGIN
     ALTER TABLE dbo.asset_categories
     ADD CONSTRAINT df_asset_categories_created_at DEFAULT SYSUTCDATETIME() FOR created_at;
 END;
-
-IF COL_LENGTH('dbo.asset_categories', 'updated_at') IS NOT NULL
+IF OBJECT_ID('dbo.asset_categories', 'U') IS NOT NULL AND COL_LENGTH('dbo.asset_categories', 'updated_at') IS NOT NULL
    AND NOT EXISTS (
        SELECT 1
        FROM sys.default_constraints dc
@@ -70,7 +69,7 @@ WHERE NOT EXISTS (SELECT 1 FROM dbo.asset_categories ac WHERE ac.name = s.name);
 -- Legacy data migration for assets table (skip safely when base table is absent).
 IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL
 BEGIN
-    IF COL_LENGTH('dbo.assets', 'asset_category_id') IS NULL
+IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL AND COL_LENGTH('dbo.assets', 'asset_category_id') IS NULL
     BEGIN
         ALTER TABLE dbo.assets ADD asset_category_id BIGINT NULL;
     END;
@@ -102,3 +101,4 @@ BEGIN
         CREATE INDEX idx_assets_asset_category_id ON dbo.assets(asset_category_id);
     END;
 END;
+

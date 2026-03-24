@@ -1,5 +1,6 @@
 package com.example.eam.Technician.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
 import com.example.eam.Enum.TechnicianWorkStatus;
@@ -44,13 +45,14 @@ public class TechnicianService {
 
     @Transactional
     public TechnicianDetailsResponse createTechnician(TechnicianCreateRequest request) {
+        Long companyId = currentCompanyId();
         String email = safeTrim(request.getEmail());
-        if (email != null && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalse(email)) {
+        if (email != null && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(email, companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician with the same email already exists");
         }
 
-        String badgeNumber = requireBadgeUnique(request.getBadgeNumber());
-        String technicianId = determineTechnicianId(request.getTechnicianId());
+        String badgeNumber = requireBadgeUnique(request.getBadgeNumber(), null, companyId);
+        String technicianId = determineTechnicianId(request.getTechnicianId(), companyId);
 
 
         TechnicianStatus status = request.getStatus() != null ? request.getStatus() : TechnicianStatus.ACTIVE;
@@ -58,6 +60,7 @@ public class TechnicianService {
         String lastName = request.getLastName().trim();
 
         Technician technician = Technician.builder()
+                .companyId(companyId)
                 .firstName(firstName)
                 .lastName(lastName)
                 .badgeNumber(badgeNumber)
@@ -91,7 +94,7 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianListResponse listTechnicians(Pageable pageable) {
-        Page<Technician> page = technicianRepository.findByIsDeletedFalse(pageable);
+        Page<Technician> page = technicianRepository.findByIsDeletedFalseAndCompanyId(currentCompanyId(), pageable);
         List<TechnicianDetailsResponse> rows = page.getContent().stream()
                 .map(this::toDetailsResponse)
                 .toList();
@@ -127,6 +130,7 @@ public class TechnicianService {
         List<com.example.eam.WorkOrder.Entity.WorkOrder> bookings =
                 workOrderRepository.findBookingsForTechnicianCalendar(
                         technicianId,
+                        currentCompanyId(),
                         startDate.atStartOfDay(),
                         endDate.atStartOfDay(),
                         EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
@@ -212,6 +216,7 @@ public class TechnicianService {
 
     @Transactional
     public TechnicianLeaveResponse applyLeave(Long technicianId, TechnicianLeaveRequest request) {
+        Long companyId = currentCompanyId();
         Technician technician = getTechnicianOrThrow(technicianId);
 
         LocalDate start = request.getStartDate();
@@ -224,7 +229,8 @@ public class TechnicianService {
         }
 
         boolean overlaps = technicianLeaveRepository
-                .existsByTechnician_IdAndEndDateGreaterThanEqualAndStartDateLessThanEqual(technicianId, start, end);
+                .existsByTechnician_IdAndTechnician_CompanyIdAndEndDateGreaterThanEqualAndStartDateLessThanEqual(
+                        technicianId, companyId, start, end);
         if (overlaps) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Leave dates overlap with an existing leave");
         }
@@ -242,7 +248,7 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianLeaveResponse getLeave(Long technicianId, Long leaveId) {
-        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+        TechnicianLeave leave = technicianLeaveRepository.findByIdAndTechnician_CompanyId(leaveId, currentCompanyId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
         if (!leave.getTechnician().getId().equals(technicianId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
@@ -252,13 +258,14 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianLeaveListResponse listLeaves(Long technicianId, LocalDate startDate, LocalDate endDate) {
+        Long companyId = currentCompanyId();
         Technician tech = getTechnicianOrThrow(technicianId);
         List<TechnicianLeave> leaves;
         if (startDate != null && endDate != null) {
             LocalDate endExclusive = endDate.plusDays(1);
-            leaves = technicianLeaveRepository.findOverlapping(tech.getId(), startDate, endExclusive);
+            leaves = technicianLeaveRepository.findOverlapping(tech.getId(), companyId, startDate, endExclusive);
         } else {
-            leaves = technicianLeaveRepository.findByTechnician_IdOrderByStartDateAsc(tech.getId());
+            leaves = technicianLeaveRepository.findByTechnician_IdAndTechnician_CompanyIdOrderByStartDateAsc(tech.getId(), companyId);
         }
         List<TechnicianLeaveResponse> responses = leaves.stream()
                 .map(this::toLeaveResponse)
@@ -270,12 +277,13 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianLeaveListResponse listAllLeaves(LocalDate startDate, LocalDate endDate) {
+        Long companyId = currentCompanyId();
         List<TechnicianLeave> leaves;
         if (startDate != null && endDate != null) {
             LocalDate endExclusive = endDate.plusDays(1);
-            leaves = technicianLeaveRepository.findOverlappingAny(startDate, endExclusive);
+            leaves = technicianLeaveRepository.findOverlappingAny(companyId, startDate, endExclusive);
         } else {
-            leaves = technicianLeaveRepository.findAllByOrderByStartDateAsc();
+            leaves = technicianLeaveRepository.findAllByTechnician_CompanyIdOrderByStartDateAsc(companyId);
         }
         List<TechnicianLeaveResponse> responses = leaves.stream()
                 .map(this::toLeaveResponse)
@@ -287,7 +295,8 @@ public class TechnicianService {
 
     @Transactional
     public TechnicianLeaveResponse patchLeave(Long technicianId, Long leaveId, TechnicianLeavePatchRequest request) {
-        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+        Long companyId = currentCompanyId();
+        TechnicianLeave leave = technicianLeaveRepository.findByIdAndTechnician_CompanyId(leaveId, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
         if (!leave.getTechnician().getId().equals(technicianId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
@@ -303,8 +312,8 @@ public class TechnicianService {
         }
 
         boolean overlaps = technicianLeaveRepository
-                .existsByTechnician_IdAndEndDateGreaterThanEqualAndStartDateLessThanEqualAndIdNot(
-                        technicianId, newStart, newEnd, leaveId);
+                .existsByTechnician_IdAndTechnician_CompanyIdAndEndDateGreaterThanEqualAndStartDateLessThanEqualAndIdNot(
+                        technicianId, companyId, newStart, newEnd, leaveId);
         if (overlaps) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Leave dates overlap with an existing leave");
         }
@@ -321,7 +330,7 @@ public class TechnicianService {
 
     @Transactional
     public void deleteLeave(Long technicianId, Long leaveId) {
-        TechnicianLeave leave = technicianLeaveRepository.findById(leaveId)
+        TechnicianLeave leave = technicianLeaveRepository.findByIdAndTechnician_CompanyId(leaveId, currentCompanyId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found"));
         if (!leave.getTechnician().getId().equals(technicianId)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Leave not found");
@@ -331,11 +340,13 @@ public class TechnicianService {
 
     @Transactional
     public TechnicianHolidayResponse addHoliday(TechnicianHolidayRequest request) {
-        if (technicianHolidayRepository.existsByHolidayDate(request.getHolidayDate())) {
+        Long companyId = currentCompanyId();
+        if (technicianHolidayRepository.existsByHolidayDateAndCompanyId(request.getHolidayDate(), companyId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "Holiday already exists for the given date");
         }
 
         TechnicianHoliday holiday = TechnicianHoliday.builder()
+                .companyId(companyId)
                 .holidayName(request.getHolidayName().trim())
                 .holidayType(request.getHolidayType())
                 .holidayDate(request.getHolidayDate())
@@ -348,19 +359,20 @@ public class TechnicianService {
 
     @Transactional(readOnly = true)
     public TechnicianHolidayResponse getHoliday(Long id) {
-        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+        TechnicianHoliday holiday = technicianHolidayRepository.findByIdAndCompanyId(id, currentCompanyId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
         return toHolidayResponse(holiday);
     }
 
     @Transactional(readOnly = true)
     public TechnicianHolidayListResponse listHolidays(LocalDate startDate, LocalDate endDate) {
+        Long companyId = currentCompanyId();
         List<TechnicianHoliday> rows;
         if (startDate != null && endDate != null) {
             LocalDate endExclusive = endDate.plusDays(1);
-            rows = technicianHolidayRepository.findInRange(startDate, endExclusive);
+            rows = technicianHolidayRepository.findInRange(companyId, startDate, endExclusive);
         } else {
-            rows = technicianHolidayRepository.findAllByOrderByHolidayDateAsc();
+            rows = technicianHolidayRepository.findAllByCompanyIdOrderByHolidayDateAsc(companyId);
         }
         List<TechnicianHolidayResponse> responses = rows.stream()
                 .map(this::toHolidayResponse)
@@ -372,7 +384,8 @@ public class TechnicianService {
 
     @Transactional
     public TechnicianHolidayResponse patchHoliday(Long id, TechnicianHolidayPatchRequest request) {
-        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+        Long companyId = currentCompanyId();
+        TechnicianHoliday holiday = technicianHolidayRepository.findByIdAndCompanyId(id, companyId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
 
         if (request.getHolidayName() != null) {
@@ -389,7 +402,7 @@ public class TechnicianService {
 
         if (request.getHolidayDate() != null) {
             LocalDate newDate = request.getHolidayDate();
-            if (technicianHolidayRepository.existsByHolidayDateAndIdNot(newDate, id)) {
+            if (technicianHolidayRepository.existsByHolidayDateAndCompanyIdAndIdNot(newDate, companyId, id)) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Holiday already exists for the given date");
             }
             holiday.setHolidayDate(newDate);
@@ -405,7 +418,7 @@ public class TechnicianService {
 
     @Transactional
     public void deleteHoliday(Long id) {
-        TechnicianHoliday holiday = technicianHolidayRepository.findById(id)
+        TechnicianHoliday holiday = technicianHolidayRepository.findByIdAndCompanyId(id, currentCompanyId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Holiday not found"));
         technicianHolidayRepository.delete(holiday);
     }
@@ -434,7 +447,7 @@ public class TechnicianService {
         if (request.getPhoneNumber() != null) technician.setPhoneNumber(safeTrim(request.getPhoneNumber()));
 
         if (request.getBadgeNumber() != null) {
-            String badge = requireBadgeUnique(request.getBadgeNumber(), technician.getId());
+            String badge = requireBadgeUnique(request.getBadgeNumber(), technician.getId(), currentCompanyId());
             technician.setBadgeNumber(badge);
         }
 
@@ -443,14 +456,14 @@ public class TechnicianService {
             if (techId.isEmpty()) {
                 throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "technicianId cannot be blank");
             }
-            ensureTechnicianIdUnique(techId, technician.getId());
+            ensureTechnicianIdUnique(techId, technician.getId(), currentCompanyId());
             technician.setTechnicianId(techId);
         }
 
         if (request.getEmail() != null) {
             String email = safeTrim(request.getEmail());
             if (email != null && !email.equalsIgnoreCase(safeTrim(technician.getEmail()))
-                    && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalse(email)) {
+                    && technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(email, currentCompanyId())) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "Technician with the same email already exists");
             }
             technician.setEmail(email);
@@ -481,6 +494,7 @@ public class TechnicianService {
         LocalDateTime now = LocalDateTime.now();
         long activeOrFutureBookings = workOrderRepository.countActiveBookingsForTechnician(
                 id,
+                currentCompanyId(),
                 now,
                 now.plusYears(50), // generous window for "future"
                 EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
@@ -498,7 +512,7 @@ public class TechnicianService {
     }
 
     private Technician getTechnicianOrThrow(Long id) {
-        return technicianRepository.findByIdAndIsDeletedFalse(id)
+        return technicianRepository.findByIdAndIsDeletedFalseAndCompanyId(id, currentCompanyId())
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Technician not found"));
     }
 
@@ -572,6 +586,7 @@ public class TechnicianService {
 
         long activeBookings = workOrderRepository.countActiveBookingsForTechnician(
                 technicianId,
+                currentCompanyId(),
                 start,
                 end,
                 EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
@@ -584,7 +599,12 @@ public class TechnicianService {
                                        Long technicianId,
                                        LocalDate rangeStart,
                                        LocalDate rangeEndExclusive) {
-        List<TechnicianLeave> leaves = technicianLeaveRepository.findOverlapping(technicianId, rangeStart, rangeEndExclusive);
+        List<TechnicianLeave> leaves = technicianLeaveRepository.findOverlapping(
+                technicianId,
+                currentCompanyId(),
+                rangeStart,
+                rangeEndExclusive
+        );
         for (TechnicianLeave leave : leaves) {
             LocalDate leaveStart = leave.getStartDate().isBefore(rangeStart) ? rangeStart : leave.getStartDate();
             LocalDate leaveEnd = leave.getEndDate().isBefore(rangeEndExclusive.minusDays(1))
@@ -600,7 +620,7 @@ public class TechnicianService {
     private void applyHolidaysToCalendar(Map<LocalDate, TechnicianCalendarStatus> calendar,
                                          LocalDate rangeStart,
                                          LocalDate rangeEndExclusive) {
-        List<TechnicianHoliday> holidays = technicianHolidayRepository.findInRange(rangeStart, rangeEndExclusive);
+        List<TechnicianHoliday> holidays = technicianHolidayRepository.findInRange(currentCompanyId(), rangeStart, rangeEndExclusive);
         for (TechnicianHoliday holiday : holidays) {
             LocalDate date = holiday.getHolidayDate();
             calendar.put(date, TechnicianCalendarStatus.HOLIDAY);
@@ -668,16 +688,16 @@ public class TechnicianService {
     }
 
     private String requireBadgeUnique(String badgeNumber) {
-        return requireBadgeUnique(badgeNumber, null);
+        return requireBadgeUnique(badgeNumber, null, currentCompanyId());
     }
 
-    private String requireBadgeUnique(String badgeNumber, Long currentId) {
+    private String requireBadgeUnique(String badgeNumber, Long currentId, Long companyId) {
         if (badgeNumber == null || badgeNumber.trim().isEmpty()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "badgeNumber is required");
         }
         String trimmed = badgeNumber.trim();
-        if (technicianRepository.existsByBadgeNumberIgnoreCaseAndIsDeletedFalse(trimmed)) {
-            if (currentId == null || technicianRepository.findByIdAndIsDeletedFalse(currentId).stream()
+        if (technicianRepository.existsByBadgeNumberIgnoreCaseAndIsDeletedFalseAndCompanyId(trimmed, companyId)) {
+            if (currentId == null || technicianRepository.findByIdAndIsDeletedFalseAndCompanyId(currentId, companyId).stream()
                     .noneMatch(t -> trimmed.equalsIgnoreCase(t.getBadgeNumber()))) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "badgeNumber already exists");
             }
@@ -685,10 +705,10 @@ public class TechnicianService {
         return trimmed;
     }
 
-    private String determineTechnicianId(String provided) {
+    private String determineTechnicianId(String provided, Long companyId) {
         if (provided != null && !provided.trim().isEmpty()) {
             String trimmed = provided.trim();
-            ensureTechnicianIdUnique(trimmed, null);
+            ensureTechnicianIdUnique(trimmed, null, companyId);
             return trimmed;
         }
         // simple auto id: TECH-YYYYMMDD-XXXX
@@ -696,20 +716,20 @@ public class TechnicianService {
         for (int i = 0; i < 30; i++) {
             int rand = java.util.concurrent.ThreadLocalRandom.current().nextInt(0, 10000);
             String candidate = String.format("TECH-%s-%04d", date, rand);
-            if (!technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(candidate)) {
+            if (!technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalseAndCompanyId(candidate, companyId)) {
                 return candidate;
             }
         }
         throw new ResponseStatusException(HttpStatus.INTERNAL_SERVER_ERROR, "Unable to generate technicianId");
     }
 
-    private void ensureTechnicianIdUnique(String technicianId, Long currentId) {
-        boolean exists = technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalse(technicianId);
+    private void ensureTechnicianIdUnique(String technicianId, Long currentId, Long companyId) {
+        boolean exists = technicianRepository.existsByTechnicianIdIgnoreCaseAndIsDeletedFalseAndCompanyId(technicianId, companyId);
         if (exists) {
             if (currentId == null) {
                 throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
             }
-            technicianRepository.findByIdAndIsDeletedFalse(currentId).ifPresent(t -> {
+            technicianRepository.findByIdAndIsDeletedFalseAndCompanyId(currentId, companyId).ifPresent(t -> {
                 if (!technicianId.equalsIgnoreCase(t.getTechnicianId())) {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "technicianId already exists");
                 }
@@ -739,5 +759,9 @@ public class TechnicianService {
                 })
                 .filter(name -> name != null && !name.isBlank())
                 .toList();
+    }
+
+    private Long currentCompanyId() {
+        return CompanyContextHolder.getCompanyId().orElse(null);
     }
 }

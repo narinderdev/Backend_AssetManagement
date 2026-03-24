@@ -7,4 +7,6 @@ import org.springframework.data.domain.Pageable;
 
 public interface InventoryReconciliationRepository extends JpaRepository<InventoryReconciliation, Long> {
     Page<InventoryReconciliation> findAllByOrderByCreatedAtDesc(Pageable pageable);
+    Page<InventoryReconciliation> findByCompanyIdOrderByCreatedAtDesc(Long companyId, Pageable pageable);
+    java.util.Optional<InventoryReconciliation> findByIdAndCompanyId(Long id, Long companyId);
 }

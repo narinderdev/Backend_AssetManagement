@@ -1,5 +1,6 @@
 package com.example.eam.InventoryManagement.Service;
 
+import com.example.eam.Common.CompanyContextHolder;
 import com.example.eam.Enum.InventoryReferenceType;
 import com.example.eam.Enum.InventoryTransactionType;
 import com.example.eam.InventoryManagement.Dto.*;
@@ -21,7 +22,6 @@ import java.util.Comparator;
 import java.util.EnumMap;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -39,11 +39,11 @@ public class InventoryReportService {
                                              String period,
                                              Pageable pageable,
                                              int topN) {
+        Long companyId = CompanyContextHolder.getCompanyId().orElse(null);
         InventoryReportResponse.InventoryReportResponseBuilder builder = InventoryReportResponse.builder();
 
         if (view == InventoryReportView.ITEMS) {
-            List<InventoryItem> items = itemRepository.findAll().stream()
-                    .filter(i -> !Boolean.TRUE.equals(i.isDeleted()))
+            List<InventoryItem> items = itemRepository.findByDeletedFalseAndCompanyId(companyId, pageable).getContent().stream()
                     .filter(i -> warehouseId == null || (i.getWarehouse() != null && warehouseId.equals(i.getWarehouse().getId())))
                     .filter(i -> !lowStockOnly || isLowStock(i))
                     .toList();
@@ -74,11 +74,17 @@ public class InventoryReportService {
                     .topStockValue(topValue);
         } else if (view == InventoryReportView.TRANSACTIONS) {
             LocalDateTimeRange range = resolveRange(period);
-            Page<InventoryAuditLog> page = auditLogRepository.findByCreatedAtBetweenOrderByCreatedAtDesc(
-                    range.from(), range.to(), pageable);
+            Page<InventoryAuditLog> page;
+            if (txnType != null) {
+                page = auditLogRepository.findByTransactionTypeAndInventoryItem_CompanyIdOrderByCreatedAtDesc(txnType, companyId, pageable);
+            } else if (refType != null) {
+                page = auditLogRepository.findByReferenceTypeAndInventoryItem_CompanyIdOrderByCreatedAtDesc(refType, companyId, pageable);
+            } else {
+                page = auditLogRepository.findByCreatedAtBetweenAndInventoryItem_CompanyIdOrderByCreatedAtDesc(
+                        range.from(), range.to(), companyId, pageable);
+            }
 
             List<InventoryTransactionReportRow> rows = page.getContent().stream()
-                    .filter(log -> txnType == null || log.getTransactionType() == txnType)
                     .filter(log -> refType == null || log.getReferenceType() == refType)
                     .filter(log -> warehouseId == null || (log.getInventoryItem() != null
                             && log.getInventoryItem().getWarehouse() != null

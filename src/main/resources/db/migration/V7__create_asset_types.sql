@@ -43,21 +43,35 @@ END;
 GO
 
 -- Link assets to asset types (nullable to support existing data)
-IF COL_LENGTH('assets', 'asset_type_id') IS NULL
+IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL
+   AND COL_LENGTH('dbo.assets', 'asset_type_id') IS NULL
 BEGIN
-    ALTER TABLE assets ADD asset_type_id BIGINT NULL;
+    ALTER TABLE dbo.assets ADD asset_type_id BIGINT NULL;
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE name = 'fk_assets_asset_type')
+IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL
+   AND OBJECT_ID('dbo.asset_types', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.foreign_keys
+       WHERE name = 'fk_assets_asset_type'
+         AND parent_object_id = OBJECT_ID('dbo.assets')
+   )
 BEGIN
-    ALTER TABLE assets
-        ADD CONSTRAINT fk_assets_asset_type FOREIGN KEY (asset_type_id) REFERENCES asset_types(id);
+    ALTER TABLE dbo.assets
+        ADD CONSTRAINT fk_assets_asset_type FOREIGN KEY (asset_type_id) REFERENCES dbo.asset_types(id);
 END;
 GO
 
-IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE name = 'idx_assets_asset_type_id' AND object_id = OBJECT_ID('assets'))
+IF OBJECT_ID('dbo.assets', 'U') IS NOT NULL
+   AND NOT EXISTS (
+       SELECT 1
+       FROM sys.indexes
+       WHERE name = 'idx_assets_asset_type_id'
+         AND object_id = OBJECT_ID('dbo.assets')
+   )
 BEGIN
-    CREATE INDEX idx_assets_asset_type_id ON assets(asset_type_id);
+    CREATE INDEX idx_assets_asset_type_id ON dbo.assets(asset_type_id);
 END;
 GO

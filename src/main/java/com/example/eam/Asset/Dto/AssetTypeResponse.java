@@ -11,6 +11,7 @@ public class AssetTypeResponse {
     private Long id;
     private String code;
     private String name;
+    private Long companyId;
     private Long assetCategoryId;
     private String assetCategory;
     private AssetCriticality defaultCriticality;
