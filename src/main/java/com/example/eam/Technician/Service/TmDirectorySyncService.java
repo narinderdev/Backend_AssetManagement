@@ -14,6 +14,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
@@ -72,7 +73,7 @@ public class TmDirectorySyncService {
         List<TmTeamRow> tmTeams = fetchTeams();
         Map<Long, List<TmMemberRow>> membersByTeam = fetchMembersByTeam();
 
-        Map<Long, Technician> tmIdToTechnician = upsertTechnicians(tmTechnicians);
+        Map<TmTechnicianKey, Technician> tmIdToTechnician = upsertTechnicians(tmTechnicians);
         upsertTeams(tmTeams, membersByTeam, tmIdToTechnician);
 
         SyncReport report = new SyncReport(tmIdToTechnician.size(), tmTeams.size());
@@ -84,11 +85,13 @@ public class TmDirectorySyncService {
 
     private List<TmUserRow> fetchTechnicians() {
         return tmJdbcTemplate.query("""
-                SELECT id, first_name, last_name, email, status, is_deleted
+                SELECT id, company_id, first_name, last_name, email, status, is_deleted
                 FROM technicians
                 WHERE is_deleted = 0
+                  AND company_id IS NOT NULL
                 """, (rs, row) -> new TmUserRow(
                 rs.getLong("id"),
+                rs.getLong("company_id"),
                 rs.getString("first_name"),
                 rs.getString("last_name"),
                 rs.getString("email"),
@@ -97,10 +100,12 @@ public class TmDirectorySyncService {
 
     private List<TmTeamRow> fetchTeams() {
         return tmJdbcTemplate.query("""
-                SELECT id, team_name, team_description, status
+                SELECT id, company_id, team_name, team_description, status
                 FROM technician_teams
+                WHERE company_id IS NOT NULL
                 """, (rs, row) -> new TmTeamRow(
                 rs.getLong("id"),
+                rs.getLong("company_id"),
                 rs.getString("team_name"),
                 rs.getString("team_description"),
                 rs.getString("status")));
@@ -108,10 +113,16 @@ public class TmDirectorySyncService {
 
     private Map<Long, List<TmMemberRow>> fetchMembersByTeam() {
         return tmJdbcTemplate.query("""
-                SELECT team_id, technician_id, team_leader
-                FROM technician_team_members
+                SELECT m.team_id, m.technician_id, m.team_leader, tt.company_id
+                FROM technician_team_members m
+                JOIN technician_teams tt ON tt.id = m.team_id
+                JOIN technicians t ON t.id = m.technician_id
+                WHERE tt.company_id IS NOT NULL
+                  AND t.is_deleted = 0
+                  AND t.company_id = tt.company_id
                 """, (rs, row) -> new TmMemberRow(
                 rs.getLong("team_id"),
+                rs.getLong("company_id"),
                 rs.getLong("technician_id"),
                 rs.getBoolean("team_leader")))
                 .stream()
@@ -120,63 +131,71 @@ public class TmDirectorySyncService {
 
     // ---------- Upsert into EAM ----------
 
-    private Map<Long, Technician> upsertTechnicians(List<TmUserRow> rows) {
-        Map<Long, Technician> result = new HashMap<>();
+    private Map<TmTechnicianKey, Technician> upsertTechnicians(List<TmUserRow> rows) {
+        Map<TmTechnicianKey, Technician> result = new HashMap<>();
         for (TmUserRow row : rows) {
             String externalId = externalTechId(row.id());
+            String email = row.email();
 
             Optional<Technician> existingById = technicianRepository
-                    .findFirstByTechnicianIdIgnoreCase(externalId);
-            Optional<Technician> existingByEmail = row.email() == null
+                    .findFirstByTechnicianIdIgnoreCaseAndCompanyId(externalId, row.companyId());
+            Optional<Technician> existingByEmail = email == null
                     ? Optional.empty()
-                    : technicianRepository.findFirstByEmailIgnoreCase(row.email());
+                    : technicianRepository.findFirstByEmailIgnoreCaseAndCompanyId(email, row.companyId());
 
-            Technician tech = existingById.or(() -> existingByEmail).orElseGet(Technician::new);
+            Technician tech = existingById
+                    .or(() -> existingByEmail)
+                    .or(() -> findLegacyTechnician(row.companyId(), externalId, email))
+                    .orElseGet(Technician::new);
 
+            tech.setCompanyId(row.companyId());
             tech.setTechnicianId(externalId);
             if (tech.getBadgeNumber() == null || tech.getBadgeNumber().isBlank()) {
                 tech.setBadgeNumber("TM-BADGE-" + row.id());
             }
             tech.setFirstName(defaulted(row.firstName(), "Technician"));
             tech.setLastName(defaulted(row.lastName(), String.valueOf(row.id())));
-            tech.setEmail(row.email());
+            tech.setEmail(email);
             tech.setTechnicianType(TechnicianType.FULL_TIME);
             tech.setStatus(row.active() ? TechnicianStatus.ACTIVE : TechnicianStatus.INACTIVE);
             tech.setDeleted(!row.active());
 
             Technician saved = technicianRepository.save(tech);
-            result.put(row.id(), saved);
+            result.put(new TmTechnicianKey(row.companyId(), row.id()), saved);
         }
         return result;
     }
 
     private void upsertTeams(List<TmTeamRow> teams,
                              Map<Long, List<TmMemberRow>> members,
-                             Map<Long, Technician> tmIdToTech) {
+                             Map<TmTechnicianKey, Technician> tmIdToTech) {
 
-        Map<String, TechnicianTeam> existingByName = technicianTeamRepository.findAll().stream()
-                .filter(t -> t.getTeamName() != null && !t.getTeamName().isBlank())
-                .collect(Collectors.toMap(t -> t.getTeamName().toLowerCase(Locale.ROOT),
+        Map<TmTeamKey, TechnicianTeam> existingByName = technicianTeamRepository.findAll().stream()
+                .filter(t -> t.getCompanyId() != null && t.getTeamName() != null && !t.getTeamName().isBlank())
+                .collect(Collectors.toMap(
+                        t -> new TmTeamKey(t.getCompanyId(), t.getTeamName().toLowerCase(Locale.ROOT)),
                         Function.identity(), (a, b) -> a));
 
         for (TmTeamRow row : teams) {
             if (row.name() == null || row.name().isBlank()) {
                 continue;
             }
-            String key = row.name().toLowerCase(Locale.ROOT);
+            TmTeamKey key = new TmTeamKey(row.companyId(), row.name().toLowerCase(Locale.ROOT));
             TechnicianTeam team = existingByName.getOrDefault(key, new TechnicianTeam());
+            team.setCompanyId(row.companyId());
             team.setTeamName(row.name());
             team.setTeamDescription(row.description());
             team.setStatus(parseStatus(row.status()));
 
             TechnicianTeam saved = technicianTeamRepository.save(team);
+            existingByName.put(key, saved);
             syncMembers(saved, members.getOrDefault(row.id(), List.of()), tmIdToTech);
         }
     }
 
     private void syncMembers(TechnicianTeam team,
                              List<TmMemberRow> desired,
-                             Map<Long, Technician> tmIdToTech) {
+                             Map<TmTechnicianKey, Technician> tmIdToTech) {
 
         Map<Long, TechnicianTeamMember> current = technicianTeamMemberRepository.findByTeam_Id(team.getId())
                 .stream()
@@ -184,7 +203,10 @@ public class TmDirectorySyncService {
 
         Set<Long> keep = new HashSet<>();
         for (TmMemberRow row : desired) {
-            Technician tech = tmIdToTech.get(row.technicianId());
+            if (!Objects.equals(team.getCompanyId(), row.companyId())) {
+                continue;
+            }
+            Technician tech = tmIdToTech.get(new TmTechnicianKey(row.companyId(), row.technicianId()));
             if (tech == null) continue; // skip unknown
 
             keep.add(tech.getId());
@@ -217,13 +239,28 @@ public class TmDirectorySyncService {
         return "TM-" + tmId;
     }
 
+    private Optional<Technician> findLegacyTechnician(Long companyId, String externalId, String email) {
+        Optional<Technician> byId = technicianRepository.findFirstByTechnicianIdIgnoreCase(externalId)
+                .filter(technician -> technician.getCompanyId() == null || Objects.equals(technician.getCompanyId(), companyId));
+        if (byId.isPresent()) {
+            return byId;
+        }
+        if (email == null || email.isBlank()) {
+            return Optional.empty();
+        }
+        return technicianRepository.findFirstByEmailIgnoreCase(email)
+                .filter(technician -> technician.getCompanyId() == null || Objects.equals(technician.getCompanyId(), companyId));
+    }
+
     private String defaulted(String value, String fallback) {
         return (value == null || value.isBlank()) ? fallback : value.trim();
     }
 
     // ---------- DTOs ----------
     public record SyncReport(int technicians, int teams) {}
-    private record TmUserRow(Long id, String firstName, String lastName, String email, boolean active) {}
-    private record TmTeamRow(Long id, String name, String description, String status) {}
-    private record TmMemberRow(Long teamId, Long technicianId, boolean teamLeader) {}
+    private record TmTechnicianKey(Long companyId, Long technicianId) {}
+    private record TmTeamKey(Long companyId, String teamName) {}
+    private record TmUserRow(Long id, Long companyId, String firstName, String lastName, String email, boolean active) {}
+    private record TmTeamRow(Long id, Long companyId, String name, String description, String status) {}
+    private record TmMemberRow(Long teamId, Long companyId, Long technicianId, boolean teamLeader) {}
 }

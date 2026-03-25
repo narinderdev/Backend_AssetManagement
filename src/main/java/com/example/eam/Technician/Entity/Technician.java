@@ -15,12 +15,13 @@ import java.util.List;
 @Table(
         name = "technicians",
         uniqueConstraints = {
-                @UniqueConstraint(name = "uk_technicians_email", columnNames = "email"),
-                @UniqueConstraint(name = "uk_technicians_badge", columnNames = "badge_number"),
-                @UniqueConstraint(name = "uk_technicians_identifier", columnNames = "technician_id")
+                @UniqueConstraint(name = "uk_technicians_company_email", columnNames = {"company_id", "email"}),
+                @UniqueConstraint(name = "uk_technicians_company_badge", columnNames = {"company_id", "badge_number"}),
+                @UniqueConstraint(name = "uk_technicians_company_identifier", columnNames = {"company_id", "technician_id"})
         },
         indexes = {
                 @Index(name = "idx_technicians_status", columnList = "status"),
+                @Index(name = "idx_technicians_company_id", columnList = "company_id"),
                 @Index(name = "idx_technicians_badge", columnList = "badge_number"),
                 @Index(name = "idx_technicians_identifier", columnList = "technician_id")
         }
