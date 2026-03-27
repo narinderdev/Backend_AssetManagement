@@ -21,6 +21,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -28,6 +29,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
 
@@ -134,6 +136,32 @@ public class CompanyService {
         Pageable effectivePageable = normalizeCompanySort(pageable);
         return userCompanyRepository.findCompaniesByUserEmail(currentUserEmail, includeInactive, effectivePageable)
                 .map(this::toResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public List<CompanyResponse> listCompaniesByUserId(Long userId) {
+        if (userId == null || userId <= 0) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "userId must be greater than 0");
+        }
+
+        Users targetUser = usersRepository.findByIdAndDeletedFalse(userId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "User not found"));
+
+        String currentUserEmail = resolveCurrentUserEmailOrThrow();
+        Users currentUser = usersRepository.findByEmailAndDeletedFalse(currentUserEmail)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized"));
+
+        if (!isCurrentUserAdmin() && !Objects.equals(currentUser.getId(), targetUser.getId())) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not allowed to access this user's companies");
+        }
+
+        return userCompanyRepository.findByUser_IdAndCompany_ActiveTrue(targetUser.getId()).stream()
+                .map(UserCompany::getCompany)
+                .filter(Objects::nonNull)
+                .distinct()
+                .sorted(java.util.Comparator.comparing(Company::getId, java.util.Comparator.nullsLast(Long::compareTo)))
+                .map(this::toResponse)
+                .toList();
     }
 
     @Transactional
@@ -260,5 +288,20 @@ public class CompanyService {
                 mappedProperty,
                 order.getNullHandling()
         );
+    }
+
+    private boolean isCurrentUserAdmin() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || auth.getAuthorities() == null) {
+            return false;
+        }
+
+        for (GrantedAuthority authority : auth.getAuthorities()) {
+            if (authority != null && authority.getAuthority() != null
+                    && "ROLE_Admin".equalsIgnoreCase(authority.getAuthority().trim())) {
+                return true;
+            }
+        }
+        return false;
     }
 }
