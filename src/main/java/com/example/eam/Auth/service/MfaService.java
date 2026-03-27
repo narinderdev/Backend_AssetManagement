@@ -3,10 +3,10 @@ package com.example.eam.Auth.service;
 import java.io.ByteArrayOutputStream;
 import java.net.URLEncoder;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.Base64;
-import java.security.SecureRandom;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatus;
@@ -99,11 +99,21 @@ public class MfaService {
 
     public void sendEmailOtp(String email) {
         Users user = requireUser(email);
+
+        Instant now = Instant.now();
+        String existingOtp = user.getMfaEmailOtp();
+        Instant existingExpiry = user.getMfaEmailOtpExpiresAt();
+        if (existingOtp != null && !existingOtp.isBlank()
+                && existingExpiry != null
+                && !now.isAfter(existingExpiry)) {
+            return;
+        }
+
         rateLimitService.checkOrThrow(rateLimitKey("email_send", user.getId()));
 
         String otp = generateOtp();
         user.setMfaEmailOtp(otp);
-        user.setMfaEmailOtpExpiresAt(Instant.now().plus(Duration.ofMinutes(emailOtpExpiryMinutes)));
+        user.setMfaEmailOtpExpiresAt(now.plus(Duration.ofMinutes(emailOtpExpiryMinutes)));
         user.setMfaEmailVerified(false);
         usersRepository.save(user);
 

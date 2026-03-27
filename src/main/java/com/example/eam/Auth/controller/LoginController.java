@@ -35,8 +35,7 @@ public class LoginController {
         LoginResponseDto user = loginService.login(dto);
 
         String message = Boolean.TRUE.equals(user.getMfaRequired())
-                // ? "MFA required" 
-                ?"OTP Sent on Email"
+                ? "MFA required"
                 : "Login Successfully";
         ApiResponse<LoginResponseDto> body = ApiResponse.successResponse(
             201, 
@@ -77,11 +76,6 @@ public class LoginController {
                 null
         );
         return ResponseEntity.ok(body);
-    }
-
-    private String currentUserEmail() {
-        var auth = org.springframework.security.core.context.SecurityContextHolder.getContext().getAuthentication();
-        return auth != null ? String.valueOf(auth.getPrincipal()) : null;
     }
 
     @PostMapping("/logout")

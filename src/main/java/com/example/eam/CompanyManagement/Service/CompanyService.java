@@ -15,14 +15,20 @@ import com.example.eam.User.repository.UserCompanyRepository;
 import com.example.eam.User.repository.UsersRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.function.Consumer;
 
 @Service
@@ -34,6 +40,19 @@ public class CompanyService {
     private final UserCompanyRepository userCompanyRepository;
     private final RoleRepository roleRepository;
     private final AppPermissionRepository appPermissionRepository;
+    private static final Set<String> COMPANY_SORT_FIELDS = Set.of(
+            "id",
+            "companyLegalName",
+            "companyTradeName",
+            "companyNumber",
+            "address",
+            "city",
+            "country",
+            "postalCode",
+            "active",
+            "createdAt",
+            "updatedAt"
+    );
 
     @Transactional
     public CompanyResponse create(CompanyCreateRequest req) {
@@ -103,16 +122,18 @@ public class CompanyService {
 
     @Transactional(readOnly = true)
     public CompanyResponse get(Long id) {
-        return toResponse(getOrThrowActive(id));
+        String currentUserEmail = resolveCurrentUserEmailOrThrow();
+        return userCompanyRepository.findActiveCompanyByUserEmailAndCompanyId(currentUserEmail, id)
+                .map(this::toResponse)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Company not found"));
     }
 
     @Transactional(readOnly = true)
     public Page<CompanyResponse> list(Pageable pageable, boolean includeInactive) {
-        Page<Company> page = includeInactive
-                ? companyRepository.findAll(pageable)
-                : companyRepository.findByActiveTrue(pageable);
-
-        return page.map(this::toResponse);
+        String currentUserEmail = resolveCurrentUserEmailOrThrow();
+        Pageable effectivePageable = normalizeCompanySort(pageable);
+        return userCompanyRepository.findCompaniesByUserEmail(currentUserEmail, includeInactive, effectivePageable)
+                .map(this::toResponse);
     }
 
     @Transactional
@@ -186,5 +207,58 @@ public class CompanyService {
 
         companyAdmin.setPermissions(new HashSet<>(permissions));
         roleRepository.save(companyAdmin);
+    }
+
+    private String resolveCurrentUserEmailOrThrow() {
+        try {
+            Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+            if (auth == null || !auth.isAuthenticated() || auth instanceof AnonymousAuthenticationToken) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+            }
+            Object principal = auth.getPrincipal();
+            if (principal == null) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+            }
+            String email = String.valueOf(principal).trim();
+            if (email.isBlank()) {
+                throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+            }
+            return email;
+        } catch (ResponseStatusException ex) {
+            throw ex;
+        } catch (Exception ex) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unauthorized");
+        }
+    }
+
+    private Pageable normalizeCompanySort(Pageable pageable) {
+        if (pageable == null || pageable.getSort() == null || pageable.getSort().isUnsorted()) {
+            return pageable;
+        }
+
+        List<Sort.Order> mappedOrders = pageable.getSort().stream()
+                .map(this::mapCompanySortOrder)
+                .toList();
+
+        return PageRequest.of(pageable.getPageNumber(), pageable.getPageSize(), Sort.by(mappedOrders));
+    }
+
+    private Sort.Order mapCompanySortOrder(Sort.Order order) {
+        String requestedProperty = order.getProperty();
+        String normalizedProperty = requestedProperty == null ? "" : requestedProperty.trim();
+
+        if (normalizedProperty.startsWith("company.")) {
+            normalizedProperty = normalizedProperty.substring("company.".length());
+        }
+
+        String mappedProperty = COMPANY_SORT_FIELDS.contains(normalizedProperty)
+                ? "company." + normalizedProperty
+                : "company.companyLegalName";
+
+        return new Sort.Order(
+                order.getDirection(),
+                mappedProperty,
+                order.getNullHandling()
+        );
     }
 }

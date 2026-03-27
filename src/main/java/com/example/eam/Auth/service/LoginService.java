@@ -138,13 +138,13 @@ public class LoginService {
         if (user.getStatus() != UserStatus.ACTIVE) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "User is not active");
         }
-
         if (!user.isMfaEnabled()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "MFA is not enabled");
         }
 
         mfaService.checkLoginRateLimit(user.getId());
-        if (!mfaService.verifyActiveCode(user, dto.getCode())) {
+        boolean codeValid = mfaService.verifyActiveCode(user, dto.getCode());
+        if (!codeValid) {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid MFA code");
         }
 
@@ -212,14 +212,17 @@ public class LoginService {
                 : List.of();
         boolean isTeamLeader = !leaderTeams.isEmpty();
 
-        String token = jwtService.generateToken(
-                user.getEmail(),
-                Map.of(
-                        "userId", user.getId(),
-                        "email", user.getEmail(),
-                        "roles", roles
-                )
-        );
+        String token = null;
+        if (!Boolean.TRUE.equals(mfaRequired)) {
+            token = jwtService.generateToken(
+                    user.getEmail(),
+                    Map.of(
+                            "userId", user.getId(),
+                            "email", user.getEmail(),
+                            "roles", roles
+                    )
+            );
+        }
         return new LoginResponseDto(
                 token,
                 user,
