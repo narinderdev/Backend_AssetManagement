@@ -55,8 +55,7 @@ public class IotTelemetryLog {
     @Column(name = "anomaly_type", length = 32)
     private IotAlertType anomalyType;
 
-    @Lob
-    @Column(name = "notes")
+    @Column(name = "notes", columnDefinition = "NVARCHAR(MAX)")
     private String notes;
 
     @CreationTimestamp
