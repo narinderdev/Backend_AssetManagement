@@ -25,7 +25,8 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
             "/api/companies",
             "/api/permissions",
             "/api/security-dashboard",
-            "/api/mfa"
+            "/api/mfa",
+            "/api/iot/ingest"
     );
 
     private final ObjectMapper objectMapper;

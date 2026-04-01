@@ -3,6 +3,7 @@ package com.example.eam.Exception;
 import com.example.eam.Common.ApiResponse;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -70,6 +71,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ApiResponse<Void>> handleNotFoundExceptions(Exception ex) {
         ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.NOT_FOUND.value(), "Not found");
         return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                .contentType(MediaType.APPLICATION_JSON)
+                .body(apiResponse);
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    public ResponseEntity<ApiResponse<Void>> handleDataIntegrityViolationException(DataIntegrityViolationException ex) {
+        ApiResponse<Void> apiResponse = ApiResponse.errorResponse(HttpStatus.CONFLICT.value(), "Duplicate or conflicting data");
+        return ResponseEntity.status(HttpStatus.CONFLICT)
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(apiResponse);
     }

@@ -26,7 +26,7 @@ public class ServiceMaintenance {
     @Column(name = "company_id")
     private Long companyId;
 
-    @Column(name = "request_id", nullable = false, unique = true, length = 50)
+    @Column(name = "request_id", nullable = false, length = 50)
     private String requestId;              // Business Request ID (SR-000001 etc.)
 
     @Column(name = "linked_work_order_id", length = 64)

@@ -30,6 +30,8 @@ jobs:
           echo "Pulling latest code..."
           git pull
 
+          export $(grep -v '^#' .env | xargs)
+
           echo "Building app..."
           chmod +x gradlew
           ./gradlew clean bootJar

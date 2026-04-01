@@ -14,6 +14,7 @@ import com.example.eam.ServiceMaintenance.Dto.ServiceRequestUpdateDto;
 import com.example.eam.ServiceMaintenance.Entity.ServiceMaintenance;
 import com.example.eam.ServiceMaintenance.Repository.ServiceMaintenanceRepository;
 import lombok.RequiredArgsConstructor;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
@@ -82,7 +83,7 @@ public class ServiceMaintenanceService {
                 .approvedAt(null)
                 .build();
 
-        ServiceMaintenance saved = serviceRepo.save(entity);
+        ServiceMaintenance saved = saveOrThrowConflict(entity);
         return toResponse(saved);
     }
 
@@ -212,7 +213,7 @@ public class ServiceMaintenanceService {
             entity.setStatus(dto.getStatus());
         }
 
-        ServiceMaintenance saved = serviceRepo.save(entity);
+        ServiceMaintenance saved = saveOrThrowConflict(entity);
         return toResponse(saved);
     }
 
@@ -342,6 +343,18 @@ public class ServiceMaintenanceService {
         if (technicianId != null && teamId != null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
                     "Specify either preferredTechnicianId or preferredTeamId, not both");
+        }
+    }
+
+    private ServiceMaintenance saveOrThrowConflict(ServiceMaintenance entity) {
+        try {
+            return serviceRepo.save(entity);
+        } catch (DataIntegrityViolationException ex) {
+            throw new ResponseStatusException(
+                    HttpStatus.CONFLICT,
+                    "Service Request ID already exists: " + entity.getRequestId(),
+                    ex
+            );
         }
     }
 }
