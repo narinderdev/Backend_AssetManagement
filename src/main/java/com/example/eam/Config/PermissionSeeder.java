@@ -45,6 +45,10 @@ public class PermissionSeeder implements ApplicationRunner {
         seedCrud(toInsert, PermissionModule.INVENTORY, "inventory", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN, "technician", sort); sort += 4;
         seedCrud(toInsert, PermissionModule.TECHNICIAN_TEAM, "technician_team", sort); sort += 4;
+        seedCrud(toInsert, PermissionModule.IOT, "iot", sort); sort += 4;
+        seedViewOnly(toInsert, PermissionModule.IOT, "iot_dashboard", sort++);
+        seedViewOnly(toInsert, PermissionModule.IOT, "iot_alerts", sort++);
+        seedOne(toInsert, PermissionModule.IOT, PermissionAction.UPDATE, "update_iot_alerts", "Update Iot Alerts", sort++);
         seedViewOnly(toInsert, PermissionModule.DASHBOARD, "dashboard", sort++);
         seedReport(toInsert, PermissionModule.REPORTS, "reports", sort); sort += 2;
 

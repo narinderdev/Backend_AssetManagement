@@ -67,6 +67,7 @@ public class SecurityConfig {
                         "/auth/mfa/email/send",
                         "/auth/mfa/email/verify"
                 ).permitAll()
+                .requestMatchers(HttpMethod.POST, "/iot/v1/telemetry").permitAll()
                 .requestMatchers("/auth/signup/**").permitAll()
                 .requestMatchers(
                         "/users/accept",

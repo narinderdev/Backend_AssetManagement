@@ -17,6 +17,7 @@ import com.example.eam.Maintenance.Predictive.Entity.AssetThreshold;
 import com.example.eam.Maintenance.Predictive.Entity.PredictiveMeterReading;
 import com.example.eam.Maintenance.Predictive.Repository.AssetThresholdRepository;
 import com.example.eam.Maintenance.Predictive.Repository.PredictiveMeterReadingRepository;
+import com.example.eam.Iot.Service.IotPredictiveBridgeService;
 import com.example.eam.WorkOrder.Entity.WorkOrder;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
@@ -49,6 +50,7 @@ public class PredictiveMaintenanceService {
     private final PredictiveMeterReadingRepository meterReadingRepository;
     private final WorkRequestTypeService workRequestTypeService;
     private final WoNumberPoolService woNumberPoolService;
+    private final IotPredictiveBridgeService iotPredictiveBridgeService;
 
     @Transactional
     public AssetThresholdResponse createThreshold(@Valid AssetThresholdRequest req) {
@@ -180,23 +182,30 @@ public class PredictiveMaintenanceService {
                 .build();
         meterReadingRepository.save(reading);
 
-        if (severity == null) return;
-
-        boolean skipCooldown = MeterType.TEMPERATURE.equals(threshold.getMeterType());
-        if (!skipCooldown && threshold.getLastTriggeredAt() != null && threshold.getCooldownHours() != null) {
-            LocalDateTime nextAllowed = threshold.getLastTriggeredAt().plusHours(threshold.getCooldownHours());
-            if (now.isBefore(nextAllowed)) {
-                return;
+        if (severity != null) {
+            boolean skipCooldown = MeterType.TEMPERATURE.equals(threshold.getMeterType());
+            if (!skipCooldown && threshold.getLastTriggeredAt() != null && threshold.getCooldownHours() != null) {
+                LocalDateTime nextAllowed = threshold.getLastTriggeredAt().plusHours(threshold.getCooldownHours());
+                if (now.isAfter(nextAllowed) || now.isEqual(nextAllowed)) {
+                    threshold.setLastTriggeredAt(now);
+                    threshold.setLastTriggeredSeverity(severity);
+                    thresholdRepository.save(threshold);
+                }
+            } else {
+                threshold.setLastTriggeredAt(now);
+                threshold.setLastTriggeredSeverity(severity);
+                thresholdRepository.save(threshold);
             }
         }
 
-        threshold.setLastTriggeredAt(now);
-        threshold.setLastTriggeredSeverity(severity);
-        thresholdRepository.save(threshold);
-
-        if ("CRITICAL".equals(severity) && Boolean.TRUE.equals(threshold.getAutoCreateWo())) {
-            createPredictiveWorkOrder(asset, threshold, req.getMeterType(), value);
-        }
+        iotPredictiveBridgeService.processPredictiveReading(
+                asset,
+                threshold,
+                req.getMeterType().name(),
+                value,
+                now,
+                req.getNotes()
+        );
     }
 
       private void createPredictiveWorkOrder(Asset asset, AssetThreshold threshold, MeterType meterType, double value) {

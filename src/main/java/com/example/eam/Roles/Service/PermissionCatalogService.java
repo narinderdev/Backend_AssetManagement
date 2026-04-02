@@ -131,7 +131,8 @@ public class PermissionCatalogService {
                 permissionClass("Dashboard", List.of(
                         permissionObject("Maintenance Dashboard", grouped, PermissionModule.DASHBOARD, true),
                         permissionObject("Security Dashboard", grouped, PermissionModule.DASHBOARD, true),
-                        permissionObject("Budget Dashboard", grouped, PermissionModule.DASHBOARD, true)
+                        permissionObject("Budget Dashboard", grouped, PermissionModule.DASHBOARD, true),
+                        permissionObject("IoT Dashboard", grouped, PermissionModule.IOT, true)
                 )),
                 permissionClass("Asset", List.of(
                         permissionObject("Asset Type", grouped, PermissionModule.ASSET_TYPE, false),
@@ -146,7 +147,8 @@ public class PermissionCatalogService {
                 )),
                 permissionClass("Maintenance", List.of(
                         permissionObject("Preventive", grouped, PermissionModule.PREVENTIVE_MAINTENANCE, false),
-                        permissionObject("Corrective", grouped, PermissionModule.CORRECTIVE_MAINTENANCE, false)
+                        permissionObject("Corrective", grouped, PermissionModule.CORRECTIVE_MAINTENANCE, false),
+                        permissionObject("IoT", grouped, PermissionModule.IOT, false)
                 )),
                 permissionClass("Inventory", List.of(
                         permissionObject("Warehouse", grouped, PermissionModule.INVENTORY, false),
