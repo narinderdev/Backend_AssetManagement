@@ -59,3 +59,7 @@ src/test/
 
 .gradle-user/
 .gradle/
+
+.gradle-user-codex/
+.gradle-user-tmfix/
+.tools/

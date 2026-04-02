@@ -60,7 +60,6 @@ public class SecurityConfig {
                     "/swagger-ui/**",
                     "/v3/api-docs/**"
                 ).permitAll()
-                .requestMatchers(HttpMethod.POST, "/api/iot/ingest").permitAll()
                 .requestMatchers(HttpMethod.POST,
                         "/auth",
                         "/auth/",
