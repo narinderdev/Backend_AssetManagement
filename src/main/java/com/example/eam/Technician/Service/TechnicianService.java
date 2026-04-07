@@ -133,7 +133,12 @@ public class TechnicianService {
                         currentCompanyId(),
                         startDate.atStartOfDay(),
                         endDate.atStartOfDay(),
-                        EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                        EnumSet.of(
+                                WorkOrderStatus.SCHEDULED,
+                                WorkOrderStatus.ON_THE_WAY,
+                                WorkOrderStatus.ARRIVED,
+                                WorkOrderStatus.IN_PROGRESS
+                        )
                 );
 
         for (var wo : bookings) {
@@ -497,7 +502,12 @@ public class TechnicianService {
                 currentCompanyId(),
                 now,
                 now.plusYears(50), // generous window for "future"
-                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                EnumSet.of(
+                        WorkOrderStatus.SCHEDULED,
+                        WorkOrderStatus.ON_THE_WAY,
+                        WorkOrderStatus.ARRIVED,
+                        WorkOrderStatus.IN_PROGRESS
+                )
         );
         if (activeOrFutureBookings > 0) {
             throw new ResponseStatusException(
@@ -589,7 +599,12 @@ public class TechnicianService {
                 currentCompanyId(),
                 start,
                 end,
-                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                EnumSet.of(
+                        WorkOrderStatus.SCHEDULED,
+                        WorkOrderStatus.ON_THE_WAY,
+                        WorkOrderStatus.ARRIVED,
+                        WorkOrderStatus.IN_PROGRESS
+                )
         );
 
         return activeBookings > 0 ? TechnicianWorkStatus.WORKING : TechnicianWorkStatus.AVAILABLE;

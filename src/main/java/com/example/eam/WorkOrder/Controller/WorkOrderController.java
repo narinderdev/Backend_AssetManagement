@@ -100,6 +100,15 @@ public class WorkOrderController {
         return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order in progress", data));
     }
 
+    @PostMapping("/{id}/location-events")
+    public ResponseEntity<ApiResponse<WorkOrderLocationEventResponse>> ingestLocationEvent(
+            @PathVariable Long id,
+            @Valid @RequestBody WorkOrderLocationEventRequest request
+    ) {
+        WorkOrderLocationEventResponse data = workOrderService.ingestLocationEvent(id, request);
+        return ResponseEntity.ok(ApiResponse.successResponse(HttpStatus.OK.value(), "Work order location event recorded", data));
+    }
+
     @PostMapping("/{id}/check-in")
     public ResponseEntity<ApiResponse<WorkOrderDetailsResponse>> checkIn(
             @PathVariable Long id,

@@ -35,7 +35,14 @@ import java.util.Set;
 public class DashboardService {
 
     private static final Set<WorkOrderStatus> ACTIVE_WORK_ORDER_STATUSES =
-            EnumSet.of(WorkOrderStatus.NEW, WorkOrderStatus.APPROVED, WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS);
+            EnumSet.of(
+                    WorkOrderStatus.NEW,
+                    WorkOrderStatus.APPROVED,
+                    WorkOrderStatus.SCHEDULED,
+                    WorkOrderStatus.ON_THE_WAY,
+                    WorkOrderStatus.ARRIVED,
+                    WorkOrderStatus.IN_PROGRESS
+            );
 
     private static final Set<WorkOrderStatus> COMPLETED_STATUSES =
             EnumSet.of(WorkOrderStatus.COMPLETED, WorkOrderStatus.CLOSED);
@@ -147,7 +154,12 @@ public class DashboardService {
                 companyId,
                 start,
                 end,
-                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                EnumSet.of(
+                        WorkOrderStatus.SCHEDULED,
+                        WorkOrderStatus.ON_THE_WAY,
+                        WorkOrderStatus.ARRIVED,
+                        WorkOrderStatus.IN_PROGRESS
+                )
         );
 
         long onLeave = technicianLeaveRepository.countTechniciansOnLeave(today, companyId);
@@ -177,6 +189,8 @@ public class DashboardService {
                     String activity = switch (wo.getStatus()) {
                         case COMPLETED -> "Completed Work Order #" + wo.getWorkOrderId();
                         case IN_PROGRESS -> "Started Work Order #" + wo.getWorkOrderId();
+                        case ARRIVED -> "Arrived at Work Order #" + wo.getWorkOrderId();
+                        case ON_THE_WAY -> "On the way for Work Order #" + wo.getWorkOrderId();
                         case SCHEDULED -> "Scheduled Work Order #" + wo.getWorkOrderId();
                         default -> "Updated Work Order #" + wo.getWorkOrderId();
                     };
