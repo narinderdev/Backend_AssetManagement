@@ -117,6 +117,8 @@ public class AssetService {
         loc.setCostCenter(dto.getCostCenter());
         loc.setAssignedOwner(dto.getAssignedOwner());
         loc.setMaintenanceTeam(dto.getMaintenanceTeam());
+        loc.setLatitude(dto.getLatitude());
+        loc.setLongitude(dto.getLongitude());
 
         locationRepository.save(loc);
         return getAssetDetails(assetId);
@@ -319,6 +321,8 @@ public class AssetService {
             updateIfNotNull(dto.getCostCenter(), loc::setCostCenter);
             updateIfNotNull(dto.getAssignedOwner(), loc::setAssignedOwner);
             updateIfNotNull(dto.getMaintenanceTeam(), loc::setMaintenanceTeam);
+            updateIfNotNull(dto.getLatitude(), loc::setLatitude);
+            updateIfNotNull(dto.getLongitude(), loc::setLongitude);
 
             locationRepository.save(loc);
         }
@@ -648,6 +652,8 @@ public class AssetService {
             locDto.setCostCenter(loc.getCostCenter());
             locDto.setAssignedOwner(loc.getAssignedOwner());
             locDto.setMaintenanceTeam(loc.getMaintenanceTeam());
+            locDto.setLatitude(loc.getLatitude());
+            locDto.setLongitude(loc.getLongitude());
         }
 
         AssetTechnicalDetailsDto techDto = null;

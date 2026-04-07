@@ -4,6 +4,8 @@ package com.example.eam.Asset.Entity;
 import jakarta.persistence.*;
 import lombok.*;
 
+import java.math.BigDecimal;
+
 @Entity
 @Table(name = "asset_location")
 @Getter
@@ -35,6 +37,12 @@ public class AssetLocation {
 
     @Column(name = "maintenance_team", length = 255)
     private String maintenanceTeam;
+
+    @Column(name = "latitude", precision = 10, scale = 7)
+    private BigDecimal latitude;
+
+    @Column(name = "longitude", precision = 10, scale = 7)
+    private BigDecimal longitude;
 
     @Override
     public boolean equals(Object o) {
