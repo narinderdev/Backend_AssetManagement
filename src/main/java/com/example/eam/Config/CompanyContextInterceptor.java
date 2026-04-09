@@ -2,6 +2,7 @@ package com.example.eam.Config;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.Common.CompanyContextHolder;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.User.repository.UserCompanyRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -30,6 +31,7 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
     private final ObjectMapper objectMapper;
     private final UserCompanyRepository userCompanyRepository;
+    private final TechnicianRepository technicianRepository;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -71,6 +73,9 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
                 userEmail,
                 companyId
         );
+        if (!allowed) {
+            allowed = technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(userEmail, companyId);
+        }
         if (!allowed) {
             writeError(response, HttpStatus.FORBIDDEN, "You are not assigned to this company");
             return false;

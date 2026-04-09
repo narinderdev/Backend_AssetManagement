@@ -9,6 +9,8 @@ import com.example.eam.TechnicianTeam.Entity.TechnicianTeam;
 import com.example.eam.TechnicianTeam.Entity.TechnicianTeamMember;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamMemberRepository;
 import com.example.eam.TechnicianTeam.Repository.TechnicianTeamRepository;
+import java.sql.Date;
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -85,17 +87,36 @@ public class TmDirectorySyncService {
 
     private List<TmUserRow> fetchTechnicians() {
         return tmJdbcTemplate.query("""
-                SELECT id, company_id, first_name, last_name, email, status, is_deleted
+                SELECT id, company_id, technician_id, badge_number, first_name, last_name,
+                       technician_type, skills, phone_number, email, address, status,
+                       hire_date, work_shift, technician_photo_url, certificate_url,
+                       certificate_issue_date, certificate_expiry_date, termination_date,
+                       certifications, notes, is_deleted
                 FROM technicians
-                WHERE is_deleted = 0
-                  AND company_id IS NOT NULL
+                WHERE company_id IS NOT NULL
                 """, (rs, row) -> new TmUserRow(
                 rs.getLong("id"),
                 rs.getLong("company_id"),
+                rs.getString("technician_id"),
+                rs.getString("badge_number"),
                 rs.getString("first_name"),
                 rs.getString("last_name"),
+                rs.getString("technician_type"),
+                rs.getString("skills"),
+                rs.getString("phone_number"),
                 rs.getString("email"),
-                !"INACTIVE".equalsIgnoreCase(rs.getString("status")) && !rs.getBoolean("is_deleted")));
+                rs.getString("address"),
+                rs.getString("status"),
+                toLocalDate(rs.getDate("hire_date")),
+                rs.getString("work_shift"),
+                rs.getString("technician_photo_url"),
+                rs.getString("certificate_url"),
+                toLocalDate(rs.getDate("certificate_issue_date")),
+                toLocalDate(rs.getDate("certificate_expiry_date")),
+                toLocalDate(rs.getDate("termination_date")),
+                rs.getString("certifications"),
+                rs.getString("notes"),
+                rs.getBoolean("is_deleted")));
     }
 
     private List<TmTeamRow> fetchTeams() {
@@ -134,31 +155,49 @@ public class TmDirectorySyncService {
     private Map<TmTechnicianKey, Technician> upsertTechnicians(List<TmUserRow> rows) {
         Map<TmTechnicianKey, Technician> result = new HashMap<>();
         for (TmUserRow row : rows) {
-            String externalId = externalTechId(row.id());
-            String email = row.email();
+            String legacyExternalId = externalTechId(row.id());
+            String technicianId = defaulted(trimToNull(row.technicianId()), legacyExternalId);
+            String badgeNumber = defaulted(trimToNull(row.badgeNumber()), "TM-BADGE-" + row.id());
+            String email = trimToNull(row.email());
 
             Optional<Technician> existingById = technicianRepository
-                    .findFirstByTechnicianIdIgnoreCaseAndCompanyId(externalId, row.companyId());
+                    .findFirstByTechnicianIdIgnoreCaseAndCompanyId(technicianId, row.companyId());
             Optional<Technician> existingByEmail = email == null
                     ? Optional.empty()
                     : technicianRepository.findFirstByEmailIgnoreCaseAndCompanyId(email, row.companyId());
+            Optional<Technician> existingByLegacyId = technicianId.equalsIgnoreCase(legacyExternalId)
+                    ? Optional.empty()
+                    : technicianRepository.findFirstByTechnicianIdIgnoreCaseAndCompanyId(legacyExternalId, row.companyId());
 
             Technician tech = existingById
                     .or(() -> existingByEmail)
-                    .or(() -> findLegacyTechnician(row.companyId(), externalId, email))
+                    .or(() -> existingByLegacyId)
+                    .or(() -> findLegacyTechnician(row.companyId(), technicianId, legacyExternalId, email))
                     .orElseGet(Technician::new);
 
             tech.setCompanyId(row.companyId());
-            tech.setTechnicianId(externalId);
-            if (tech.getBadgeNumber() == null || tech.getBadgeNumber().isBlank()) {
-                tech.setBadgeNumber("TM-BADGE-" + row.id());
-            }
+            tech.setTechnicianId(technicianId);
+            tech.setBadgeNumber(badgeNumber);
             tech.setFirstName(defaulted(row.firstName(), "Technician"));
             tech.setLastName(defaulted(row.lastName(), String.valueOf(row.id())));
             tech.setEmail(email);
-            tech.setTechnicianType(TechnicianType.FULL_TIME);
-            tech.setStatus(row.active() ? TechnicianStatus.ACTIVE : TechnicianStatus.INACTIVE);
-            tech.setDeleted(!row.active());
+            tech.setTechnicianType(parseTechnicianType(row.technicianType()));
+            tech.setSkills(row.skills());
+            tech.setPhoneNumber(trimToNull(row.phoneNumber()));
+            tech.setAddress(row.address());
+            tech.setStatus(row.deleted()
+                    ? TechnicianStatus.INACTIVE
+                    : parseTechnicianStatus(row.status()));
+            tech.setHireDate(row.hireDate());
+            tech.setWorkShift(trimToNull(row.workShift()));
+            tech.setTechnicianPhotoUrl(trimToNull(row.technicianPhotoUrl()));
+            tech.setCertificateUrl(trimToNull(row.certificateUrl()));
+            tech.setCertificateIssueDate(row.certificateIssueDate());
+            tech.setCertificateExpiryDate(row.certificateExpiryDate());
+            tech.setTerminationDate(row.terminationDate());
+            tech.setCertifications(row.certifications());
+            tech.setNotes(row.notes());
+            tech.setDeleted(row.deleted());
 
             Technician saved = technicianRepository.save(tech);
             result.put(new TmTechnicianKey(row.companyId(), row.id()), saved);
@@ -239,9 +278,14 @@ public class TmDirectorySyncService {
         return "TM-" + tmId;
     }
 
-    private Optional<Technician> findLegacyTechnician(Long companyId, String externalId, String email) {
-        Optional<Technician> byId = technicianRepository.findFirstByTechnicianIdIgnoreCase(externalId)
-                .filter(technician -> technician.getCompanyId() == null || Objects.equals(technician.getCompanyId(), companyId));
+    private Optional<Technician> findLegacyTechnician(
+            Long companyId,
+            String primaryTechnicianId,
+            String secondaryTechnicianId,
+            String email) {
+
+        Optional<Technician> byId = findLegacyTechnicianById(companyId, primaryTechnicianId)
+                .or(() -> findLegacyTechnicianById(companyId, secondaryTechnicianId));
         if (byId.isPresent()) {
             return byId;
         }
@@ -252,15 +296,86 @@ public class TmDirectorySyncService {
                 .filter(technician -> technician.getCompanyId() == null || Objects.equals(technician.getCompanyId(), companyId));
     }
 
+    private Optional<Technician> findLegacyTechnicianById(Long companyId, String technicianId) {
+        if (technicianId == null || technicianId.isBlank()) {
+            return Optional.empty();
+        }
+        return technicianRepository.findFirstByTechnicianIdIgnoreCase(technicianId)
+                .filter(technician -> technician.getCompanyId() == null || Objects.equals(technician.getCompanyId(), companyId));
+    }
+
     private String defaulted(String value, String fallback) {
         return (value == null || value.isBlank()) ? fallback : value.trim();
+    }
+
+    private String trimToNull(String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        return trimmed.isEmpty() ? null : trimmed;
+    }
+
+    private TechnicianType parseTechnicianType(String value) {
+        if (value == null || value.isBlank()) {
+            return TechnicianType.FULL_TIME;
+        }
+        try {
+            return TechnicianType.valueOf(value.trim().toUpperCase(Locale.ROOT));
+        } catch (Exception ex) {
+            return TechnicianType.FULL_TIME;
+        }
+    }
+
+    private TechnicianStatus parseTechnicianStatus(String value) {
+        if (value == null || value.isBlank()) {
+            return TechnicianStatus.ACTIVE;
+        }
+        String normalized = value.trim().toUpperCase(Locale.ROOT);
+        if ("INACTIVE".equals(normalized) || "DISABLED".equals(normalized)) {
+            return TechnicianStatus.INACTIVE;
+        }
+        if ("ACTIVE".equals(normalized) || "ENABLED".equals(normalized)) {
+            return TechnicianStatus.ACTIVE;
+        }
+        try {
+            return TechnicianStatus.valueOf(normalized);
+        } catch (Exception ex) {
+            return TechnicianStatus.ACTIVE;
+        }
+    }
+
+    private LocalDate toLocalDate(Date value) {
+        return value == null ? null : value.toLocalDate();
     }
 
     // ---------- DTOs ----------
     public record SyncReport(int technicians, int teams) {}
     private record TmTechnicianKey(Long companyId, Long technicianId) {}
     private record TmTeamKey(Long companyId, String teamName) {}
-    private record TmUserRow(Long id, Long companyId, String firstName, String lastName, String email, boolean active) {}
+    private record TmUserRow(
+            Long id,
+            Long companyId,
+            String technicianId,
+            String badgeNumber,
+            String firstName,
+            String lastName,
+            String technicianType,
+            String skills,
+            String phoneNumber,
+            String email,
+            String address,
+            String status,
+            LocalDate hireDate,
+            String workShift,
+            String technicianPhotoUrl,
+            String certificateUrl,
+            LocalDate certificateIssueDate,
+            LocalDate certificateExpiryDate,
+            LocalDate terminationDate,
+            String certifications,
+            String notes,
+            boolean deleted) {}
     private record TmTeamRow(Long id, Long companyId, String name, String description, String status) {}
     private record TmMemberRow(Long teamId, Long companyId, Long technicianId, boolean teamLeader) {}
 }

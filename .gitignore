@@ -63,3 +63,5 @@ src/test/
 .gradle-user-codex/
 .gradle-user-tmfix/
 .tools/
+
+src/main/java/com/example/tm1/*

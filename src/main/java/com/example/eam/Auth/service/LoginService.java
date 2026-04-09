@@ -20,6 +20,8 @@ import org.springframework.dao.DataIntegrityViolationException;
 import com.example.eam.Auth.dto.LoginDto;
 import com.example.eam.Auth.dto.LoginResponseDto;
 import com.example.eam.Auth.dto.MfaLoginDto;
+import com.example.eam.CompanyManagement.Entity.Company;
+import com.example.eam.CompanyManagement.Repository.CompanyRepository;
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
 import com.example.eam.Roles.Entity.Role;
@@ -60,6 +62,7 @@ public class LoginService {
     private final TechnicianTeamMemberRepository technicianTeamMemberRepository;
     private final PasswordPolicyRepository passwordPolicyRepository;
     private final UserCompanyRepository userCompanyRepository;
+    private final CompanyRepository companyRepository;
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
@@ -162,24 +165,13 @@ public class LoginService {
                 .toList());
         boolean isAdmin = roles.stream().anyMatch(this::isAdminRoleName);
 
-        List<LoginResponseDto.CompanySummary> companies = userCompanyRepository
+        List<LoginResponseDto.CompanySummary> companies = new ArrayList<>(userCompanyRepository
                 .findByUser_IdAndCompany_ActiveTrue(user.getId())
                 .stream()
                 .map(UserCompany::getCompany)
                 .filter(Objects::nonNull)
-                .map(c -> new LoginResponseDto.CompanySummary(
-                        c.getId(),
-                        c.getCompanyLegalName(),
-                        c.getCompanyTradeName(),
-                        c.getCompanyNumber(),
-                        c.getAddress(),
-                        c.getCity(),
-                        c.getCountry(),
-                        c.getPostalCode()
-                ))
-                .toList();
-
-        Boolean isCompanySetup = isAdmin ? !companies.isEmpty() : null;
+                .map(this::toCompanySummary)
+                .toList());
 
         boolean hasTechnicianRole = user.getUserRoles()
                 .stream()
@@ -199,6 +191,9 @@ public class LoginService {
         Long technicianId = (hasTechnicianRole || isTmDbTechnician) ? ensureTechnicianProfile(user) : null;
         if (technicianId != null && deviceToken != null && !deviceToken.trim().isEmpty()) {
             registerDeviceToken(technicianId, deviceToken, devicePlatform);
+        }
+        if (companies.isEmpty() && technicianId != null) {
+            findTechnicianCompanySummary(technicianId).ifPresent(companies::add);
         }
 
         boolean isTechnician = technicianId != null;
@@ -223,6 +218,7 @@ public class LoginService {
                     )
             );
         }
+        Boolean isCompanySetup = isAdmin ? !companies.isEmpty() : null;
         return new LoginResponseDto(
                 token,
                 user,
@@ -236,6 +232,30 @@ public class LoginService {
                 mfaToken,
                 companies,
                 isCompanySetup
+        );
+    }
+
+    private java.util.Optional<LoginResponseDto.CompanySummary> findTechnicianCompanySummary(Long technicianId) {
+        if (technicianId == null) {
+            return java.util.Optional.empty();
+        }
+        return technicianRepository.findByIdAndIsDeletedFalse(technicianId)
+                .map(Technician::getCompanyId)
+                .filter(companyId -> companyId != null && companyId > 0)
+                .flatMap(companyRepository::findByIdAndActiveTrue)
+                .map(this::toCompanySummary);
+    }
+
+    private LoginResponseDto.CompanySummary toCompanySummary(Company company) {
+        return new LoginResponseDto.CompanySummary(
+                company.getId(),
+                company.getCompanyLegalName(),
+                company.getCompanyTradeName(),
+                company.getCompanyNumber(),
+                company.getAddress(),
+                company.getCity(),
+                company.getCountry(),
+                company.getPostalCode()
         );
     }
 

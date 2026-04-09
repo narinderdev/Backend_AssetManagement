@@ -30,6 +30,7 @@ import com.example.eam.Enum.SecurityEventType;
 import com.example.eam.Enum.SecurityTargetType;
 import com.example.eam.Security.Entity.SecurityEvent;
 import com.example.eam.Security.Repository.SecurityEventRepository;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -49,6 +50,7 @@ public class UserService {
     private final UserRoleRepository userRoleRepository;
     private final UserCompanyRepository userCompanyRepository;
     private final CompanyRepository companyRepository;
+    private final TechnicianRepository technicianRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityEventRepository securityEventRepository;
 
@@ -274,6 +276,9 @@ public class UserService {
                 return;
             }
             boolean allowed = userCompanyRepository.existsActiveMapping(currentEmail, companyId);
+            if (!allowed) {
+                allowed = technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(currentEmail, companyId);
+            }
             if (!allowed) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not assigned to this company");
             }

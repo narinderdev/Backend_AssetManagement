@@ -22,6 +22,15 @@ java {
 	}
 }
 
+sourceSets {
+	main {
+		java {
+			// Exclude reference EAM codebase; TM uses only explicit integration models under tm.auth.integration.eam
+			exclude 'com/example/tm1/**'
+		}
+	}
+}
+
 configurations {
 	compileOnly {
 		extendsFrom annotationProcessor
