@@ -117,7 +117,7 @@ private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
         WorkOrderStatus.APPROVED
 );
-private static final int DEFAULT_GEOFENCE_RADIUS_METERS = 100;
+private static final int DEFAULT_GEOFENCE_RADIUS_METERS = 2;
 private static final Set<WorkOrderStatus> BOOKING_CONFLICT_STATUSES = Set.of(
         WorkOrderStatus.SCHEDULED,
         WorkOrderStatus.ON_THE_WAY,
@@ -695,10 +695,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             if (!insideGeofence && wo.getStatus() == WorkOrderStatus.SCHEDULED) {
                 transitionWorkOrderStatus(wo, WorkOrderStatus.ON_THE_WAY);
             }
-            if (insideGeofence
-                    && (wo.getStatus() == WorkOrderStatus.SCHEDULED || wo.getStatus() == WorkOrderStatus.ON_THE_WAY)) {
-                transitionWorkOrderStatus(wo, WorkOrderStatus.ARRIVED);
-            }
 
             boolean hasOpenCheckIn = workOrderCheckLogRepository
                     .findFirstByWorkOrder_IdAndTechnician_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id, technician.getId())
@@ -718,8 +714,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             if (insideGeofence
                     && hasOpenCheckIn
                     && (wo.getStatus() == WorkOrderStatus.SCHEDULED
-                    || wo.getStatus() == WorkOrderStatus.ON_THE_WAY
-                    || wo.getStatus() == WorkOrderStatus.ARRIVED)) {
+                    || wo.getStatus() == WorkOrderStatus.ON_THE_WAY)) {
                 try {
                     WorkOrderInProgressRequest inProgressRequest = new WorkOrderInProgressRequest();
                     inProgressRequest.setActualStartDateTime(observedAt);

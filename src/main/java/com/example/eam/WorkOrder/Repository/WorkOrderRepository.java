@@ -24,6 +24,8 @@ public interface WorkOrderRepository extends JpaRepository<WorkOrder, Long> {
 
     Optional<WorkOrder> findByIdAndDeletedFalse(Long id);
     Optional<WorkOrder> findByIdAndDeletedFalseAndCompanyId(Long id, Long companyId);
+    Optional<WorkOrder> findTopByWorkOrderIdAndDeletedFalseAndCompanyIdOrderByIdDesc(String workOrderId, Long companyId);
+    Optional<WorkOrder> findTopByWoNumberAndDeletedFalseAndCompanyIdOrderByIdDesc(String woNumber, Long companyId);
 
     Page<WorkOrder> findByDeletedFalse(Pageable pageable);
     Page<WorkOrder> findByDeletedFalseAndCompanyId(Long companyId, Pageable pageable);

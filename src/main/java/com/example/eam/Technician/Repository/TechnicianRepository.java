@@ -1,6 +1,7 @@
 package com.example.eam.Technician.Repository;
 
 import com.example.eam.Technician.Entity.Technician;
+import com.example.eam.Enum.TechnicianStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -38,6 +39,7 @@ public interface TechnicianRepository extends JpaRepository<Technician, Long> {
 
     List<Technician> findByIdInAndIsDeletedFalse(Iterable<Long> ids);
     List<Technician> findByIdInAndIsDeletedFalseAndCompanyId(Iterable<Long> ids, Long companyId);
+    List<Technician> findByIsDeletedFalseAndStatusAndCompanyId(TechnicianStatus status, Long companyId);
 
     /**
      * Backward-compatible helpers used in older code/tests. They delegate to the

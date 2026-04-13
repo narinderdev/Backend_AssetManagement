@@ -22,6 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CompanyContextInterceptor implements HandlerInterceptor {
 
+    private static final String VOICE_AI_INTAKE_PATH = "/api/voice-ai/intake";
+    private static final long VOICE_AI_DEFAULT_COMPANY_ID = 2L;
+
     private static final List<String> EXCLUDED_PREFIXES = List.of(
             "/api/companies",
             "/api/permissions",
@@ -41,6 +44,11 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (path == null || !path.startsWith("/api/") || isExcluded(path)) {
+            return true;
+        }
+
+        if (isVoiceAiIntakePath(path)) {
+            CompanyContextHolder.setCompanyId(VOICE_AI_DEFAULT_COMPANY_ID);
             return true;
         }
 
@@ -92,6 +100,10 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
     private boolean isExcluded(String path) {
         return EXCLUDED_PREFIXES.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isVoiceAiIntakePath(String path) {
+        return VOICE_AI_INTAKE_PATH.equals(path) || (VOICE_AI_INTAKE_PATH + "/").equals(path);
     }
 
     private String resolveCurrentUserEmail() {

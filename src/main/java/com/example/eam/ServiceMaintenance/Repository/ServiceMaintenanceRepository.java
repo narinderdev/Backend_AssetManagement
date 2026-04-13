@@ -27,6 +27,7 @@ public interface ServiceMaintenanceRepository extends JpaRepository<ServiceMaint
 
     Optional<ServiceMaintenance> findTopByOrderByIdDesc();   // for auto-numbering
     Optional<ServiceMaintenance> findTopByCompanyIdOrderByIdDesc(Long companyId);
+    Optional<ServiceMaintenance> findTopByRequestIdAndCompanyIdOrderByIdDesc(String requestId, Long companyId);
 
     Page<ServiceMaintenance> findByDeletedFalseAndStatusNot(ServiceRequestStatus status, Pageable pageable);
     Page<ServiceMaintenance> findByDeletedFalseAndStatusNotAndCompanyId(ServiceRequestStatus status, Long companyId, Pageable pageable);
