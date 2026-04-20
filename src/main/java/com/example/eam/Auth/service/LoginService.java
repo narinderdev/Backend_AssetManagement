@@ -22,9 +22,13 @@ import com.example.eam.Auth.dto.LoginResponseDto;
 import com.example.eam.Auth.dto.MfaLoginDto;
 import com.example.eam.CompanyManagement.Entity.Company;
 import com.example.eam.CompanyManagement.Repository.CompanyRepository;
+import com.example.eam.Enum.PermissionAction;
+import com.example.eam.Enum.PermissionModule;
 import com.example.eam.Enum.TechnicianStatus;
 import com.example.eam.Enum.TechnicianType;
+import com.example.eam.Roles.Entity.AppPermission;
 import com.example.eam.Roles.Entity.Role;
+import com.example.eam.Roles.Repository.AppPermissionRepository;
 import com.example.eam.Roles.Repository.RoleRepository;
 import com.example.eam.Technician.Entity.Technician;
 import com.example.eam.Technician.Repository.TechnicianRepository;
@@ -65,6 +69,7 @@ public class LoginService {
     private final CompanyRepository companyRepository;
     private final MfaService mfaService;
     private final RoleRepository roleRepository;
+    private final AppPermissionRepository appPermissionRepository;
     private final UserRoleRepository userRoleRepository;
     private final Map<String, JdbcTemplate> jdbcTemplates;
 
@@ -76,6 +81,9 @@ public class LoginService {
     private static final int PASSWORD_EXPIRY_WARNING_DAYS = 7;
     private static final String TECHNICIAN_ROLE_NAME = "Technician";
     private static final String TM_TECHNICIAN_ID_PREFIX = "TM-";
+    private static final String CREATE_WORK_ORDER_PERMISSION = "create_work_order";
+    private static final String UPDATE_WORK_ORDER_PERMISSION = "update_work_order";
+    private static final String VIEW_WORK_ORDER_PERMISSION = "view_work_order";
     private static final String TM_USER_LOGIN_SQL = """
             SELECT TOP 1 first_name, last_name, email, password_hash, active
             FROM tm_users
@@ -206,6 +214,7 @@ public class LoginService {
                     .toList()
                 : List.of();
         boolean isTeamLeader = !leaderTeams.isEmpty();
+        Users responseUser = buildResponseUser(user, isTechnician);
 
         String token = null;
         if (!Boolean.TRUE.equals(mfaRequired)) {
@@ -221,7 +230,7 @@ public class LoginService {
         Boolean isCompanySetup = isAdmin ? !companies.isEmpty() : null;
         return new LoginResponseDto(
                 token,
-                user,
+                responseUser,
                 technicianId,
                 isTechnician,
                 isTeamLeader,
@@ -283,6 +292,155 @@ public class LoginService {
 
     private boolean isAdminRoleName(String roleName) {
         return roleName != null && "Admin".equalsIgnoreCase(roleName.trim());
+    }
+
+    private Users buildResponseUser(Users user, boolean isTechnician) {
+        if (user == null) {
+            return null;
+        }
+        List<AppPermission> mandatoryPermissions = isTechnician ? resolveMandatoryWorkOrderPermissions() : List.of();
+        List<UserRole> responseUserRoles = user.getUserRoles() == null
+                ? new ArrayList<>()
+                : user.getUserRoles().stream()
+                .map(userRole -> copyUserRoleForResponse(userRole, mandatoryPermissions, isTechnician))
+                .toList();
+
+        Users responseUser = Users.builder()
+                .id(user.getId())
+                .firstName(user.getFirstName())
+                .lastName(user.getLastName())
+                .email(user.getEmail())
+                .password(user.getPassword())
+                .status(user.getStatus())
+                .deleted(user.isDeleted())
+                .userRoles(new ArrayList<>())
+                .userCompanies(user.getUserCompanies() == null ? new ArrayList<>() : new ArrayList<>(user.getUserCompanies()))
+                .createdAt(user.getCreatedAt())
+                .updatedAt(user.getUpdatedAt())
+                .mfaEnabled(user.isMfaEnabled())
+                .mfaSecret(user.getMfaSecret())
+                .mfaSecretTemp(user.getMfaSecretTemp())
+                .mfaEmailOtp(user.getMfaEmailOtp())
+                .mfaEmailOtpExpiresAt(user.getMfaEmailOtpExpiresAt())
+                .mfaEmailVerified(user.isMfaEmailVerified())
+                .build();
+        responseUser.getUserRoles().addAll(responseUserRoles);
+        responseUser.getUserRoles().forEach(role -> role.setUser(responseUser));
+        return responseUser;
+    }
+
+    private UserRole copyUserRoleForResponse(UserRole userRole, List<AppPermission> mandatoryPermissions, boolean isTechnician) {
+        if (userRole == null) {
+            return UserRole.builder().build();
+        }
+        return UserRole.builder()
+                .id(userRole.getId())
+                .role(copyRoleForResponse(userRole.getRole(), mandatoryPermissions, isTechnician))
+                .build();
+    }
+
+    private Role copyRoleForResponse(Role role, List<AppPermission> mandatoryPermissions, boolean isTechnician) {
+        if (role == null) {
+            return null;
+        }
+        java.util.Set<AppPermission> responsePermissions = copyPermissionSet(role.getPermissions());
+        if (isTechnician && role.isTechnicianRole()) {
+            for (AppPermission mandatoryPermission : mandatoryPermissions) {
+                responsePermissions.removeIf(existing -> hasCode(existing, mandatoryPermission.getCode()));
+                responsePermissions.add(copyPermission(mandatoryPermission));
+            }
+        }
+
+        return Role.builder()
+                .id(role.getId())
+                .companyId(role.getCompanyId())
+                .name(role.getName())
+                .description(role.getDescription())
+                .active(role.isActive())
+                .technicianRole(role.isTechnicianRole())
+                .permissions(new java.util.HashSet<>(responsePermissions))
+                .createdAt(role.getCreatedAt())
+                .updatedAt(role.getUpdatedAt())
+                .build();
+    }
+
+    private java.util.Set<AppPermission> copyPermissionSet(java.util.Set<AppPermission> permissions) {
+        if (permissions == null || permissions.isEmpty()) {
+            return new java.util.HashSet<>();
+        }
+        java.util.Set<AppPermission> copied = new java.util.HashSet<>();
+        permissions.stream()
+                .filter(Objects::nonNull)
+                .map(this::copyPermission)
+                .forEach(copied::add);
+        return copied;
+    }
+
+    private AppPermission copyPermission(AppPermission permission) {
+        return AppPermission.builder()
+                .id(permission.getId())
+                .code(permission.getCode())
+                .module(permission.getModule())
+                .action(permission.getAction())
+                .label(permission.getLabel())
+                .description(permission.getDescription())
+                .active(permission.isActive())
+                .sortOrder(permission.getSortOrder())
+                .build();
+    }
+
+    private List<AppPermission> resolveMandatoryWorkOrderPermissions() {
+        List<String> mandatoryCodes = List.of(
+                CREATE_WORK_ORDER_PERMISSION,
+                UPDATE_WORK_ORDER_PERMISSION,
+                VIEW_WORK_ORDER_PERMISSION
+        );
+        java.util.Map<String, AppPermission> foundByCode = appPermissionRepository.findByCodeIn(mandatoryCodes).stream()
+                .filter(Objects::nonNull)
+                .filter(AppPermission::isActive)
+                .filter(permission -> permission.getCode() != null && !permission.getCode().isBlank())
+                .collect(java.util.stream.Collectors.toMap(
+                        permission -> permission.getCode().trim(),
+                        permission -> permission,
+                        (first, second) -> first
+                ));
+
+        List<AppPermission> resolved = new ArrayList<>();
+        for (String code : mandatoryCodes) {
+            AppPermission permission = foundByCode.get(code);
+            resolved.add(permission != null ? permission : fallbackWorkOrderPermission(code));
+        }
+        return resolved;
+    }
+
+    private AppPermission fallbackWorkOrderPermission(String code) {
+        PermissionAction action = switch (code) {
+            case CREATE_WORK_ORDER_PERMISSION -> PermissionAction.CREATE;
+            case UPDATE_WORK_ORDER_PERMISSION -> PermissionAction.UPDATE;
+            default -> PermissionAction.VIEW;
+        };
+        String label = switch (code) {
+            case CREATE_WORK_ORDER_PERMISSION -> "Create Work Order";
+            case UPDATE_WORK_ORDER_PERMISSION -> "Update Work Order";
+            default -> "View Work Order";
+        };
+        String description = "Allows user to " + action.name().toLowerCase() + " in " + PermissionModule.WORK_ORDER.name();
+        return AppPermission.builder()
+                .id(null)
+                .code(code)
+                .module(PermissionModule.WORK_ORDER)
+                .action(action)
+                .label(label)
+                .description(description)
+                .active(true)
+                .build();
+    }
+
+    private boolean hasCode(AppPermission permission, String code) {
+        if (permission == null || permission.getCode() == null || code == null) {
+            return false;
+        }
+        return permission.getCode().trim().equalsIgnoreCase(code.trim());
     }
 
     private java.util.Optional<Users> provisionFromTmUserIfValid(String normalizedEmail, String rawPassword) {

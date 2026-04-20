@@ -9,6 +9,7 @@ import com.example.eam.Roles.Entity.AppPermission;
 import com.example.eam.Roles.Entity.Role;
 import com.example.eam.Roles.Repository.AppPermissionRepository;
 import com.example.eam.Roles.Repository.RoleRepository;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.User.entity.UserCompany;
 import com.example.eam.User.entity.Users;
 import com.example.eam.User.repository.UserCompanyRepository;
@@ -40,6 +41,7 @@ public class CompanyService {
     private final CompanyRepository companyRepository;
     private final UsersRepository usersRepository;
     private final UserCompanyRepository userCompanyRepository;
+    private final TechnicianRepository technicianRepository;
     private final RoleRepository roleRepository;
     private final AppPermissionRepository appPermissionRepository;
     private static final Set<String> COMPANY_SORT_FIELDS = Set.of(
@@ -155,9 +157,21 @@ public class CompanyService {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not allowed to access this user's companies");
         }
 
-        return userCompanyRepository.findByUser_IdAndCompany_ActiveTrue(targetUser.getId()).stream()
+        List<Company> companies = userCompanyRepository.findByUser_IdAndCompany_ActiveTrue(targetUser.getId()).stream()
                 .map(UserCompany::getCompany)
                 .filter(Objects::nonNull)
+                .toList();
+
+        if (companies.isEmpty() && targetUser.getEmail() != null && !targetUser.getEmail().isBlank()) {
+            List<Long> technicianCompanyIds = technicianRepository.findDistinctCompanyIdsByEmailIgnoreCase(targetUser.getEmail());
+            if (technicianCompanyIds != null && !technicianCompanyIds.isEmpty()) {
+                companies = companyRepository.findAllById(technicianCompanyIds).stream()
+                        .filter(Company::isActive)
+                        .toList();
+            }
+        }
+
+        return companies.stream()
                 .distinct()
                 .sorted(java.util.Comparator.comparing(Company::getId, java.util.Comparator.nullsLast(Long::compareTo)))
                 .map(this::toResponse)

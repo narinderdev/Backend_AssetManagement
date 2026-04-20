@@ -61,5 +61,15 @@ public class IotSecurityService {
             return false;
         }
     }
-}
 
+    public boolean matchesSecret(String rawSecret, String storedSecretHash) {
+        if (rawSecret == null || rawSecret.isBlank() || storedSecretHash == null || storedSecretHash.isBlank()) {
+            return false;
+        }
+        String candidate = hashSecret(rawSecret.trim());
+        return MessageDigest.isEqual(
+                candidate.getBytes(StandardCharsets.UTF_8),
+                storedSecretHash.getBytes(StandardCharsets.UTF_8)
+        );
+    }
+}

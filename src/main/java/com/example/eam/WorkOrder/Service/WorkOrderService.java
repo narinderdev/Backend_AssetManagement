@@ -52,8 +52,10 @@ import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
+import com.example.eam.WorkOrder.Event.WorkOrderCompletedEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -112,12 +114,13 @@ public class WorkOrderService {
     private final WoNumberPoolService woNumberPoolService;
     private final WorkRequestTypeService workRequestTypeService;
     private final WorkOrderTypeTemplateRepository workOrderTypeTemplateRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
         WorkOrderStatus.APPROVED
 );
-private static final int DEFAULT_GEOFENCE_RADIUS_METERS = 2;
+private static final int DEFAULT_GEOFENCE_RADIUS_METERS = 100;
 private static final Set<WorkOrderStatus> BOOKING_CONFLICT_STATUSES = Set.of(
         WorkOrderStatus.SCHEDULED,
         WorkOrderStatus.ON_THE_WAY,
@@ -1280,12 +1283,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     "Only in-progress work orders can be completed by technicians");
         }
 
-        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
-        if (!openLogs.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Check out all technicians before completing the work order");
-        }
-
         if (request.getActualStartDateTime() != null) {
             wo.setActualStartDateTime(request.getActualStartDateTime());
         } else if (wo.getActualStartDateTime() == null) {
@@ -1297,6 +1294,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         } else {
             wo.setActualEndDateTime(LocalDateTime.now());
         }
+        LocalDateTime completionAt = wo.getActualEndDateTime();
 
         updateIfNotNull(request.getCompletionNotes(), wo::setCompletionNotes);
         updateIfNotNull(request.getFailureCause(), wo::setFailureCause);
@@ -1305,6 +1303,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         updateIfNotNull(request.getAfterPhotoUrl(), wo::setAfterPhotoUrl);
 
         List<WorkOrderCheckLog> checkLogs = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        finalizeOpenCheckLogsAtCompletion(checkLogs, completionAt);
         Map<Long, BigDecimal> workingHoursByTechnician = computeWorkingHoursByTechnician(checkLogs);
 
         BigDecimal totalLaborHours = BigDecimal.ZERO;
@@ -1357,6 +1356,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         wo.setStatus(WorkOrderStatus.COMPLETED);
 
         WorkOrder saved = workOrderRepository.save(wo);
+        applicationEventPublisher.publishEvent(new WorkOrderCompletedEvent(saved.getId(), saved.getCompanyId()));
         return toDetailsResponse(saved);
     }
 
@@ -1712,6 +1712,70 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             pauses = workOrderPauseLogRepository.findByCheckLog_IdOrderByPauseAtAsc(log.getId());
         }
         return pauses;
+    }
+
+    private void finalizeOpenCheckLogsAtCompletion(List<WorkOrderCheckLog> checkLogs, LocalDateTime completionAt) {
+        if (checkLogs == null || checkLogs.isEmpty() || completionAt == null) {
+            return;
+        }
+
+        for (WorkOrderCheckLog checkLog : checkLogs) {
+            if (checkLog == null) {
+                continue;
+            }
+
+            LocalDateTime checkInAt = checkLog.getCheckInAt();
+            LocalDateTime checkOutAt = checkLog.getCheckOutAt();
+            String logIdentifier = checkLog.getTechnician() != null && checkLog.getTechnician().getId() != null
+                    ? "technicianId: " + checkLog.getTechnician().getId()
+                    : "checkLogId: " + checkLog.getId();
+
+            if (checkOutAt != null) {
+                if (checkOutAt.isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before existing checkOutAt for " + logIdentifier
+                    );
+                }
+                continue;
+            }
+
+            if (checkInAt == null) {
+                continue;
+            }
+            if (completionAt.isBefore(checkInAt)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "actualEndDateTime cannot be before checkInAt for " + logIdentifier
+                );
+            }
+
+            List<WorkOrderPauseLog> pauses = resolvePauseLogs(checkLog);
+            for (WorkOrderPauseLog pause : pauses) {
+                if (pause == null || pause.getPauseAt() == null) {
+                    continue;
+                }
+                if (pause.getPauseAt().isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before pauseAt for " + logIdentifier
+                    );
+                }
+                if (pause.getResumeAt() != null && pause.getResumeAt().isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before resumeAt for " + logIdentifier
+                    );
+                }
+                if (pause.getResumeAt() == null) {
+                    pause.setResumeAt(completionAt);
+                }
+            }
+
+            checkLog.setCheckOutAt(completionAt);
+            workOrderCheckLogRepository.save(checkLog);
+            updateTechnicianDailyWorkSummaries(checkLog);
+        }
     }
 
     private void accumulateLaborHours(WorkOrder wo, WorkOrderCheckLog log) {

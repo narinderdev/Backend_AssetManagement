@@ -42,12 +42,7 @@ public class IotTelemetryIngestService {
                                             String signatureHeader,
                                             String rawBody,
                                             IotTelemetryBatchRequest request) {
-        IotDevice device = deviceRepository.findByDeviceUid(deviceUid)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown device"));
-
-        if (!device.isEnabled()) {
-            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Device is disabled");
-        }
+        IotDevice device = resolveDeviceOrThrow(deviceUid);
 
         long timestamp = parseTimestamp(timestampHeader);
         if (!iotSecurityService.isTimestampWithinWindow(timestamp)) {
@@ -66,6 +61,24 @@ public class IotTelemetryIngestService {
             throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid IoT signature");
         }
 
+        return processTelemetryBatch(device, request);
+    }
+
+    @Transactional
+    public IotTelemetryBatchResponse ingestFromMqtt(String deviceUid,
+                                                    String deviceSecret,
+                                                    IotTelemetryBatchRequest request) {
+        IotDevice device = resolveDeviceOrThrow(deviceUid);
+        if (!iotSecurityService.matchesSecret(deviceSecret, device.getSecretHash())) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Invalid IoT device secret");
+        }
+        return processTelemetryBatch(device, request);
+    }
+
+    private IotTelemetryBatchResponse processTelemetryBatch(IotDevice device, IotTelemetryBatchRequest request) {
+        if (request == null || request.getReadings() == null || request.getReadings().isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "At least one telemetry reading is required");
+        }
         if (request.getReadings().size() > MAX_BATCH_SIZE) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Maximum 500 readings per request");
         }
@@ -131,6 +144,20 @@ public class IotTelemetryIngestService {
                 .build();
     }
 
+    private IotDevice resolveDeviceOrThrow(String rawDeviceUid) {
+        String deviceUid = normalizeOptional(rawDeviceUid);
+        if (deviceUid == null) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown device");
+        }
+
+        IotDevice device = deviceRepository.findByDeviceUid(deviceUid)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Unknown device"));
+        if (!device.isEnabled()) {
+            throw new ResponseStatusException(HttpStatus.UNAUTHORIZED, "Device is disabled");
+        }
+        return device;
+    }
+
     @Transactional
     public int retryPendingAndFailed(int batchSize) {
         List<IotTelemetryLog> logs = telemetryLogRepository.findByIngestStatusInOrderByCreatedAtAsc(
@@ -187,4 +214,3 @@ public class IotTelemetryIngestService {
         return trimmed.isEmpty() ? null : trimmed;
     }
 }
-

@@ -5,6 +5,8 @@ import com.example.eam.Enum.TechnicianStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import java.util.List;
 import java.util.Optional;
 
@@ -52,4 +54,13 @@ public interface TechnicianRepository extends JpaRepository<Technician, Long> {
     default Optional<Technician> findByEmailIgnoreCase(String email) {
         return findByEmailIgnoreCaseAndIsDeletedFalse(email);
     }
+
+    @Query("""
+            select distinct t.companyId
+            from Technician t
+            where lower(t.email) = lower(:email)
+              and t.isDeleted = false
+              and t.companyId is not null
+            """)
+    List<Long> findDistinctCompanyIdsByEmailIgnoreCase(@Param("email") String email);
 }
