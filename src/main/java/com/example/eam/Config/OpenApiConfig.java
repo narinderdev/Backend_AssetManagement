@@ -19,12 +19,16 @@ import java.util.List;
 public class OpenApiConfig {
 
     private static final String SECURITY_SCHEME_NAME = "BearerAuth";
+    private static final List<String> PUBLIC_NO_AUTH_PATHS = List.of(
+            "/api/voice-ai/intake"
+    );
     private static final List<String> COMPANY_ID_EXCLUDED_PREFIXES = List.of(
             "/api/companies",
             "/api/permissions",
             "/api/roles",
             "/api/security-dashboard",
-            "/api/mfa"
+            "/api/mfa",
+            "/api/voice-ai"
     );
 
     @Bean
@@ -68,6 +72,21 @@ public class OpenApiConfig {
                         operation.addParametersItem(buildCompanyIdParameter());
                     }
                 }
+            });
+        };
+    }
+
+    @Bean
+    public OpenApiCustomizer publicEndpointsSecurityCustomizer() {
+        return openApi -> {
+            if (openApi.getPaths() == null) {
+                return;
+            }
+            openApi.getPaths().forEach((path, pathItem) -> {
+                if (!PUBLIC_NO_AUTH_PATHS.contains(path) || pathItem == null) {
+                    return;
+                }
+                pathItem.readOperations().forEach(operation -> operation.setSecurity(List.of()));
             });
         };
     }

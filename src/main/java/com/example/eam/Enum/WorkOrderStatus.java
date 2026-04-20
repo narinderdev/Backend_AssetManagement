@@ -5,6 +5,8 @@ public enum WorkOrderStatus {
     APPROVED,
     REJECTED,
     SCHEDULED,
+    ON_THE_WAY,
+    ARRIVED,
     IN_PROGRESS,
     COMPLETED,
     CLOSED

@@ -2,6 +2,7 @@ package com.example.eam.Config;
 
 import com.example.eam.Common.ApiResponse;
 import com.example.eam.Common.CompanyContextHolder;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import com.example.eam.User.repository.UserCompanyRepository;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import jakarta.servlet.http.HttpServletRequest;
@@ -21,6 +22,9 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CompanyContextInterceptor implements HandlerInterceptor {
 
+    private static final String VOICE_AI_INTAKE_PATH = "/api/voice-ai/intake";
+    private static final long VOICE_AI_DEFAULT_COMPANY_ID = 2L;
+
     private static final List<String> EXCLUDED_PREFIXES = List.of(
             "/api/companies",
             "/api/permissions",
@@ -30,6 +34,7 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
     private final ObjectMapper objectMapper;
     private final UserCompanyRepository userCompanyRepository;
+    private final TechnicianRepository technicianRepository;
 
     @Override
     public boolean preHandle(HttpServletRequest request, HttpServletResponse response, Object handler) throws Exception {
@@ -39,6 +44,11 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
         String path = request.getRequestURI();
         if (path == null || !path.startsWith("/api/") || isExcluded(path)) {
+            return true;
+        }
+
+        if (isVoiceAiIntakePath(path)) {
+            CompanyContextHolder.setCompanyId(VOICE_AI_DEFAULT_COMPANY_ID);
             return true;
         }
 
@@ -72,6 +82,9 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
                 companyId
         );
         if (!allowed) {
+            allowed = technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(userEmail, companyId);
+        }
+        if (!allowed) {
             writeError(response, HttpStatus.FORBIDDEN, "You are not assigned to this company");
             return false;
         }
@@ -87,6 +100,10 @@ public class CompanyContextInterceptor implements HandlerInterceptor {
 
     private boolean isExcluded(String path) {
         return EXCLUDED_PREFIXES.stream().anyMatch(path::startsWith);
+    }
+
+    private boolean isVoiceAiIntakePath(String path) {
+        return VOICE_AI_INTAKE_PATH.equals(path) || (VOICE_AI_INTAKE_PATH + "/").equals(path);
     }
 
     private String resolveCurrentUserEmail() {

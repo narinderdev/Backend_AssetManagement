@@ -19,6 +19,7 @@ public interface AssetRepository extends JpaRepository<Asset, Long> {
 
     boolean existsByAssetId(String assetId);
     Optional<Asset> findByIdAndCompanyId(Long id, Long companyId);
+    Optional<Asset> findFirstByAssetIdAndCompanyId(String assetId, Long companyId);
     Page<Asset> findByCompanyId(Long companyId, Pageable pageable);
 
     List<Asset> findByAssetCategory_Name(String assetCategory);

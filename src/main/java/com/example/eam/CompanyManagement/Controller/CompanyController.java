@@ -23,6 +23,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/companies")
 @RequiredArgsConstructor
@@ -62,6 +64,18 @@ public class CompanyController {
                         HttpStatus.OK.value(),
                         "Companies fetched successfully",
                         PageResponse.from(data)
+                )
+        );
+    }
+
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<ApiResponse<List<CompanyResponse>>> listCompaniesByUserId(@PathVariable Long userId) {
+        List<CompanyResponse> data = companyService.listCompaniesByUserId(userId);
+        return ResponseEntity.ok(
+                ApiResponse.successResponse(
+                        HttpStatus.OK.value(),
+                        "Companies fetched successfully",
+                        data
                 )
         );
     }

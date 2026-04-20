@@ -30,6 +30,7 @@ import com.example.eam.Enum.SecurityEventType;
 import com.example.eam.Enum.SecurityTargetType;
 import com.example.eam.Security.Entity.SecurityEvent;
 import com.example.eam.Security.Repository.SecurityEventRepository;
+import com.example.eam.Technician.Repository.TechnicianRepository;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 
@@ -49,6 +50,7 @@ public class UserService {
     private final UserRoleRepository userRoleRepository;
     private final UserCompanyRepository userCompanyRepository;
     private final CompanyRepository companyRepository;
+    private final TechnicianRepository technicianRepository;
     private final PasswordEncoder passwordEncoder;
     private final SecurityEventRepository securityEventRepository;
 
@@ -64,10 +66,14 @@ public class UserService {
             String password = dto.getPassword();
             String email = dto.getEmail().trim().toLowerCase();
 
-            // Check if the user already exists
             Optional<Users> existingUser = usersRepository.findByEmailAndDeletedFalse(email);
+            Users savedUser = existingUser.orElse(null);
             if (existingUser.isPresent()) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists with this email");
+                Users existing = existingUser.get();
+                boolean alreadyMapped = userCompanyRepository.existsByUser_IdAndCompany_Id(existing.getId(), resolvedCompanyId);
+                if (alreadyMapped) {
+                    throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists in this company");
+                }
             }
 
             // Enforce single Admin assignment
@@ -80,29 +86,32 @@ public class UserService {
             // Assign Admin role to the new user
             Role ownerRole = resolveOrSeedCompanyAdminRole(resolvedCompanyId);
 
-            // Create the user object and assign the role
-            Users newUser = new Users();
-            newUser.setFirstName(firstName);
-            newUser.setLastName(lastName);
-            newUser.setEmail(email);
-            newUser.setStatus(UserStatus.ACTIVE);
-            newUser.setDeleted(false);
-            newUser.setPassword(passwordEncoder.encode(password));
-            newUser.setUpdatedAt(Instant.now());
-            
+            if (savedUser == null) {
+                // Create the user object and assign the role
+                Users newUser = new Users();
+                newUser.setFirstName(firstName);
+                newUser.setLastName(lastName);
+                newUser.setEmail(email);
+                newUser.setStatus(UserStatus.ACTIVE);
+                newUser.setDeleted(false);
+                newUser.setPassword(passwordEncoder.encode(password));
+                newUser.setUpdatedAt(Instant.now());
+                
 
-            // Save the user
-            Users savedUser = usersRepository.save(newUser);  // This should now correctly insert into the user_roles join table
+                // Save the user
+                savedUser = usersRepository.save(newUser);
+            }
 
 
             // Create the UserRole object to link the user with the role
-            UserRole userRole = UserRole.builder()
-                    .user(savedUser)
-                    .role(ownerRole)
-                    .build();
-
-            // Save the UserRole to establish the relationship between the user and the role
-            userRoleRepository.save(userRole);
+            if (!userRoleRepository.existsByUser_IdAndRole_Id(savedUser.getId(), ownerRole.getId())) {
+                UserRole userRole = UserRole.builder()
+                        .user(savedUser)
+                        .role(ownerRole)
+                        .build();
+                // Save the UserRole to establish the relationship between the user and the role
+                userRoleRepository.save(userRole);
+            }
 
             if (dto.getCompanyIds() != null && !dto.getCompanyIds().isEmpty()
                     && !new HashSet<>(dto.getCompanyIds()).contains(resolvedCompanyId)) {
@@ -211,14 +220,22 @@ public class UserService {
         }
 
         private void syncUserCompanies(Users user, List<Long> companyIds) {
-            userCompanyRepository.deleteByUser_Id(user.getId());
-
             if (companyIds == null || companyIds.isEmpty()) {
                 return;
             }
 
+            java.util.Set<Long> existingCompanyIds = userCompanyRepository.findByUser_Id(user.getId())
+                    .stream()
+                    .map(UserCompany::getCompany)
+                    .filter(java.util.Objects::nonNull)
+                    .map(Company::getId)
+                    .collect(java.util.stream.Collectors.toSet());
+
             for (Long companyId : new HashSet<>(companyIds)) {
                 if (companyId == null) {
+                    continue;
+                }
+                if (existingCompanyIds.contains(companyId)) {
                     continue;
                 }
                 Company company = companyRepository.findById(companyId)
@@ -229,6 +246,7 @@ public class UserService {
                         .user(user)
                         .company(company)
                         .build());
+                existingCompanyIds.add(companyId);
             }
         }
 
@@ -258,6 +276,9 @@ public class UserService {
                 return;
             }
             boolean allowed = userCompanyRepository.existsActiveMapping(currentEmail, companyId);
+            if (!allowed) {
+                allowed = technicianRepository.existsByEmailIgnoreCaseAndIsDeletedFalseAndCompanyId(currentEmail, companyId);
+            }
             if (!allowed) {
                 throw new ResponseStatusException(HttpStatus.FORBIDDEN, "You are not assigned to this company");
             }

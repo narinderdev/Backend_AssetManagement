@@ -291,7 +291,12 @@ public class TechnicianTeamService {
                 CompanyContextHolder.getCompanyId().orElse(null),
                 start,
                 end,
-                EnumSet.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                EnumSet.of(
+                        WorkOrderStatus.SCHEDULED,
+                        WorkOrderStatus.ON_THE_WAY,
+                        WorkOrderStatus.ARRIVED,
+                        WorkOrderStatus.IN_PROGRESS
+                )
         );
         return bookings.isEmpty() ? "Available" : "Unavailable";
     }

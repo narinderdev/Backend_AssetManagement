@@ -68,26 +68,25 @@ public class InvitationService {
         String email = request.getEmail().trim().toLowerCase();
 
         Optional<Users> existingOpt = usersRepository.findByEmail(email);
-
-        if (existingOpt.isPresent()) {
-            Users existing = existingOpt.get();
-            if (!existing.isDeleted() && existing.getStatus() != UserStatus.INVITED) {
-                throw new ResponseStatusException(HttpStatus.CONFLICT, "User already exists with this email");
-            }
-        }
+        Users existing = existingOpt.orElse(null);
+        boolean requiresInviteActivation = existing == null
+                || existing.isDeleted()
+                || existing.getStatus() == null
+                || existing.getStatus() == UserStatus.INVITED;
 
         Users user = existingOpt.orElseGet(Users::new);
         user.setFirstName(request.getFirstName());
         user.setLastName(request.getLastName());
         user.setEmail(email);
-        user.setStatus(UserStatus.INVITED);
         user.setDeleted(false);
-        user.setPassword(null);
+        if (requiresInviteActivation) {
+            user.setStatus(UserStatus.INVITED);
+            user.setPassword(null);
+        }
 
         Users saved = usersRepository.save(user);
 
-        // reset role links then add requested roles
-        userRoleRepository.deleteByUserId(saved.getId());
+        // Preserve existing roles and add requested ones.
         Set<Long> uniqueRoleIds = new HashSet<>(request.getRoleIds());
         List<UserRoleAssignmentResponse.RoleAssignment> assignedRoles = new ArrayList<>();
         boolean technicianRoleAssigned = false;
@@ -117,10 +116,12 @@ public class InvitationService {
                     throw new ResponseStatusException(HttpStatus.CONFLICT, "Admin role is already assigned to another user");
                 }
             }
-            userRoleRepository.save(UserRole.builder()
-                    .user(saved)
-                    .role(role)
-                    .build());
+            if (!userRoleRepository.existsByUser_IdAndRole_Id(saved.getId(), role.getId())) {
+                userRoleRepository.save(UserRole.builder()
+                        .user(saved)
+                        .role(role)
+                        .build());
+            }
             technicianRoleAssigned = technicianRoleAssigned || role.isTechnicianRole();
             assignedRoles.add(UserRoleAssignmentResponse.RoleAssignment.builder()
                     .id(role.getId())
@@ -134,19 +135,33 @@ public class InvitationService {
                 ? ensureTechnicianProfile(saved)
                 : null;
 
-        String inviteLink = buildInviteLink(email);
-        String emailHtml = emailTemplateService.buildInviteEmail(
-                Optional.ofNullable(user.getFirstName()).orElse("there"),
-                applicationName,
-                inviteLink
-        );
+        if (requiresInviteActivation) {
+            String inviteLink = buildInviteLink(email);
+            String emailHtml = emailTemplateService.buildInviteEmail(
+                    Optional.ofNullable(user.getFirstName()).orElse("there"),
+                    applicationName,
+                    inviteLink
+            );
 
-        emailService.sendWithAttachment(
-                email,
-                "You're invited to join " + applicationName,
-                emailHtml,
-                null
-        );
+            emailService.sendWithAttachment(
+                    email,
+                    "You're invited to join " + applicationName,
+                    emailHtml,
+                    null
+            );
+        } else {
+            String emailHtml = """
+                    <p>Hello %s,</p>
+                    <p>Your account access has been updated in %s.</p>
+                    <p>You can now access additional company data based on your new assignments.</p>
+                    """.formatted(Optional.ofNullable(user.getFirstName()).orElse("there"), applicationName);
+            emailService.sendWithAttachment(
+                    email,
+                    "Access updated for " + applicationName,
+                    emailHtml,
+                    null
+            );
+        }
 
         return UserRoleAssignmentResponse.builder()
                 .userId(saved.getId())
@@ -160,15 +175,23 @@ public class InvitationService {
     }
 
     private void syncUserCompanies(Users user, List<Long> companyIds) {
-        userCompanyRepository.deleteByUser_Id(user.getId());
-
         if (companyIds == null || companyIds.isEmpty()) {
             return;
         }
 
+        Set<Long> existingCompanyIds = userCompanyRepository.findByUser_Id(user.getId())
+                .stream()
+                .map(UserCompany::getCompany)
+                .filter(java.util.Objects::nonNull)
+                .map(Company::getId)
+                .collect(java.util.stream.Collectors.toSet());
+
         Set<Long> uniqueCompanyIds = new HashSet<>(companyIds);
         for (Long companyId : uniqueCompanyIds) {
             if (companyId == null) {
+                continue;
+            }
+            if (existingCompanyIds.contains(companyId)) {
                 continue;
             }
             Company company = companyRepository.findById(companyId)
@@ -179,6 +202,7 @@ public class InvitationService {
                     .user(user)
                     .company(company)
                     .build());
+            existingCompanyIds.add(companyId);
         }
     }
 

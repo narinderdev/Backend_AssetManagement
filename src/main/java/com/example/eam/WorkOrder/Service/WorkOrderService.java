@@ -33,12 +33,14 @@ import com.example.eam.WorkOrder.Entity.WorkOrderLaborEntry;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialPlan;
 import com.example.eam.WorkOrder.Entity.WorkOrderMaterialUsage;
 import com.example.eam.WorkOrder.Entity.WorkOrderCheckLog;
+import com.example.eam.WorkOrder.Entity.WorkOrderLocationLog;
 import com.example.eam.WorkOrder.Entity.WorkOrderPauseLog;
 import com.example.eam.WorkOrder.Repository.WorkOrderLaborEntryRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialPlanRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderMaterialUsageRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderCheckLogRepository;
+import com.example.eam.WorkOrder.Repository.WorkOrderLocationLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderPauseLogRepository;
 import com.example.eam.WorkOrder.Repository.WorkOrderChecklistItemRepository;
 import com.example.eam.WorkOrder.Dto.WorkOrderPauseWindowResponse;
@@ -50,8 +52,10 @@ import com.example.eam.WorkOrder.Entity.WorkOrderTypeTemplate;
 import com.example.eam.WorkRequestType.Entity.WorkRequestType;
 import com.example.eam.WorkRequestType.Service.WorkRequestTypeService;
 import com.example.eam.WorkOrder.Service.WoNumberPoolService;
+import com.example.eam.WorkOrder.Event.WorkOrderCompletedEvent;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.context.ApplicationEventPublisher;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -103,23 +107,34 @@ public class WorkOrderService {
     private final WorkOrderMaterialPlanRepository workOrderMaterialPlanRepository;
     private final InventoryAuditLogService inventoryAuditLogService;
     private final WorkOrderCheckLogRepository workOrderCheckLogRepository;
+    private final WorkOrderLocationLogRepository workOrderLocationLogRepository;
     private final WorkOrderPauseLogRepository workOrderPauseLogRepository;
     private final EmergencyIncidentRepository emergencyIncidentRepository;
     private final NotificationService notificationService;
     private final WoNumberPoolService woNumberPoolService;
     private final WorkRequestTypeService workRequestTypeService;
     private final WorkOrderTypeTemplateRepository workOrderTypeTemplateRepository;
+    private final ApplicationEventPublisher applicationEventPublisher;
 
 private static final Set<WorkOrderStatus> CREATION_ALLOWED_STATUSES = Set.of(
         WorkOrderStatus.NEW,
         WorkOrderStatus.APPROVED
+);
+private static final int DEFAULT_GEOFENCE_RADIUS_METERS = 100;
+private static final Set<WorkOrderStatus> BOOKING_CONFLICT_STATUSES = Set.of(
+        WorkOrderStatus.SCHEDULED,
+        WorkOrderStatus.ON_THE_WAY,
+        WorkOrderStatus.ARRIVED,
+        WorkOrderStatus.IN_PROGRESS
 );
 private static final BigDecimal MIN_BILLABLE_HOURS = new BigDecimal("0.01");
 
 private static final Map<WorkOrderStatus, Set<WorkOrderStatus>> STATUS_TRANSITIONS = Map.of(
         WorkOrderStatus.NEW, Set.of(WorkOrderStatus.APPROVED, WorkOrderStatus.REJECTED),
         WorkOrderStatus.APPROVED, Set.of(WorkOrderStatus.SCHEDULED),
-        WorkOrderStatus.SCHEDULED, Set.of(WorkOrderStatus.IN_PROGRESS),
+        WorkOrderStatus.SCHEDULED, Set.of(WorkOrderStatus.ON_THE_WAY, WorkOrderStatus.ARRIVED, WorkOrderStatus.IN_PROGRESS),
+        WorkOrderStatus.ON_THE_WAY, Set.of(WorkOrderStatus.ARRIVED, WorkOrderStatus.IN_PROGRESS),
+        WorkOrderStatus.ARRIVED, Set.of(WorkOrderStatus.IN_PROGRESS),
         WorkOrderStatus.IN_PROGRESS, Set.of(WorkOrderStatus.COMPLETED),
         WorkOrderStatus.COMPLETED, Set.of(WorkOrderStatus.CLOSED),
         WorkOrderStatus.REJECTED, Set.of()
@@ -598,8 +613,11 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
     @Transactional
     public WorkOrderDetailsResponse markInProgress(Long id, WorkOrderInProgressRequest request) {
         WorkOrder wo = getWorkOrderOrThrow(id);
-        if (wo.getStatus() != WorkOrderStatus.SCHEDULED) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Only SCHEDULED work orders can be moved to IN_PROGRESS");
+        if (wo.getStatus() != WorkOrderStatus.SCHEDULED
+                && wo.getStatus() != WorkOrderStatus.ON_THE_WAY
+                && wo.getStatus() != WorkOrderStatus.ARRIVED) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT,
+                    "Only SCHEDULED, ON_THE_WAY, or ARRIVED work orders can be moved to IN_PROGRESS");
         }
 
         if (request != null && request.getActualStartDateTime() != null) {
@@ -612,6 +630,168 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
 
         WorkOrder saved = workOrderRepository.save(wo);
         return toDetailsResponse(saved);
+    }
+
+    @Transactional
+    public WorkOrderLocationEventResponse ingestLocationEvent(Long id, WorkOrderLocationEventRequest request) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Location event payload is required");
+        }
+
+        WorkOrder wo = getWorkOrderOrThrow(id);
+        Technician technician = resolveTechnician(request.getTechnicianId());
+        TechnicianTeam team = resolveTeam(request.getTeamId());
+
+        TechnicianTeam assignedTeam = wo.getAssignedTeam();
+        if (assignedTeam != null) {
+            if (team == null) {
+                team = assignedTeam;
+            } else if (!assignedTeam.getId().equals(team.getId())) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Team must match the work order assigned team");
+            }
+        }
+        if (wo.getAssignedTechnician() != null
+                && !wo.getAssignedTechnician().getId().equals(technician.getId())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician must match the work order assignment");
+        }
+        if (team != null) {
+            boolean member = getTeamMembers(team).stream()
+                    .anyMatch(t -> t.getId().equals(technician.getId()));
+            if (!member) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Technician is not part of the specified team");
+            }
+        }
+
+        LocalDateTime observedAt = request.getObservedAt() != null
+                ? request.getObservedAt().truncatedTo(ChronoUnit.SECONDS)
+                : LocalDateTime.now().truncatedTo(ChronoUnit.SECONDS);
+
+        WorkOrderStatus statusBefore = wo.getStatus();
+        WorkOrderStatus statusAfter = statusBefore;
+        BigDecimal distanceMeters = null;
+        boolean insideGeofence = false;
+        WorkOrderGeofenceEventType eventType = WorkOrderGeofenceEventType.NO_ASSET_COORDINATES;
+        boolean autoCheckIn = false;
+        boolean autoCheckOut = false;
+
+        AssetLocation assetLocation = resolveAssetLocation(wo);
+        BigDecimal assetLat = assetLocation != null ? assetLocation.getLatitude() : null;
+        BigDecimal assetLon = assetLocation != null ? assetLocation.getLongitude() : null;
+
+        if (assetLat != null && assetLon != null) {
+            distanceMeters = calculateDistanceMeters(
+                    request.getLatitude(),
+                    request.getLongitude(),
+                    assetLat,
+                    assetLon
+            ).setScale(2, RoundingMode.HALF_UP);
+            insideGeofence = distanceMeters.compareTo(BigDecimal.valueOf(DEFAULT_GEOFENCE_RADIUS_METERS)) <= 0;
+
+            java.util.Optional<WorkOrderLocationLog> previousLogOpt = workOrderLocationLogRepository
+                    .findTopByWorkOrder_IdAndTechnician_IdOrderByObservedAtDescIdDesc(id, technician.getId());
+
+            eventType = resolveGeofenceEventType(
+                    previousLogOpt.map(WorkOrderLocationLog::isInsideGeofence).orElse(null),
+                    insideGeofence
+            );
+
+            if (!insideGeofence && wo.getStatus() == WorkOrderStatus.SCHEDULED) {
+                transitionWorkOrderStatus(wo, WorkOrderStatus.ON_THE_WAY);
+            }
+
+            boolean hasOpenCheckIn = workOrderCheckLogRepository
+                    .findFirstByWorkOrder_IdAndTechnician_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(id, technician.getId())
+                    .isPresent();
+
+            if (insideGeofence && !hasOpenCheckIn && isCheckFlowAllowedStatus(wo.getStatus())) {
+                try {
+                    autoCheckInByAssignment(wo, technician, team, observedAt);
+                    autoCheckIn = true;
+                    hasOpenCheckIn = true;
+                } catch (ResponseStatusException ex) {
+                    log.warn("Auto check-in skipped for workOrder {} technician {}: {}",
+                            wo.getId(), technician.getId(), ex.getReason());
+                }
+            }
+
+            if (insideGeofence
+                    && hasOpenCheckIn
+                    && (wo.getStatus() == WorkOrderStatus.SCHEDULED
+                    || wo.getStatus() == WorkOrderStatus.ON_THE_WAY)) {
+                try {
+                    WorkOrderInProgressRequest inProgressRequest = new WorkOrderInProgressRequest();
+                    inProgressRequest.setActualStartDateTime(observedAt);
+                    markInProgress(id, inProgressRequest);
+                    wo = getWorkOrderOrThrow(id);
+                } catch (ResponseStatusException ex) {
+                    log.warn("Auto in-progress skipped for workOrder {}: {}", wo.getId(), ex.getReason());
+                }
+            }
+
+            boolean shouldAutoCheckOut = eventType == WorkOrderGeofenceEventType.EXITED_SITE
+                    && workOrderCheckLogRepository.findFirstByWorkOrder_IdAndTechnician_IdAndCheckOutAtIsNullOrderByCheckInAtDesc(
+                    id, technician.getId()).isPresent()
+                    && isCheckFlowAllowedStatus(wo.getStatus());
+
+            if (shouldAutoCheckOut) {
+                try {
+                    autoCheckOutByAssignment(wo, technician, team, observedAt);
+                    autoCheckOut = true;
+                } catch (ResponseStatusException ex) {
+                    log.warn("Auto check-out skipped for workOrder {} technician {}: {}",
+                            wo.getId(), technician.getId(), ex.getReason());
+                }
+            }
+
+            wo = getWorkOrderOrThrow(id);
+            statusAfter = wo.getStatus();
+        }
+
+        WorkOrderLocationLog savedLog = workOrderLocationLogRepository.save(
+                WorkOrderLocationLog.builder()
+                        .companyId(wo.getCompanyId())
+                        .workOrder(wo)
+                        .technician(technician)
+                        .team(team)
+                        .latitude(request.getLatitude())
+                        .longitude(request.getLongitude())
+                        .observedAt(observedAt)
+                        .distanceMeters(distanceMeters)
+                        .geofenceRadiusMeters(DEFAULT_GEOFENCE_RADIUS_METERS)
+                        .insideGeofence(insideGeofence)
+                        .eventType(eventType)
+                        .statusBefore(statusBefore)
+                        .statusAfter(statusAfter)
+                        .autoCheckIn(autoCheckIn)
+                        .autoCheckOut(autoCheckOut)
+                        .build()
+        );
+
+        return WorkOrderLocationEventResponse.builder()
+                .locationLogId(savedLog.getId())
+                .workOrderDbId(wo.getId())
+                .workOrderId(wo.getWorkOrderId())
+                .technicianId(technician.getId())
+                .teamId(team != null ? team.getId() : null)
+                .latitude(request.getLatitude())
+                .longitude(request.getLongitude())
+                .observedAt(observedAt)
+                .geofenceRadiusMeters(DEFAULT_GEOFENCE_RADIUS_METERS)
+                .distanceMeters(distanceMeters)
+                .insideGeofence(insideGeofence)
+                .eventType(eventType)
+                .statusBefore(statusBefore)
+                .statusAfter(statusAfter)
+                .autoCheckIn(autoCheckIn)
+                .autoCheckOut(autoCheckOut)
+                .build();
+    }
+
+    @Transactional
+    public long purgeGeofenceLocationLogsOlderThanDays(int retentionDays) {
+        int effectiveRetentionDays = Math.max(1, retentionDays);
+        LocalDateTime threshold = LocalDateTime.now().minusDays(effectiveRetentionDays);
+        return workOrderLocationLogRepository.deleteByObservedAtBefore(threshold);
     }
 
     @Transactional(readOnly = true)
@@ -1103,12 +1283,6 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                     "Only in-progress work orders can be completed by technicians");
         }
 
-        List<WorkOrderCheckLog> openLogs = workOrderCheckLogRepository.findByWorkOrder_IdAndCheckOutAtIsNull(id);
-        if (!openLogs.isEmpty()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT,
-                    "Check out all technicians before completing the work order");
-        }
-
         if (request.getActualStartDateTime() != null) {
             wo.setActualStartDateTime(request.getActualStartDateTime());
         } else if (wo.getActualStartDateTime() == null) {
@@ -1120,6 +1294,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         } else {
             wo.setActualEndDateTime(LocalDateTime.now());
         }
+        LocalDateTime completionAt = wo.getActualEndDateTime();
 
         updateIfNotNull(request.getCompletionNotes(), wo::setCompletionNotes);
         updateIfNotNull(request.getFailureCause(), wo::setFailureCause);
@@ -1128,6 +1303,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         updateIfNotNull(request.getAfterPhotoUrl(), wo::setAfterPhotoUrl);
 
         List<WorkOrderCheckLog> checkLogs = workOrderCheckLogRepository.findByWorkOrder_Id(wo.getId());
+        finalizeOpenCheckLogsAtCompletion(checkLogs, completionAt);
         Map<Long, BigDecimal> workingHoursByTechnician = computeWorkingHoursByTechnician(checkLogs);
 
         BigDecimal totalLaborHours = BigDecimal.ZERO;
@@ -1180,6 +1356,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
         wo.setStatus(WorkOrderStatus.COMPLETED);
 
         WorkOrder saved = workOrderRepository.save(wo);
+        applicationEventPublisher.publishEvent(new WorkOrderCompletedEvent(saved.getId(), saved.getCompanyId()));
         return toDetailsResponse(saved);
     }
 
@@ -1358,6 +1535,107 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 .orElse(null);
     }
 
+    private AssetLocation resolveAssetLocation(WorkOrder wo) {
+        if (wo == null || wo.getAsset() == null || wo.getAsset().getId() == null) {
+            return null;
+        }
+        return assetLocationRepository.findByAsset_Id(wo.getAsset().getId()).orElse(null);
+    }
+
+    private BigDecimal calculateDistanceMeters(BigDecimal technicianLat,
+                                               BigDecimal technicianLon,
+                                               BigDecimal assetLat,
+                                               BigDecimal assetLon) {
+        double lat1 = Math.toRadians(technicianLat.doubleValue());
+        double lon1 = Math.toRadians(technicianLon.doubleValue());
+        double lat2 = Math.toRadians(assetLat.doubleValue());
+        double lon2 = Math.toRadians(assetLon.doubleValue());
+
+        double dLat = lat2 - lat1;
+        double dLon = lon2 - lon1;
+
+        double a = Math.sin(dLat / 2) * Math.sin(dLat / 2)
+                + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        double c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        double meters = 6371000d * c;
+        return BigDecimal.valueOf(meters);
+    }
+
+    private WorkOrderGeofenceEventType resolveGeofenceEventType(Boolean previousInside, boolean insideNow) {
+        if (previousInside == null) {
+            return insideNow ? WorkOrderGeofenceEventType.ENTERED_SITE : WorkOrderGeofenceEventType.OUTSIDE;
+        }
+        if (!previousInside && insideNow) {
+            return WorkOrderGeofenceEventType.ENTERED_SITE;
+        }
+        if (previousInside && !insideNow) {
+            return WorkOrderGeofenceEventType.EXITED_SITE;
+        }
+        return insideNow ? WorkOrderGeofenceEventType.INSIDE : WorkOrderGeofenceEventType.OUTSIDE;
+    }
+
+    private void transitionWorkOrderStatus(WorkOrder wo, WorkOrderStatus newStatus) {
+        if (wo == null || newStatus == null || wo.getStatus() == newStatus) {
+            return;
+        }
+        validateStatusTransition(wo.getStatus(), newStatus);
+        handleStatusSideEffects(wo, newStatus);
+        wo.setStatus(newStatus);
+    }
+
+    private boolean isCheckFlowAllowedStatus(WorkOrderStatus status) {
+        return status != WorkOrderStatus.CLOSED && status != WorkOrderStatus.REJECTED;
+    }
+
+    private void autoCheckInByAssignment(WorkOrder wo,
+                                         Technician technician,
+                                         TechnicianTeam team,
+                                         LocalDateTime observedAt) {
+        if (wo.getAssignedTeam() != null) {
+            WorkOrderTeamCheckInEntry entry = new WorkOrderTeamCheckInEntry();
+            entry.setTechnicianId(technician.getId());
+            entry.setCheckInAt(observedAt);
+            entry.setNotes("Auto check-in via geofence");
+
+            WorkOrderTeamCheckInRequest teamRequest = new WorkOrderTeamCheckInRequest();
+            teamRequest.setTeamId(wo.getAssignedTeam().getId());
+            teamRequest.setTechnicians(List.of(entry));
+            teamCheckIn(wo.getId(), teamRequest);
+            return;
+        }
+
+        WorkOrderCheckInRequest request = new WorkOrderCheckInRequest();
+        request.setTechnicianId(technician.getId());
+        request.setTeamId(team != null ? team.getId() : null);
+        request.setCheckInAt(observedAt);
+        request.setNotes("Auto check-in via geofence");
+        checkIn(wo.getId(), request);
+    }
+
+    private void autoCheckOutByAssignment(WorkOrder wo,
+                                          Technician technician,
+                                          TechnicianTeam team,
+                                          LocalDateTime observedAt) {
+        if (wo.getAssignedTeam() != null) {
+            WorkOrderTeamCheckOutEntry entry = new WorkOrderTeamCheckOutEntry();
+            entry.setTechnicianId(technician.getId());
+            entry.setCheckOutAt(observedAt);
+            entry.setNotes("Auto check-out via geofence");
+
+            WorkOrderTeamCheckOutRequest teamRequest = new WorkOrderTeamCheckOutRequest();
+            teamRequest.setTeamId(wo.getAssignedTeam().getId());
+            teamRequest.setTechnicians(List.of(entry));
+            teamCheckOut(wo.getId(), teamRequest);
+            return;
+        }
+
+        WorkOrderCheckOutRequest request = new WorkOrderCheckOutRequest();
+        request.setTechnicianId(technician.getId());
+        request.setCheckOutAt(observedAt);
+        request.setNotes("Auto check-out via geofence");
+        checkOut(wo.getId(), request);
+    }
+
     private String generateUniqueWorkOrderId() {
         String datePart = LocalDate.now().format(DateTimeFormatter.BASIC_ISO_DATE); // YYYYMMDD
 
@@ -1434,6 +1712,70 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
             pauses = workOrderPauseLogRepository.findByCheckLog_IdOrderByPauseAtAsc(log.getId());
         }
         return pauses;
+    }
+
+    private void finalizeOpenCheckLogsAtCompletion(List<WorkOrderCheckLog> checkLogs, LocalDateTime completionAt) {
+        if (checkLogs == null || checkLogs.isEmpty() || completionAt == null) {
+            return;
+        }
+
+        for (WorkOrderCheckLog checkLog : checkLogs) {
+            if (checkLog == null) {
+                continue;
+            }
+
+            LocalDateTime checkInAt = checkLog.getCheckInAt();
+            LocalDateTime checkOutAt = checkLog.getCheckOutAt();
+            String logIdentifier = checkLog.getTechnician() != null && checkLog.getTechnician().getId() != null
+                    ? "technicianId: " + checkLog.getTechnician().getId()
+                    : "checkLogId: " + checkLog.getId();
+
+            if (checkOutAt != null) {
+                if (checkOutAt.isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before existing checkOutAt for " + logIdentifier
+                    );
+                }
+                continue;
+            }
+
+            if (checkInAt == null) {
+                continue;
+            }
+            if (completionAt.isBefore(checkInAt)) {
+                throw new ResponseStatusException(
+                        HttpStatus.BAD_REQUEST,
+                        "actualEndDateTime cannot be before checkInAt for " + logIdentifier
+                );
+            }
+
+            List<WorkOrderPauseLog> pauses = resolvePauseLogs(checkLog);
+            for (WorkOrderPauseLog pause : pauses) {
+                if (pause == null || pause.getPauseAt() == null) {
+                    continue;
+                }
+                if (pause.getPauseAt().isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before pauseAt for " + logIdentifier
+                    );
+                }
+                if (pause.getResumeAt() != null && pause.getResumeAt().isAfter(completionAt)) {
+                    throw new ResponseStatusException(
+                            HttpStatus.BAD_REQUEST,
+                            "actualEndDateTime cannot be before resumeAt for " + logIdentifier
+                    );
+                }
+                if (pause.getResumeAt() == null) {
+                    pause.setResumeAt(completionAt);
+                }
+            }
+
+            checkLog.setCheckOutAt(completionAt);
+            workOrderCheckLogRepository.save(checkLog);
+            updateTechnicianDailyWorkSummaries(checkLog);
+        }
     }
 
     private void accumulateLaborHours(WorkOrder wo, WorkOrderCheckLog log) {
@@ -1909,7 +2251,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 CompanyContextHolder.getCompanyId().orElse(null),
                 rangeStart,
                 rangeEnd,
-                Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                BOOKING_CONFLICT_STATUSES
         );
 
         List<TimeWindow> bookingWindows = bookings.stream()
@@ -1984,7 +2326,7 @@ public WorkOrderDetailsResponse convertServiceRequestToWorkOrder(Long serviceReq
                 CompanyContextHolder.getCompanyId().orElse(null),
                 rangeStart,
                 rangeEnd,
-                Set.of(WorkOrderStatus.SCHEDULED, WorkOrderStatus.IN_PROGRESS)
+                BOOKING_CONFLICT_STATUSES
         );
 
         List<TimeWindow> bookingWindows = bookings.stream()

@@ -58,3 +58,10 @@ src/main/resources/*firebase-adminsdk*.json
 src/test/
 
 .gradle-user/
+.gradle/
+
+.gradle-user-codex/
+.gradle-user-tmfix/
+.tools/
+
+src/main/java/com/example/tm1/*

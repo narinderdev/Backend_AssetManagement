@@ -78,6 +78,9 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
         while (headerNames.hasMoreElements()) {
             String name = headerNames.nextElement();
             String value = request.getHeader(name);
+            if (isSensitiveHeader(name)) {
+                value = "***";
+            }
             sb.append("Header: ").append(name).append(" = ").append(value).append("\n");
         }
 
@@ -144,7 +147,19 @@ public class RequestResponseLoggingFilter extends OncePerRequestFilter {
                 .replaceAll("\"mfa_token\"\\s*:\\s*\"[^\"]*\"", "\"mfa_token\":\"***\"")
                 .replaceAll("\"code\"\\s*:\\s*\"\\d{6}\"", "\"code\":\"***\"")
                 .replaceAll("\"otp\"\\s*:\\s*\"\\d{4,8}\"", "\"otp\":\"***\"")
+                .replaceAll("\"deviceSecret\"\\s*:\\s*\"[^\"]*\"", "\"deviceSecret\":\"***\"")
                 .replaceAll("\"secret\"\\s*:\\s*\"[^\"]*\"", "\"secret\":\"***\"");
+    }
+
+    private boolean isSensitiveHeader(String name) {
+        if (name == null) {
+            return false;
+        }
+        String normalized = name.trim().toLowerCase();
+        return normalized.equals("authorization")
+                || normalized.equals("x-iot-signature")
+                || normalized.equals("x-iot-device-uid")
+                || normalized.equals("x-iot-nonce");
     }
 }
 

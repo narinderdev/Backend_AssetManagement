@@ -7,6 +7,7 @@ import com.example.eam.User.entity.UserRole;
 
 public interface UserRoleRepository extends JpaRepository<UserRole, Long> {
     void deleteByUserId(Long userId);
+    boolean existsByUser_IdAndRole_Id(Long userId, Long roleId);
 
     long countByRole_NameIgnoreCaseAndUser_DeletedFalse(String roleName);
 

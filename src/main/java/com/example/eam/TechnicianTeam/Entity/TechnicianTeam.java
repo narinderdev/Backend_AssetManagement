@@ -13,9 +13,10 @@ import java.util.List;
 @Table(
         name = "technician_teams",
         uniqueConstraints = @UniqueConstraint(
-                name = "uk_technician_teams_team_name",
-                columnNames = "team_name"
-        )
+                name = "uk_technician_teams_company_team_name",
+                columnNames = {"company_id", "team_name"}
+        ),
+        indexes = @Index(name = "idx_technician_teams_company_id", columnList = "company_id")
 )
 @Getter
 @Setter

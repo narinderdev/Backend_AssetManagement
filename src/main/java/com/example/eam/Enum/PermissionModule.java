@@ -20,6 +20,7 @@ public enum PermissionModule {
     REPORTS,
     MANAGE_USERS,
     MANAGE_ROLES,
-    INVITE_USER
+    INVITE_USER,
+    IOT
 }
 

@@ -44,6 +44,8 @@ public class WorkOrderReportController {
                     WorkOrderStatus.APPROVED,
                     WorkOrderStatus.REJECTED,
                     WorkOrderStatus.SCHEDULED,
+                    WorkOrderStatus.ON_THE_WAY,
+                    WorkOrderStatus.ARRIVED,
                     WorkOrderStatus.IN_PROGRESS,
                     WorkOrderStatus.COMPLETED,
                     WorkOrderStatus.CLOSED
